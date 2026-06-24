@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Almgren Industrier — Budget & Forecast</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="dashboard">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-name">Almgren Industrier</span>
+        <span class="brand-sub">Budget &amp; Forecast — 2026</span>
+      </div>
+      <div class="topbar-right">
+        <button class="theme-toggle" id="themeToggle" aria-label="Toggle light/dark theme">🌙</button>
+        <div class="clock" id="clock">--:--:--</div>
+      </div>
+    </header>
+
+    <section class="stats-row">
+      <div class="stat-card">
+        <span class="stat-label">Annual Budget</span>
+        <span class="stat-value" id="totalBudget">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Actual (YTD)</span>
+        <span class="stat-value" id="actualYTD">0</span>
+        <span class="stat-sub" id="ytdVariance">vs budget —</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Full-Year Forecast</span>
+        <span class="stat-value" id="fullYearForecast">0</span>
+      </div>
+      <div class="stat-card highlight">
+        <span class="stat-label">Forecast vs Budget</span>
+        <span class="stat-value" id="variance">0</span>
+        <span class="stat-sub" id="variancePct">—</span>
+      </div>
+    </section>
+
+    <section class="main-row">
+      <div class="panel chart-panel">
+        <h2>Spend — Budget vs Actual vs Forecast</h2>
+        <canvas id="trendChart"></canvas>
+      </div>
+      <div class="panel reforecast-panel">
+        <h2>Re-forecast Scenario</h2>
+        <div class="reforecast-control">
+          <label for="reforecastSlider">Adjust H2 spend: <span id="reforecastValue">0</span>%</label>
+          <input type="range" id="reforecastSlider" min="-15" max="15" value="0" step="1">
+        </div>
+        <p class="reforecast-hint">Model a re-forecast — e.g. a cost-saving push or an unplanned overrun in the second half — and see the full-year landing point and variance update live.</p>
+      </div>
+    </section>
+
+    <section class="panel table-panel">
+      <h2>Cost Centers</h2>
+      <div class="budget-table" id="budgetTable"></div>
+    </section>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
