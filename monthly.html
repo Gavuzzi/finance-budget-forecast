@@ -3,10 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Almgren Industrier — Budget & Forecast</title>
+<title>Almgren Industrier — Monthly</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -14,8 +13,8 @@
     <aside class="sidebar" id="sidebar"></aside>
     <main class="app-main">
       <header class="page-head">
-        <h1>Overview</h1>
-        <p class="page-sub">Budget &amp; Forecast — FY2026</p>
+        <h1>Monthly</h1>
+        <p class="page-sub">Month-by-month P&amp;L — actual + forecast</p>
       </header>
 
       <section class="lens-controls">
@@ -25,19 +24,12 @@
         </div>
       </section>
 
-      <section class="stats-row" id="statsRow"></section>
+      <p class="table-hint">Figures in mkr. <span class="mt-legend-actual">Solid</span> columns are booked actuals; <span class="mt-legend-forecast">lighter</span> columns are forecast. The accent line marks where actuals end.</p>
 
-      <section class="main-row single">
-        <div class="panel chart-panel">
-          <h2 id="chartTitle">Spend — Budget vs Actual vs Forecast</h2>
-          <canvas id="trendChart"></canvas>
+      <section class="panel">
+        <div class="monthly-wrap">
+          <div id="monthlyGrid"></div>
         </div>
-      </section>
-
-      <section class="panel table-panel">
-        <h2>Cost Centers</h2>
-        <p class="table-hint">Built up from headcount and known costs — edit the drivers on the <a href="planning.html">Planning page</a>.</p>
-        <div class="budget-table" id="budgetTable"></div>
       </section>
     </main>
   </div>
@@ -46,7 +38,7 @@
   <script src="lib.js"></script>
   <script src="data.js"></script>
   <script src="sidebar.js"></script>
-  <script src="script.js"></script>
+  <script src="monthly.js"></script>
   <script>requireAuthAndLoad(() => { renderSidebar(); window.initPage(); });</script>
 </body>
 </html>

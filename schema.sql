@@ -1,0 +1,239 @@
+-- ============================================================================
+-- FP&A Base — Phase 1 schema (multi-tenant, RLS from day one)
+-- Run this in: Supabase Dashboard → SQL Editor → New query → paste → Run.
+-- Safe to re-run: table creation uses IF NOT EXISTS, and the seed is guarded
+-- so it only inserts once.
+-- ============================================================================
+
+-- ---------------------------------------------------------------------------
+-- Tables
+-- Every business table carries org_id. A row belongs to exactly one tenant.
+-- ---------------------------------------------------------------------------
+
+create table if not exists organizations (
+  id                uuid primary key default gen_random_uuid(),
+  name              text not null,
+  close_month       smallint not null default 6,   -- actuals booked through this absolute month (1..24 timeline)
+  currency          text not null default 'SEK',
+  created_at        timestamptz not null default now()
+);
+
+-- Links an auth user to an org with a role. This table IS the multi-tenant boundary.
+create table if not exists memberships (
+  user_id           uuid not null references auth.users(id) on delete cascade,
+  org_id            uuid not null references organizations(id) on delete cascade,
+  role              text not null default 'editor',   -- owner | editor | viewer
+  created_at        timestamptz not null default now(),
+  primary key (user_id, org_id)
+);
+
+-- Per-tenant rate assumptions (one row per org). Feeds the rate engine.
+create table if not exists assumptions (
+  org_id                      uuid primary key references organizations(id) on delete cascade,
+  employer_contribution_pct   numeric not null default 31.42,
+  equipment_monthly           numeric not null default 1200,
+  other_overhead_pct          numeric not null default 4
+);
+
+-- Per-tenant role salary catalog. Loaded cost is DERIVED in app code from base_salary + assumptions.
+create table if not exists roles (
+  id                uuid primary key default gen_random_uuid(),
+  org_id            uuid not null references organizations(id) on delete cascade,
+  label             text not null,
+  base_salary       numeric not null default 0
+);
+
+create table if not exists cost_centers (
+  id                uuid primary key default gen_random_uuid(),
+  org_id            uuid not null references organizations(id) on delete cascade,
+  name              text not null,
+  annual_budget     numeric not null default 0,
+  other_monthly     numeric not null default 0   -- catch-all monthly run-rate (materials, utilities, etc.)
+);
+
+-- A headcount line on the absolute month timeline (hires/leavers/contracts start & stop).
+create table if not exists headcount_lines (
+  id                uuid primary key default gen_random_uuid(),
+  org_id            uuid not null references organizations(id) on delete cascade,
+  cost_center_id    uuid not null references cost_centers(id) on delete cascade,
+  role_id           uuid not null references roles(id) on delete restrict,
+  count             integer not null default 1,    -- negative = leaver
+  start_month       smallint not null,
+  end_month         smallint not null
+);
+
+create table if not exists one_offs (
+  id                uuid primary key default gen_random_uuid(),
+  org_id            uuid not null references organizations(id) on delete cascade,
+  cost_center_id    uuid not null references cost_centers(id) on delete cascade,
+  label             text not null,
+  amount            numeric not null default 0,
+  month             smallint not null
+);
+
+-- Booked actuals per cost center per absolute month (later fed by the ERP import).
+create table if not exists monthly_actual (
+  id                uuid primary key default gen_random_uuid(),
+  org_id            uuid not null references organizations(id) on delete cascade,
+  cost_center_id    uuid not null references cost_centers(id) on delete cascade,
+  month             smallint not null,
+  amount            numeric not null default 0,
+  unique (cost_center_id, month)
+);
+
+-- ---------------------------------------------------------------------------
+-- Row-Level Security: a user can touch a row only if they're a member of its org.
+-- Enabled on EVERY table. The anon key is safe in the browser only because of this.
+-- ---------------------------------------------------------------------------
+
+alter table organizations   enable row level security;
+alter table memberships     enable row level security;
+alter table assumptions     enable row level security;
+alter table roles           enable row level security;
+alter table cost_centers    enable row level security;
+alter table headcount_lines enable row level security;
+alter table one_offs        enable row level security;
+alter table monthly_actual  enable row level security;
+
+-- You can only see your own membership rows.
+drop policy if exists "own memberships" on memberships;
+create policy "own memberships" on memberships for all
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+-- Organizations: visible if you're a member.
+drop policy if exists "org member access" on organizations;
+create policy "org member access" on organizations for all
+  using (id in (select org_id from memberships where user_id = auth.uid()))
+  with check (id in (select org_id from memberships where user_id = auth.uid()));
+
+-- Every other table: access if the row's org is one you belong to.
+-- (Same policy shape repeated per table — explicit on purpose, easy to read.)
+drop policy if exists "member access" on assumptions;
+create policy "member access" on assumptions for all
+  using (org_id in (select org_id from memberships where user_id = auth.uid()))
+  with check (org_id in (select org_id from memberships where user_id = auth.uid()));
+
+drop policy if exists "member access" on roles;
+create policy "member access" on roles for all
+  using (org_id in (select org_id from memberships where user_id = auth.uid()))
+  with check (org_id in (select org_id from memberships where user_id = auth.uid()));
+
+drop policy if exists "member access" on cost_centers;
+create policy "member access" on cost_centers for all
+  using (org_id in (select org_id from memberships where user_id = auth.uid()))
+  with check (org_id in (select org_id from memberships where user_id = auth.uid()));
+
+drop policy if exists "member access" on headcount_lines;
+create policy "member access" on headcount_lines for all
+  using (org_id in (select org_id from memberships where user_id = auth.uid()))
+  with check (org_id in (select org_id from memberships where user_id = auth.uid()));
+
+drop policy if exists "member access" on one_offs;
+create policy "member access" on one_offs for all
+  using (org_id in (select org_id from memberships where user_id = auth.uid()))
+  with check (org_id in (select org_id from memberships where user_id = auth.uid()));
+
+drop policy if exists "member access" on monthly_actual;
+create policy "member access" on monthly_actual for all
+  using (org_id in (select org_id from memberships where user_id = auth.uid()))
+  with check (org_id in (select org_id from memberships where user_id = auth.uid()));
+
+-- ---------------------------------------------------------------------------
+-- Seed: one tenant ("Almgren Industrier") ported from the demo fixtures.
+-- Guarded so re-running the whole file won't duplicate it.
+-- The SQL editor runs as an admin role, so this bypasses RLS (expected).
+-- ---------------------------------------------------------------------------
+
+do $$
+declare
+  v_org uuid := 'a0000000-0000-0000-0000-000000000001';
+  r_prodop  uuid := 'b0000000-0000-0000-0000-000000000001';
+  r_shift   uuid := 'b0000000-0000-0000-0000-000000000002';
+  r_acct    uuid := 'b0000000-0000-0000-0000-000000000003';
+  r_mkt     uuid := 'b0000000-0000-0000-0000-000000000004';
+  r_eng     uuid := 'b0000000-0000-0000-0000-000000000005';
+  r_intern  uuid := 'b0000000-0000-0000-0000-000000000006';
+  r_admin   uuid := 'b0000000-0000-0000-0000-000000000007';
+  r_it      uuid := 'b0000000-0000-0000-0000-000000000008';
+  r_devops  uuid := 'b0000000-0000-0000-0000-000000000009';
+  c_prod    uuid := 'c0000000-0000-0000-0000-000000000001';
+  c_sales   uuid := 'c0000000-0000-0000-0000-000000000002';
+  c_rnd     uuid := 'c0000000-0000-0000-0000-000000000003';
+  c_admin   uuid := 'c0000000-0000-0000-0000-000000000004';
+  c_it      uuid := 'c0000000-0000-0000-0000-000000000005';
+begin
+  if exists (select 1 from organizations where id = v_org) then
+    return; -- already seeded
+  end if;
+
+  insert into organizations (id, name, close_month, currency)
+    values (v_org, 'Almgren Industrier', 6, 'SEK');
+
+  insert into assumptions (org_id, employer_contribution_pct, equipment_monthly, other_overhead_pct)
+    values (v_org, 31.42, 1200, 4);
+
+  insert into roles (id, org_id, label, base_salary) values
+    (r_prodop, v_org, 'Production Operator', 33000),
+    (r_shift,  v_org, 'Shift Supervisor', 42000),
+    (r_acct,   v_org, 'Account Manager', 39000),
+    (r_mkt,    v_org, 'Marketing Coordinator', 29000),
+    (r_eng,    v_org, 'Engineer', 47000),
+    (r_intern, v_org, 'Research Intern', 21000),
+    (r_admin,  v_org, 'Admin & Finance Staff', 33000),
+    (r_it,     v_org, 'IT Support Specialist', 36000),
+    (r_devops, v_org, 'Cloud/DevOps Contractor', 48000);
+
+  insert into cost_centers (id, org_id, name, annual_budget, other_monthly) values
+    (c_prod,  v_org, 'Production', 28000000, 1350000),
+    (c_sales, v_org, 'Sales & Marketing', 12000000, 583000),
+    (c_rnd,   v_org, 'R&D', 9000000, 283000),
+    (c_admin, v_org, 'Administration', 6000000, 250000),
+    (c_it,    v_org, 'IT', 5000000, 166000);
+
+  insert into headcount_lines (org_id, cost_center_id, role_id, count, start_month, end_month) values
+    (v_org, c_prod,  r_prodop, 18, 1, 24),
+    (v_org, c_prod,  r_shift,   1, 9, 24),
+    (v_org, c_sales, r_acct,    5, 1, 24),
+    (v_org, c_sales, r_mkt,     1, 8, 24),
+    (v_org, c_rnd,   r_eng,     6, 1, 24),
+    (v_org, c_rnd,   r_intern,  1, 9, 12),
+    (v_org, c_admin, r_admin,   4, 1, 24),
+    (v_org, c_it,    r_it,      2, 1, 24),
+    (v_org, c_it,    r_devops,  1, 10, 12);
+
+  insert into one_offs (org_id, cost_center_id, label, amount, month) values
+    (v_org, c_prod,  'Press line maintenance overhaul', 650000, 9),
+    (v_org, c_sales, 'Autumn trade-fair campaign', 480000, 10),
+    (v_org, c_rnd,   'Prototype tooling', 320000, 8),
+    (v_org, c_admin, 'Office renovation', 150000, 11),
+    (v_org, c_it,    'Laptop refresh batch', 180000, 8);
+
+  insert into monthly_actual (org_id, cost_center_id, month, amount) values
+    (v_org, c_prod, 1,2380000),(v_org, c_prod, 2,2410000),(v_org, c_prod, 3,2510000),
+    (v_org, c_prod, 4,2440000),(v_org, c_prod, 5,2460000),(v_org, c_prod, 6,2400000),
+    (v_org, c_prod, 7,2250000),(v_org, c_prod, 8,2150000),(v_org, c_prod, 9,2950000),
+    (v_org, c_sales,1,1080000),(v_org, c_sales,2,1100000),(v_org, c_sales,3,1200000),
+    (v_org, c_sales,4,1120000),(v_org, c_sales,5,1150000),(v_org, c_sales,6,1150000),
+    (v_org, c_sales,7, 880000),(v_org, c_sales,8, 870000),(v_org, c_sales,9, 930000),
+    (v_org, c_rnd,  1, 780000),(v_org, c_rnd,  2, 800000),(v_org, c_rnd,  3, 850000),
+    (v_org, c_rnd,  4, 820000),(v_org, c_rnd,  5, 830000),(v_org, c_rnd,  6, 820000),
+    (v_org, c_rnd,  7, 700000),(v_org, c_rnd,  8, 970000),(v_org, c_rnd,  9, 730000),
+    (v_org, c_admin,1, 480000),(v_org, c_admin,2, 500000),(v_org, c_admin,3, 540000),
+    (v_org, c_admin,4, 510000),(v_org, c_admin,5, 520000),(v_org, c_admin,6, 500000),
+    (v_org, c_admin,7, 430000),(v_org, c_admin,8, 445000),(v_org, c_admin,9, 438000),
+    (v_org, c_it,   1, 360000),(v_org, c_it,   2, 370000),(v_org, c_it,   3, 400000),
+    (v_org, c_it,   4, 390000),(v_org, c_it,   5, 400000),(v_org, c_it,   6, 380000),
+    (v_org, c_it,   7, 270000),(v_org, c_it,   8, 440000),(v_org, c_it,   9, 275000);
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- AFTER you create your login (Phase 2: sign up through the app, OR add a user
+-- in Dashboard → Authentication → Users), run this once to make yourself an
+-- owner of the seeded org so RLS lets you see its data:
+--
+--   insert into memberships (user_id, org_id, role)
+--   select id, 'a0000000-0000-0000-0000-000000000001', 'owner'
+--   from auth.users where email = 'felixroos@gmail.com'
+--   on conflict do nothing;
+-- ---------------------------------------------------------------------------

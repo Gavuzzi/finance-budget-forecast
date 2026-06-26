@@ -1,214 +1,271 @@
 let trendChart;
-let reforecastPct = 0;
+let currentLens = "fy"; // "fy" | "rolling"
 
 const THEME_COLORS = {
   dark: { text: "#93a1b8", grid: "#28344a", budget: "#7aa3e0", actual: "#5cb88a", forecast: "#d9a647" },
   light: { text: "#647189", grid: "#dde4ee", budget: "#3461a8", actual: "#2f9e6a", forecast: "#b6841f" },
 };
 
-function fmtMkr(n) {
-  return (n / 1_000_000).toLocaleString("sv-SE", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " mkr";
+function companyMonthlyBudget(month) {
+  if (month < 1 || month > FY_MONTHS) return null;
+  return COST_CENTERS.reduce((s, cc) => s + monthlyBudgetFor(cc, month), 0);
 }
 
-function fmtMkrSigned(n) {
-  const sign = n > 0 ? "+" : n < 0 ? "−" : "";
-  return sign + fmtMkr(Math.abs(n));
-}
-
-function getTheme() {
-  return document.documentElement.getAttribute("data-theme") || "dark";
-}
-
-function applyTheme(theme) {
-  document.documentElement.setAttribute("data-theme", theme);
-  document.getElementById("themeToggle").textContent = theme === "light" ? "☀️" : "🌙";
-  localStorage.setItem("almgren-budget-theme", theme);
-  if (trendChart) {
-    trendChart.destroy();
-    trendChart = null;
-    renderChart();
+function lensMonthRange() {
+  if (currentLens === "rolling") {
+    const { start, end } = rollingWindow();
+    const months = [];
+    for (let m = start; m <= end; m++) months.push(m);
+    return months;
   }
-}
-
-function initTheme() {
-  const saved = localStorage.getItem("almgren-budget-theme") || "dark";
-  applyTheme(saved);
-  document.getElementById("themeToggle").addEventListener("click", () => {
-    applyTheme(getTheme() === "light" ? "dark" : "light");
-  });
-}
-
-function varianceClass(variance, budget) {
-  const pct = budget ? (variance / budget) * 100 : 0;
-  if (pct > 1) return "over";
-  if (pct < -1) return "under";
-  return "neutral";
+  const months = [];
+  for (let m = 1; m <= FY_MONTHS; m++) months.push(m);
+  return months;
 }
 
 function renderStats() {
-  const t = computeTotals(reforecastPct);
+  const statsRow = document.getElementById("statsRow");
 
-  document.getElementById("totalBudget").textContent = fmtMkr(t.totalBudget);
-  document.getElementById("actualYTD").textContent = fmtMkr(t.actualYTD);
-  document.getElementById("fullYearForecast").textContent = fmtMkr(t.fullYearForecast);
-  document.getElementById("variance").textContent = fmtMkrSigned(t.variance);
+  if (currentLens === "fy") {
+    const fy = companyFySummary();
+    let bookedActual = 0;
+    for (let m = 1; m <= CLOSE_MONTH; m++) bookedActual += companyMonthAmount(m);
+    const pct = fy.budget ? (fy.variance / fy.budget) * 100 : 0;
+    const cls = varianceClass(fy.variance, fy.budget);
 
-  const ytdVar = t.actualYTD - t.budgetYTD;
-  const ytdEl = document.getElementById("ytdVariance");
-  ytdEl.textContent = fmtMkrSigned(ytdVar) + " vs budget";
-  ytdEl.className = "stat-sub " + (ytdVar > 0 ? "over" : ytdVar < 0 ? "under" : "");
+    statsRow.innerHTML = `
+      <div class="stat-card">
+        <span class="stat-label">Annual Budget (FY2026)</span>
+        <span class="stat-value">${fmtMkr(fy.budget)}</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Booked Actuals</span>
+        <span class="stat-value">${fmtMkr(bookedActual)}</span>
+        <span class="stat-sub">through ${monthLabel(CLOSE_MONTH)}</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Full-Year Total</span>
+        <span class="stat-value">${fmtMkr(fy.total)}</span>
+      </div>
+      <div class="stat-card highlight">
+        <span class="stat-label">Variance vs Budget</span>
+        <span class="stat-value ${cls}">${fmtMkrSigned(fy.variance)}</span>
+        <span class="stat-sub ${cls}">${pct > 0 ? "+" : ""}${pct.toFixed(1)}%</span>
+      </div>
+    `;
+  } else {
+    const { start, end } = rollingWindow();
+    const rolling = companyRollingSummary();
+    const monthsBeyondBudget = lensMonthRange().filter((m) => m > FY_MONTHS).length;
 
-  const varPctEl = document.getElementById("variancePct");
-  const pctStr = (t.variancePct > 0 ? "+" : "") + t.variancePct.toFixed(1) + "% vs budget";
-  varPctEl.textContent = pctStr;
-  varPctEl.className = "stat-sub " + (t.variancePct > 0.1 ? "over" : t.variancePct < -0.1 ? "under" : "");
+    statsRow.innerHTML = `
+      <div class="stat-card">
+        <span class="stat-label">Rolling 12 Total</span>
+        <span class="stat-value">${fmtMkr(rolling.total)}</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Window</span>
+        <span class="stat-value small">${monthLabel(start)} – ${monthLabel(end)}</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Avg Monthly Run-Rate</span>
+        <span class="stat-value">${fmtMkr(rolling.total / 12)}</span>
+      </div>
+      <div class="stat-card highlight">
+        <span class="stat-label">Months Without FY Budget</span>
+        <span class="stat-value">${monthsBeyondBudget}</span>
+        <span class="stat-sub">next year's budget isn't set yet</span>
+      </div>
+    `;
+  }
 }
 
 function renderTable() {
   const table = document.getElementById("budgetTable");
-  let html = `
-    <div class="budget-row header">
-      <span class="cc-name">Cost Center</span>
-      <span class="num">Budget</span>
-      <span class="num">Actual YTD</span>
-      <span class="num">Forecast</span>
-      <span class="num">Variance</span>
-    </div>
-  `;
 
-  for (const cc of COST_CENTERS) {
-    const forecast = costCenterForecast(cc, reforecastPct);
-    const variance = costCenterVariance(cc, reforecastPct);
-    const cls = varianceClass(variance, cc.budget);
-    const pct = cc.budget ? (variance / cc.budget) * 100 : 0;
+  if (currentLens === "fy") {
+    let html = `
+      <div class="budget-row header">
+        <span class="cc-name">Cost Center</span>
+        <span class="num">Budget</span>
+        <span class="num">FY2026 Total</span>
+        <span class="num">Variance</span>
+      </div>
+    `;
 
+    for (const cc of COST_CENTERS) {
+      const fy = fySummary(cc);
+      const cls = varianceClass(fy.variance, fy.budget);
+      const pct = fy.budget ? (fy.variance / fy.budget) * 100 : 0;
+
+      html += `
+        <div class="budget-row">
+          <span class="cc-name">${cc.name}</span>
+          <span class="num" data-label="Budget">${fmtMkr(fy.budget)}</span>
+          <span class="num" data-label="FY2026 Total">${fmtMkr(fy.total)}</span>
+          <span class="variance-cell ${cls}" data-label="Variance">
+            ${fmtMkrSigned(fy.variance)}
+            <span class="variance-pill ${cls}">${pct > 0 ? "+" : ""}${pct.toFixed(1)}%</span>
+          </span>
+        </div>
+      `;
+    }
+
+    const t = companyFySummary();
+    const totalCls = varianceClass(t.variance, t.budget);
+    const totalPct = t.budget ? (t.variance / t.budget) * 100 : 0;
     html += `
-      <div class="budget-row">
-        <span class="cc-name">${cc.name}</span>
-        <span class="num" data-label="Budget">${fmtMkr(cc.budget)}</span>
-        <span class="num" data-label="Actual YTD">${fmtMkr(cc.actualYTD)}</span>
-        <span class="num" data-label="Forecast">${fmtMkr(forecast)}</span>
-        <span class="variance-cell ${cls}" data-label="Variance">
-          ${fmtMkrSigned(variance)}
-          <span class="variance-pill ${cls}">${pct > 0 ? "+" : ""}${pct.toFixed(1)}%</span>
+      <div class="budget-row total">
+        <span class="cc-name">Total</span>
+        <span class="num" data-label="Budget">${fmtMkr(t.budget)}</span>
+        <span class="num" data-label="FY2026 Total">${fmtMkr(t.total)}</span>
+        <span class="variance-cell ${totalCls}" data-label="Variance">
+          ${fmtMkrSigned(t.variance)}
+          <span class="variance-pill ${totalCls}">${totalPct > 0 ? "+" : ""}${totalPct.toFixed(1)}%</span>
         </span>
       </div>
     `;
+    table.innerHTML = html;
+  } else {
+    let html = `
+      <div class="budget-row header rolling">
+        <span class="cc-name">Cost Center</span>
+        <span class="num">Rolling 12 Total</span>
+      </div>
+    `;
+
+    for (const cc of COST_CENTERS) {
+      const r = rollingSummary(cc);
+      html += `
+        <div class="budget-row rolling">
+          <span class="cc-name">${cc.name}</span>
+          <span class="num" data-label="Rolling 12 Total">${fmtMkr(r.total)}</span>
+        </div>
+      `;
+    }
+
+    const t = companyRollingSummary();
+    html += `
+      <div class="budget-row total rolling">
+        <span class="cc-name">Total</span>
+        <span class="num" data-label="Rolling 12 Total">${fmtMkr(t.total)}</span>
+      </div>
+    `;
+    table.innerHTML = html;
   }
-
-  const t = computeTotals(reforecastPct);
-  const totalCls = varianceClass(t.variance, t.totalBudget);
-  html += `
-    <div class="budget-row total">
-      <span class="cc-name">Total</span>
-      <span class="num" data-label="Budget">${fmtMkr(t.totalBudget)}</span>
-      <span class="num" data-label="Actual YTD">${fmtMkr(t.actualYTD)}</span>
-      <span class="num" data-label="Forecast">${fmtMkr(t.fullYearForecast)}</span>
-      <span class="variance-cell ${totalCls}" data-label="Variance">
-        ${fmtMkrSigned(t.variance)}
-        <span class="variance-pill ${totalCls}">${t.variancePct > 0 ? "+" : ""}${t.variancePct.toFixed(1)}%</span>
-      </span>
-    </div>
-  `;
-
-  table.innerHTML = html;
 }
 
 function renderChart() {
   const colors = THEME_COLORS[getTheme()];
-  const forecastSeries = monthlyForecastSeries(reforecastPct);
+  const months = lensMonthRange();
+  const labels = months.map(monthLabel);
 
-  // Split the combined actual+forecast series into two datasets so the
-  // forecast portion can render dashed, connected to the last actual point.
-  const actualData = MONTHS.map((_, i) => (i < CURRENT_MONTH ? forecastSeries[i] : null));
-  const forecastData = MONTHS.map((_, i) => {
-    if (i === CURRENT_MONTH - 1) return forecastSeries[i]; // connect at the seam
-    return i >= CURRENT_MONTH ? forecastSeries[i] : null;
+  const budgetSeries = months.map((m) => companyMonthlyBudget(m));
+  const actualSeries = months.map((m) => (m <= CLOSE_MONTH ? companyMonthAmount(m) : null));
+  const forecastSeries = months.map((m, i) => {
+    if (m === CLOSE_MONTH) return companyMonthAmount(m); // connect at the seam
+    return m > CLOSE_MONTH ? companyMonthAmount(m) : null;
   });
 
-  const ctx = document.getElementById("trendChart");
+  document.getElementById("chartTitle").textContent =
+    currentLens === "fy" ? "Spend — Budget vs Actual vs Forecast (FY2026)" : "Spend — Rolling 12 Months (Actual + Forecast)";
 
-  if (!trendChart) {
-    trendChart = new Chart(ctx, {
-      type: "line",
-      data: {
-        labels: MONTHS,
-        datasets: [
-          {
-            label: "Budget",
-            data: MONTHLY_BUDGET,
-            borderColor: colors.budget,
-            borderDash: [4, 4],
-            backgroundColor: "transparent",
-            tension: 0.2,
-            pointRadius: 0,
-          },
-          {
-            label: "Actual",
-            data: actualData,
-            borderColor: colors.actual,
-            backgroundColor: "transparent",
-            tension: 0.25,
-            pointRadius: 3,
-          },
-          {
-            label: "Forecast",
-            data: forecastData,
-            borderColor: colors.forecast,
-            borderDash: [6, 3],
-            backgroundColor: "transparent",
-            tension: 0.25,
-            pointRadius: 3,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { labels: { color: colors.text } } },
-        scales: {
-          x: { ticks: { color: colors.text }, grid: { color: colors.grid } },
-          y: {
-            ticks: {
-              color: colors.text,
-              callback: (v) => (v / 1_000_000).toFixed(1) + " mkr",
-            },
-            grid: { color: colors.grid },
-          },
+  const ctx = document.getElementById("trendChart");
+  const datasets = [
+    {
+      label: "Budget",
+      data: budgetSeries,
+      borderColor: colors.budget,
+      borderDash: [4, 4],
+      backgroundColor: "transparent",
+      tension: 0.2,
+      pointRadius: 0,
+      spanGaps: false,
+    },
+    {
+      label: "Actual",
+      data: actualSeries,
+      borderColor: colors.actual,
+      backgroundColor: "transparent",
+      tension: 0.25,
+      pointRadius: 3,
+    },
+    {
+      label: "Forecast",
+      data: forecastSeries,
+      borderColor: colors.forecast,
+      borderDash: [6, 3],
+      backgroundColor: "transparent",
+      tension: 0.25,
+      pointRadius: 3,
+    },
+  ];
+
+  if (trendChart) trendChart.destroy();
+  trendChart = new Chart(ctx, {
+    type: "line",
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: colors.text } } },
+      scales: {
+        x: { ticks: { color: colors.text }, grid: { color: colors.grid } },
+        y: {
+          ticks: { color: colors.text, callback: (v) => (v / 1_000_000).toFixed(1) + " mkr" },
+          grid: { color: colors.grid },
         },
       },
-    });
-  } else {
-    trendChart.data.datasets[1].data = actualData;
-    trendChart.data.datasets[2].data = forecastData;
-    trendChart.update();
-  }
+    },
+  });
 }
 
 function renderAll() {
+  const sections = document.querySelectorAll(".lens-controls, .stats-row, .main-row, .table-panel");
+  let empty = document.getElementById("emptyState");
+
+  if (COST_CENTERS.length === 0) {
+    sections.forEach((el) => (el.style.display = "none"));
+    if (!empty) {
+      empty = document.createElement("div");
+      empty.id = "emptyState";
+      document.querySelector(".app-main").appendChild(empty);
+    }
+    empty.innerHTML = emptyOrgHtml();
+    empty.style.display = "";
+    return;
+  }
+
+  sections.forEach((el) => (el.style.display = ""));
+  if (empty) empty.style.display = "none";
   renderStats();
   renderTable();
   renderChart();
 }
 
-function tickClock() {
-  document.getElementById("clock").textContent = new Date().toLocaleTimeString("sv-SE");
-}
-
-function initReforecastSlider() {
-  const slider = document.getElementById("reforecastSlider");
-  const label = document.getElementById("reforecastValue");
-  slider.addEventListener("input", () => {
-    reforecastPct = Number(slider.value);
-    label.textContent = (reforecastPct > 0 ? "+" : "") + reforecastPct;
-    renderStats();
-    renderTable();
-    renderChart();
+function initLensControls() {
+  document.querySelectorAll(".lens-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      currentLens = btn.dataset.lens;
+      document.querySelectorAll(".lens-btn").forEach((b) => b.classList.toggle("active", b === btn));
+      renderAll();
+    });
   });
 }
 
-initTheme();
-initReforecastSlider();
-tickClock();
-renderAll();
-setInterval(tickClock, 1000);
+// Redraw the chart when the theme flips (the sidebar owns the toggle) and
+// re-render everything when a month is closed from the sidebar.
+window.onThemeChanged = () => {
+  if (trendChart) {
+    trendChart.destroy();
+    trendChart = null;
+    renderChart();
+  }
+};
+window.refreshAfterPeriodChange = renderAll;
+
+// Entry point — called by the auth bootstrap (lib.js) after login + data load.
+window.initPage = () => {
+  initLensControls();
+  renderAll();
+};
