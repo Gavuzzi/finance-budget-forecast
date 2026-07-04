@@ -26,6 +26,17 @@
 
       <p class="table-hint">Figures in mkr. <span class="mt-legend-actual">Solid</span> columns are booked actuals; <span class="mt-legend-forecast">lighter</span> columns are forecast. The accent line marks where actuals end.</p>
 
+      <div class="actuals-import">
+        <button class="add-cc-btn" id="importActualsBtn" type="button">Import actuals (CSV)</button>
+        <div class="import-panel" id="importPanel" hidden>
+          <p class="import-help">One value per row: <code>Cost Center; Month (1–24); Amount</code>, separated by <code>;</code>, comma, or tab. A header row is fine. Upload a file or paste below — cost centers match by name.</p>
+          <input type="file" id="csvFile" accept=".csv,.txt,text/csv">
+          <textarea id="csvText" rows="5" placeholder="Production; 1; 2380000&#10;R&amp;D; 1; 780000&#10;IT; 1; 360000"></textarea>
+          <div class="import-preview" id="importPreview"></div>
+          <button class="add-cc-btn" id="doImportBtn" type="button" disabled>Import</button>
+        </div>
+      </div>
+
       <section class="panel">
         <div class="monthly-wrap">
           <div id="monthlyGrid"></div>

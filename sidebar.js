@@ -107,4 +107,5 @@ function renderSidebar() {
 // Apply the saved theme immediately (styles the login screen too). The sidebar
 // itself is rendered by the auth bootstrap once data has loaded — it needs
 // CLOSE_MONTH and the rest of the model to be populated first.
-applyTheme(localStorage.getItem("almgren-budget-theme") || "dark");
+const _themeParam = new URLSearchParams(location.search).get("theme");
+applyTheme(_themeParam === "light" || _themeParam === "dark" ? _themeParam : (localStorage.getItem("almgren-budget-theme") || "dark"));

@@ -1,8 +1,12 @@
 -- ============================================================================
--- FP&A Base — Phase 1 schema (multi-tenant, RLS from day one)
+-- FP&A Base — complete database setup (multi-tenant, RLS from day one).
 -- Run this in: Supabase Dashboard → SQL Editor → New query → paste → Run.
--- Safe to re-run: table creation uses IF NOT EXISTS, and the seed is guarded
--- so it only inserts once.
+--
+-- This is the SINGLE source of truth: fully idempotent, so you can run it on a
+-- fresh database OR re-run it on an existing one to bring it current — tables
+-- use IF NOT EXISTS, columns use ADD COLUMN IF NOT EXISTS, policies are dropped
+-- and recreated, and the seed is guarded so it only inserts once.
+-- (Replaces the old separate migration-*.sql files.)
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
@@ -48,7 +52,8 @@ create table if not exists cost_centers (
   org_id            uuid not null references organizations(id) on delete cascade,
   name              text not null,
   annual_budget     numeric not null default 0,
-  other_monthly     numeric not null default 0   -- catch-all monthly run-rate (materials, utilities, etc.)
+  other_monthly     numeric not null default 0,  -- catch-all monthly run-rate (materials, utilities, etc.)
+  note              text                          -- variance commentary shown on the Overview + board PDF
 );
 
 -- A headcount line on the absolute month timeline (hires/leavers/contracts start & stop).
@@ -81,6 +86,19 @@ create table if not exists monthly_actual (
   unique (cost_center_id, month)
 );
 
+-- What-if scenario snapshots: name + full-year total + per-cost-center breakdown.
+create table if not exists scenarios (
+  id                uuid primary key default gen_random_uuid(),
+  org_id            uuid not null references organizations(id) on delete cascade,
+  name              text not null,
+  fy_total          numeric not null,
+  snapshot          jsonb,
+  created_at        timestamptz not null default now()
+);
+
+-- Idempotent catch-up for databases created before newer columns existed.
+alter table cost_centers add column if not exists note text;
+
 -- ---------------------------------------------------------------------------
 -- Row-Level Security: a user can touch a row only if they're a member of its org.
 -- Enabled on EVERY table. The anon key is safe in the browser only because of this.
@@ -94,6 +112,7 @@ alter table cost_centers    enable row level security;
 alter table headcount_lines enable row level security;
 alter table one_offs        enable row level security;
 alter table monthly_actual  enable row level security;
+alter table scenarios       enable row level security;
 
 -- You can only see your own membership rows.
 drop policy if exists "own memberships" on memberships;
@@ -106,6 +125,12 @@ drop policy if exists "org member access" on organizations;
 create policy "org member access" on organizations for all
   using (id in (select org_id from memberships where user_id = auth.uid()))
   with check (id in (select org_id from memberships where user_id = auth.uid()));
+
+-- Any signed-in user can create a new organization (the app then creates their
+-- owner membership + default assumptions under the policies below).
+drop policy if exists "create org" on organizations;
+create policy "create org" on organizations for insert
+  with check (auth.uid() is not null);
 
 -- Every other table: access if the row's org is one you belong to.
 -- (Same policy shape repeated per table — explicit on purpose, easy to read.)
@@ -136,6 +161,11 @@ create policy "member access" on one_offs for all
 
 drop policy if exists "member access" on monthly_actual;
 create policy "member access" on monthly_actual for all
+  using (org_id in (select org_id from memberships where user_id = auth.uid()))
+  with check (org_id in (select org_id from memberships where user_id = auth.uid()));
+
+drop policy if exists "member access" on scenarios;
+create policy "member access" on scenarios for all
   using (org_id in (select org_id from memberships where user_id = auth.uid()))
   with check (org_id in (select org_id from memberships where user_id = auth.uid()));
 

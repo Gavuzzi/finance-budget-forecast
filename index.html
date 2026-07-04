@@ -14,9 +14,16 @@
     <aside class="sidebar" id="sidebar"></aside>
     <main class="app-main">
       <header class="page-head">
-        <h1>Overview</h1>
-        <p class="page-sub">Budget &amp; Forecast — FY2026</p>
+        <div class="page-head-text">
+          <h1>Overview</h1>
+          <p class="page-sub">Budget &amp; Forecast — FY2026</p>
+        </div>
+        <button class="print-btn print-hide" id="printBtn" type="button">Print / Save as PDF</button>
       </header>
+
+      <div class="print-only print-header" id="printHeader"></div>
+
+      <div id="onboardSlot"></div>
 
       <section class="lens-controls">
         <div class="lens-toggle" role="tablist">
@@ -38,6 +45,13 @@
         <h2>Cost Centers</h2>
         <p class="table-hint">Built up from headcount and known costs — edit the drivers on the <a href="planning.html">Planning page</a>.</p>
         <div class="budget-table" id="budgetTable"></div>
+      </section>
+
+      <section class="panel scenarios-panel">
+        <h2>Scenarios</h2>
+        <p class="table-hint">Snapshot the current plan's full-year total, then compare alternatives against the live plan. (Change drivers on Planning between snapshots.)</p>
+        <button class="add-cc-btn" id="saveScenarioBtn" type="button">+ Save current as scenario</button>
+        <div class="scenario-list" id="scenarioList"></div>
       </section>
     </main>
   </div>

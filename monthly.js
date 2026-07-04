@@ -23,7 +23,7 @@ function monthCell(value, isActual, isDivider) {
 }
 
 function renderMonthlyGrid() {
-  const sections = document.querySelectorAll(".lens-controls, .table-hint, .panel");
+  const sections = document.querySelectorAll(".lens-controls, .table-hint, .actuals-import, .panel");
   let empty = document.getElementById("emptyState");
   if (COST_CENTERS.length === 0) {
     sections.forEach((el) => (el.style.display = "none"));
@@ -92,6 +92,49 @@ function renderMonthlyGrid() {
   document.getElementById("monthlyGrid").innerHTML = html;
 }
 
+function initImport() {
+  const panel = document.getElementById("importPanel");
+  const textArea = document.getElementById("csvText");
+  const fileInput = document.getElementById("csvFile");
+  const preview = document.getElementById("importPreview");
+  const doBtn = document.getElementById("doImportBtn");
+  let parsed = { rows: [], unmatched: [], skipped: 0 };
+
+  document.getElementById("importActualsBtn").addEventListener("click", () => {
+    panel.hidden = !panel.hidden;
+  });
+
+  function refreshPreview() {
+    if (!textArea.value.trim()) {
+      parsed = { rows: [], unmatched: [], skipped: 0 };
+      preview.innerHTML = "";
+      doBtn.disabled = true;
+      return;
+    }
+    parsed = parseActualsCsv(textArea.value);
+    let msg = `<strong>${parsed.rows.length}</strong> value(s) ready to import.`;
+    if (parsed.unmatched.length) msg += ` <span class="import-warn">Unmatched cost centers (skipped): ${parsed.unmatched.join(", ")}.</span>`;
+    if (parsed.skipped) msg += ` ${parsed.skipped} row(s) skipped.`;
+    preview.innerHTML = msg;
+    doBtn.disabled = parsed.rows.length === 0;
+  }
+
+  textArea.addEventListener("input", refreshPreview);
+  fileInput.addEventListener("change", async () => {
+    if (!fileInput.files[0]) return;
+    textArea.value = await fileInput.files[0].text();
+    refreshPreview();
+  });
+
+  doBtn.addEventListener("click", async () => {
+    if (parsed.rows.length === 0) return;
+    doBtn.disabled = true;
+    const ok = await dbUpsertActuals(parsed.rows);
+    if (ok) location.reload();
+    else doBtn.disabled = false;
+  });
+}
+
 function initMonthly() {
   document.querySelectorAll(".lens-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -100,6 +143,7 @@ function initMonthly() {
       renderMonthlyGrid();
     });
   });
+  initImport();
   renderMonthlyGrid();
 }
 

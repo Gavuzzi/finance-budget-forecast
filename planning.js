@@ -94,6 +94,12 @@ function renderCcBlock(i) {
         </label>
       </div>
 
+      <div class="cc-note-row">
+        <label>Comment / variance note <span class="cc-note-hint">— shows on the Overview &amp; board pack</span>
+          <input type="text" data-ccfield="note" value="${cc.note || ""}" placeholder="e.g. DevOps hire delayed to Q4 — under budget">
+        </label>
+      </div>
+
       <div class="cc-summary">
         <span>FY2026 total: <strong>${fmtMkr(fy.total)}</strong></span>
         <span class="variance ${cls}">vs budget: <strong>${fmtMkrSigned(fy.variance)} (${pct > 0 ? "+" : ""}${pct.toFixed(1)}%)</strong></span>
@@ -179,9 +185,14 @@ function initPlanningGrid() {
       dbUpdateOneOff(o);
     } else if (target.dataset.ccfield) {
       const field = target.dataset.ccfield;
-      cc[field] = field === "name" ? target.value : Number(target.value) || 0;
-      if (field !== "name") refreshCcComputed(ccIndex);
-      dbUpdateCostCenter(cc);
+      if (field === "note") {
+        cc.note = target.value;
+        dbSetCostCenterNote(cc);
+      } else {
+        cc[field] = field === "name" ? target.value : Number(target.value) || 0;
+        if (field !== "name") refreshCcComputed(ccIndex);
+        dbUpdateCostCenter(cc);
+      }
     }
   }
 

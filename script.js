@@ -100,7 +100,7 @@ function renderTable() {
 
       html += `
         <div class="budget-row">
-          <span class="cc-name">${cc.name}</span>
+          <span class="cc-name">${cc.name}${cc.note ? `<span class="cc-note">${cc.note}</span>` : ""}</span>
           <span class="num" data-label="Budget">${fmtMkr(fy.budget)}</span>
           <span class="num" data-label="FY2026 Total">${fmtMkr(fy.total)}</span>
           <span class="variance-cell ${cls}" data-label="Variance">
@@ -138,7 +138,7 @@ function renderTable() {
       const r = rollingSummary(cc);
       html += `
         <div class="budget-row rolling">
-          <span class="cc-name">${cc.name}</span>
+          <span class="cc-name">${cc.name}${cc.note ? `<span class="cc-note">${cc.note}</span>` : ""}</span>
           <span class="num" data-label="Rolling 12 Total">${fmtMkr(r.total)}</span>
         </div>
       `;
@@ -220,8 +220,129 @@ function renderChart() {
   });
 }
 
+function onboardCardHtml() {
+  return `
+    <div class="onboard-card">
+      <button class="onboard-close" id="onboardClose" type="button" title="Dismiss">✕</button>
+      <h2>How this works</h2>
+      <p>Your budget and forecast are <strong>built from drivers</strong> — your people and known costs — not typed in cell by cell. Change a driver once and every number here updates. You never re-key figures like in a spreadsheet.</p>
+      <div class="onboard-tabs">
+        <div><strong>Overview</strong> the whole picture — budget vs. actual vs. forecast.</div>
+        <div><strong>Monthly</strong> the same numbers, month by month.</div>
+        <div><strong>Planning</strong> where you edit the drivers — headcount &amp; costs.</div>
+        <div><strong>Assumptions</strong> set pay rates once; they flow everywhere.</div>
+      </div>
+    </div>`;
+}
+
+function renderOnboard() {
+  const slot = document.getElementById("onboardSlot");
+  if (!slot) return;
+
+  if (localStorage.getItem("almgren-onboard-dismissed") === "true") {
+    slot.innerHTML = `<button class="onboard-link" id="onboardOpen" type="button">How this works ▾</button>`;
+    document.getElementById("onboardOpen").addEventListener("click", () => {
+      localStorage.removeItem("almgren-onboard-dismissed");
+      renderOnboard();
+    });
+    return;
+  }
+
+  slot.innerHTML = onboardCardHtml();
+  document.getElementById("onboardClose").addEventListener("click", () => {
+    localStorage.setItem("almgren-onboard-dismissed", "true");
+    renderOnboard();
+  });
+}
+
+function renderScenarioDetail(s, currentByName) {
+  const names = [...new Set([...(s.breakdown || []).map((b) => b.name), ...Object.keys(currentByName)])];
+  let rows = "";
+  names.forEach((name) => {
+    const scen = ((s.breakdown || []).find((b) => b.name === name) || {}).total;
+    const cur = currentByName[name];
+    const d = (scen ?? 0) - (cur ?? 0);
+    const cls = d > 0 ? "over" : d < 0 ? "under" : "neutral";
+    rows += `
+      <div class="scen-detail-row">
+        <span>${name}</span>
+        <span class="num">${scen != null ? fmtMkr(scen) : "—"}</span>
+        <span class="num">${cur != null ? fmtMkr(cur) : "—"}</span>
+        <span class="num ${cls}">${scen != null && cur != null ? fmtMkrSigned(d) : ""}</span>
+      </div>`;
+  });
+  return `<div class="scen-detail-head"><span>Cost center</span><span class="num">Scenario</span><span class="num">Current</span><span class="num">Δ</span></div>${rows}`;
+}
+
+function renderScenarios() {
+  const listEl = document.getElementById("scenarioList");
+  const currentTotal = companyFySummary().total;
+  const currentByName = {};
+  COST_CENTERS.forEach((cc) => { currentByName[cc.name] = fySummary(cc).total; });
+
+  let html = `
+    <div class="scenario-row current">
+      <span>Current plan (live)</span>
+      <span class="num">${fmtMkr(currentTotal)}</span>
+      <span class="num"></span>
+      <span></span>
+    </div>`;
+
+  if (SCENARIOS.length === 0) {
+    html += `<p class="empty-hint">No saved scenarios yet — snapshot the current plan to start comparing.</p>`;
+  } else {
+    SCENARIOS.forEach((s) => {
+      const delta = s.fyTotal - currentTotal;
+      const cls = delta > 0 ? "over" : delta < 0 ? "under" : "neutral";
+      html += `
+        <div class="scenario-row scenario-toggle" data-scen="${s.id}">
+          <span>${s.name} <span class="scenario-caret">▾</span></span>
+          <span class="num">${fmtMkr(s.fyTotal)}</span>
+          <span class="num ${cls}">${fmtMkrSigned(delta)}</span>
+          <button class="row-remove" data-delscen="${s.id}" title="Delete scenario">✕</button>
+        </div>
+        <div class="scenario-detail" data-detailscen="${s.id}" hidden>
+          ${renderScenarioDetail(s, currentByName)}
+        </div>`;
+    });
+  }
+
+  listEl.innerHTML = html;
+}
+
+function initScenarios() {
+  document.getElementById("saveScenarioBtn").addEventListener("click", async () => {
+    const name = prompt("Name this scenario (e.g. Base, Hiring freeze):");
+    if (!name || !name.trim()) return;
+    const s = await dbSaveScenario(name.trim());
+    if (!s) return;
+    SCENARIOS.push(s);
+    renderScenarios();
+  });
+
+  document.getElementById("scenarioList").addEventListener("click", async (e) => {
+    const delBtn = e.target.closest("[data-delscen]");
+    if (delBtn) {
+      const id = delBtn.dataset.delscen;
+      const s = SCENARIOS.find((x) => x.id === id);
+      if (!confirm(`Delete scenario "${s ? s.name : ""}"?`)) return;
+      if (!(await dbDeleteScenario(id))) return;
+      const idx = SCENARIOS.findIndex((x) => x.id === id);
+      if (idx > -1) SCENARIOS.splice(idx, 1);
+      renderScenarios();
+      return;
+    }
+
+    const toggle = e.target.closest(".scenario-toggle");
+    if (toggle) {
+      const detail = document.querySelector(`.scenario-detail[data-detailscen="${toggle.dataset.scen}"]`);
+      if (detail) detail.hidden = !detail.hidden;
+    }
+  });
+}
+
 function renderAll() {
-  const sections = document.querySelectorAll(".lens-controls, .stats-row, .main-row, .table-panel");
+  const sections = document.querySelectorAll(".lens-controls, .stats-row, .main-row, .table-panel, .scenarios-panel");
   let empty = document.getElementById("emptyState");
 
   if (COST_CENTERS.length === 0) {
@@ -241,6 +362,7 @@ function renderAll() {
   renderStats();
   renderTable();
   renderChart();
+  renderScenarios();
 }
 
 function initLensControls() {
@@ -265,7 +387,28 @@ window.onThemeChanged = () => {
 window.refreshAfterPeriodChange = renderAll;
 
 // Entry point — called by the auth bootstrap (lib.js) after login + data load.
+function initPrint() {
+  const orgName = (USER_ORGS.find((o) => o.id === CURRENT_ORG_ID) || {}).name || "";
+  const ph = document.getElementById("printHeader");
+  if (ph) ph.textContent = `${orgName} — Budget & Forecast FY2026 — printed ${new Date().toLocaleDateString("sv-SE")}`;
+  document.getElementById("printBtn").addEventListener("click", () => window.print());
+}
+
+// Force a clean light palette (and re-render the chart light) for printing,
+// then restore the user's theme afterward.
+let _printPrevTheme = null;
+window.addEventListener("beforeprint", () => {
+  _printPrevTheme = getTheme();
+  if (_printPrevTheme !== "light") applyTheme("light");
+});
+window.addEventListener("afterprint", () => {
+  if (_printPrevTheme && _printPrevTheme !== "light") applyTheme(_printPrevTheme);
+});
+
 window.initPage = () => {
   initLensControls();
+  initScenarios();
+  initPrint();
+  renderOnboard();
   renderAll();
 };

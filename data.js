@@ -24,6 +24,7 @@ const MAX_CLOSE_MONTH = 9; // how far the seeded fixture actuals go
 let CLOSE_MONTH = 6;
 let CURRENT_ORG_ID = null;
 let USER_ORGS = [];
+let SCENARIOS = [];
 const ORG_STORAGE_KEY = "almgren-current-org";
 const ROLE_CATALOG = [];
 const ASSUMPTIONS = { employerContributionPct: 31.42, equipmentMonthly: 1200, otherOverheadPct: 4 };
@@ -170,6 +171,7 @@ async function loadData(orgId) {
         name: cc.name,
         annualBudget: Number(cc.annual_budget),
         otherMonthly: Number(cc.other_monthly),
+        note: cc.note || "",
         headcount: hcRes.data
           .filter((h) => h.cost_center_id === cc.id)
           .map((h) => ({ id: h.id, roleId: h.role_id, count: h.count, startMonth: h.start_month, endMonth: h.end_month })),
@@ -179,6 +181,12 @@ async function loadData(orgId) {
         actualMonthly,
       });
     });
+
+  // Scenarios are optional — the table may not exist until migration-scenarios.sql
+  // is run — so load them tolerantly; the app works either way.
+  SCENARIOS.length = 0;
+  const scenRes = await sb.from("scenarios").select("*").eq("org_id", CURRENT_ORG_ID).order("created_at");
+  if (!scenRes.error) scenRes.data.forEach((s) => SCENARIOS.push({ id: s.id, name: s.name, fyTotal: Number(s.fy_total), breakdown: (s.snapshot && s.snapshot.breakdown) || [] }));
 }
 
 // ---- Preview mode ----------------------------------------------------------
@@ -196,6 +204,7 @@ function loadPreviewData() {
 
   ROLE_CATALOG.length = 0;
   COST_CENTERS.length = 0;
+  SCENARIOS.length = 0;
   if (new URLSearchParams(location.search).has("empty")) return; // ?preview&empty → fresh-org state
 
   ROLE_CATALOG.push(
@@ -206,7 +215,7 @@ function loadPreviewData() {
   );
 
   const mk = (id, name, budget, other, hc, oo, act) =>
-    ({ id, name, annualBudget: budget, otherMonthly: other, headcount: hc, oneOffs: oo, actualMonthly: act });
+    ({ id, name, annualBudget: budget, otherMonthly: other, note: "", headcount: hc, oneOffs: oo, actualMonthly: act });
 
   COST_CENTERS.push(
     mk("c1", "Production", 28000000, 1350000,
@@ -221,6 +230,14 @@ function loadPreviewData() {
       [{ id: "h4", roleId: "r4", count: 2, startMonth: 1, endMonth: 24 }],
       [],
       [360000, 370000, 400000, 390000, 400000, 380000]),
+  );
+
+  const itCc = COST_CENTERS.find((c) => c.name === "IT");
+  if (itCc) itCc.note = "DevOps contractor hire delayed to Q4 — running under budget.";
+
+  SCENARIOS.push(
+    { id: "s1", name: "Base", fyTotal: 41800000, breakdown: [{ name: "Production", total: 28600000 }, { name: "R&D", total: 9300000 }, { name: "IT", total: 3900000 }] },
+    { id: "s2", name: "Hiring freeze", fyTotal: 39500000, breakdown: [{ name: "Production", total: 27000000 }, { name: "R&D", total: 8600000 }, { name: "IT", total: 3900000 }] },
   );
 }
 
@@ -294,6 +311,13 @@ async function dbDeleteCostCenter(id) {
   return true;
 }
 
+// Separate + error-tolerant so the app still works before migration-notes.sql
+// is run (the note column may not exist yet).
+async function dbSetCostCenterNote(cc) {
+  const { error } = await sb.from("cost_centers").update({ note: cc.note || null }).eq("id", cc.id);
+  if (error) flagWriteError(error);
+}
+
 async function dbInsertHeadcount(ccId, line) {
   const { data, error } = await sb.from("headcount_lines")
     .insert({ org_id: CURRENT_ORG_ID, cost_center_id: ccId, role_id: line.roleId, count: line.count, start_month: line.startMonth, end_month: line.endMonth })
@@ -337,6 +361,60 @@ async function dbDeleteOneOff(id) {
 async function dbUpdateCloseMonth() {
   const { error } = await sb.from("organizations").update({ close_month: CLOSE_MONTH }).eq("id", CURRENT_ORG_ID);
   if (error) flagWriteError(error);
+}
+
+// Bulk import actuals. rows: [{ cost_center_id, month, amount }].
+// Upserts on the (cost_center_id, month) unique key, so re-importing a month
+// overwrites rather than duplicating.
+async function dbUpsertActuals(rows) {
+  const payload = rows.map((r) => ({ org_id: CURRENT_ORG_ID, cost_center_id: r.cost_center_id, month: r.month, amount: r.amount }));
+  const { error } = await sb.from("monthly_actual").upsert(payload, { onConflict: "cost_center_id,month" });
+  if (error) { flagWriteError(error); return false; }
+  return true;
+}
+
+// Parse a simple CSV of actuals: one row per value, columns
+// "Cost Center", "Month (1–24)", "Amount", separated by ; , or tab.
+// A header row is auto-skipped (its month field isn't numeric). Cost centers
+// are matched by name (case-insensitive); unmatched names are reported, not imported.
+function parseActualsCsv(text) {
+  const rows = [];
+  const unmatched = new Set();
+  let skipped = 0;
+
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    const parts = line.split(/[;,\t]/).map((s) => s.trim());
+    if (parts.length < 3) { skipped++; continue; }
+
+    const [name, monthStr, amountStr] = parts;
+    const month = parseInt(monthStr, 10);
+    const amount = Number(amountStr.replace(/\s/g, ""));
+    if (isNaN(month) || month < 1 || month > TIMELINE_LENGTH || isNaN(amount)) { skipped++; continue; }
+
+    const cc = COST_CENTERS.find((c) => c.name.toLowerCase() === name.toLowerCase());
+    if (!cc) { unmatched.add(name); continue; }
+
+    rows.push({ cost_center_id: cc.id, month, amount });
+  }
+
+  return { rows, unmatched: [...unmatched], skipped };
+}
+
+async function dbSaveScenario(name) {
+  const breakdown = COST_CENTERS.map((cc) => ({ name: cc.name, total: fySummary(cc).total }));
+  const fyTotal = companyFySummary().total;
+  const { data, error } = await sb.from("scenarios")
+    .insert({ org_id: CURRENT_ORG_ID, name, fy_total: fyTotal, snapshot: { breakdown } })
+    .select().single();
+  if (error) { flagWriteError(error); return null; }
+  return { id: data.id, name: data.name, fyTotal: Number(data.fy_total), breakdown };
+}
+
+async function dbDeleteScenario(id) {
+  const { error } = await sb.from("scenarios").delete().eq("id", id);
+  if (error) { flagWriteError(error); return false; }
+  return true;
 }
 
 // Client-side UUID (works on file:// — uses getRandomValues, not the
@@ -404,5 +482,56 @@ function emptyOrgHtml() {
         <li>Add <strong>cost centers</strong> and their headcount on the <a href="planning.html">Planning</a> page.</li>
       </ol>
       <a class="empty-cta" href="assumptions.html">Start on Assumptions →</a>
+      <button class="empty-cta secondary" data-loadexample type="button">Or load example data to explore</button>
     </div>`;
 }
+
+// One-click onboarding: fill the current (empty) org with a small working sample
+// company so a new user starts from something real instead of a blank app.
+async function seedExampleData() {
+  const roleDefs = [["Manager", 55000], ["Specialist", 42000], ["Associate", 33000], ["Support", 30000]];
+  const roleIds = {};
+  for (const [label, base] of roleDefs) {
+    const { data, error } = await sb.from("roles").insert({ org_id: CURRENT_ORG_ID, label, base_salary: base }).select().single();
+    if (error) { flagWriteError(error); return false; }
+    roleIds[label] = data.id;
+  }
+
+  const ccDefs = [
+    { name: "Operations", budget: 12000000, other: 300000, hc: [["Manager", 1], ["Specialist", 4], ["Associate", 6]], actuals: [900000, 920000, 950000, 930000, 940000, 930000] },
+    { name: "Sales", budget: 6000000, other: 150000, hc: [["Manager", 1], ["Associate", 4]], actuals: [480000, 500000, 510000, 490000, 505000, 500000] },
+    { name: "Admin", budget: 3000000, other: 120000, hc: [["Support", 2]], actuals: [230000, 240000, 235000, 245000, 238000, 242000] },
+  ];
+  for (const cc of ccDefs) {
+    const { data: ccRow, error } = await sb.from("cost_centers")
+      .insert({ org_id: CURRENT_ORG_ID, name: cc.name, annual_budget: cc.budget, other_monthly: cc.other })
+      .select().single();
+    if (error) { flagWriteError(error); return false; }
+    const ccId = ccRow.id;
+
+    const hcRows = cc.hc.map(([label, count]) => ({ org_id: CURRENT_ORG_ID, cost_center_id: ccId, role_id: roleIds[label], count, start_month: 1, end_month: 24 }));
+    const hcRes = await sb.from("headcount_lines").insert(hcRows);
+    if (hcRes.error) { flagWriteError(hcRes.error); return false; }
+
+    const actRows = cc.actuals.map((amount, i) => ({ org_id: CURRENT_ORG_ID, cost_center_id: ccId, month: i + 1, amount }));
+    const actRes = await sb.from("monthly_actual").insert(actRows);
+    if (actRes.error) { flagWriteError(actRes.error); return false; }
+  }
+
+  // Book actuals through month 6 so the example shows an actual/forecast split.
+  await sb.from("organizations").update({ close_month: 6 }).eq("id", CURRENT_ORG_ID);
+  return true;
+}
+
+// Delegated handler for the empty-state "Load example data" button (works on any
+// page that renders emptyOrgHtml).
+document.addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-loadexample]");
+  if (!btn) return;
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = "Loading example…";
+  const ok = await seedExampleData();
+  if (ok) location.reload();
+  else { btn.disabled = false; btn.textContent = orig; }
+});
