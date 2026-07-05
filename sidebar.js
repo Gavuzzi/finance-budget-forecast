@@ -70,6 +70,12 @@ function renderSidebar() {
   document.getElementById("sidebar").innerHTML = sidebarHtml();
   document.getElementById("themeToggle").textContent = getTheme() === "light" ? "☀️ Light" : "🌙 Dark";
 
+  // Reflect the live tenant in the tab title so multiple orgs/tabs are distinguishable
+  // (the static <title> is only a pre-load fallback).
+  const activeOrg = USER_ORGS.find((o) => o.id === CURRENT_ORG_ID) || USER_ORGS[0];
+  const pageLabel = (NAV.find((n) => n.id === currentPageId()) || {}).label || "";
+  if (activeOrg && activeOrg.name) document.title = `${pageLabel} · ${activeOrg.name}`;
+
   document.getElementById("themeToggle").addEventListener("click", () => {
     applyTheme(getTheme() === "light" ? "dark" : "light");
   });

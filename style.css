@@ -67,6 +67,53 @@
 .login-error { font-size: 0.82rem; color: var(--text-dim); min-height: 1em; }
 .login-error.error { color: var(--red); }
 
+/* Loading + load-error states */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+}
+
+.loading-spinner {
+  width: 42px;
+  height: 42px;
+  border: 3px solid var(--panel-border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.load-error {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 56px 24px;
+  font-family: 'Inter', sans-serif;
+}
+
+.load-error h2 { font-family: 'Fraunces', serif; font-size: 1.5rem; color: var(--red); margin-bottom: 12px; }
+.load-error p { color: var(--text); margin-bottom: 10px; }
+.load-error-hint { color: var(--text-dim); font-size: 0.9rem; }
+.load-error code { background: var(--panel); padding: 2px 6px; border-radius: 5px; }
+
+.load-error button {
+  margin-top: 14px;
+  background: var(--accent);
+  border: none;
+  color: #0e141f;
+  font-weight: 700;
+  padding: 10px 18px;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.load-error button:hover { background: var(--accent-soft); }
+
 .readonly-note {
   background: rgba(217, 166, 71, 0.12);
   border: 1px solid var(--amber);
@@ -232,6 +279,34 @@
   font-weight: 600;
   cursor: pointer;
   padding: 0;
+}
+
+/* Cost by role breakdown */
+.rb-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 0.8fr;
+  gap: 14px;
+  padding: 11px 8px;
+  align-items: center;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.rb-row .num { text-align: right; font-variant-numeric: tabular-nums; }
+.rb-row span:first-child { font-weight: 600; }
+
+.rb-head {
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.rb-head span:first-child { font-weight: 600; }
+
+.rb-total {
+  border-top: 2px solid var(--panel-border);
+  border-bottom: none;
+  font-weight: 700;
+  margin-top: 4px;
 }
 
 /* Scenarios */

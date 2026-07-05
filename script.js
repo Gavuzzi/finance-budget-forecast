@@ -255,6 +255,42 @@ function renderOnboard() {
   });
 }
 
+// Total people cost per role across all cost centers, for the fiscal year.
+function roleFyTotals() {
+  const totals = {};
+  COST_CENTERS.forEach((cc) => {
+    cc.headcount.forEach((h) => {
+      const activeFy = Math.max(0, Math.min(h.endMonth, FY_MONTHS) - Math.max(h.startMonth, 1) + 1);
+      const cost = h.count * monthlyCostForRole(h.roleId) * activeFy;
+      const role = getRole(h.roleId);
+      if (!totals[h.roleId]) totals[h.roleId] = { label: role ? role.label : "—", count: 0, cost: 0 };
+      totals[h.roleId].count += h.count;
+      totals[h.roleId].cost += cost;
+    });
+  });
+  return Object.values(totals).sort((a, b) => b.cost - a.cost);
+}
+
+function renderRoleBreakdown() {
+  const el = document.getElementById("roleBreakdown");
+  if (!el) return;
+  const rows = roleFyTotals();
+
+  if (rows.length === 0) {
+    el.innerHTML = `<p class="empty-hint">No headcount yet — add some on the Planning page.</p>`;
+    return;
+  }
+
+  const total = rows.reduce((s, r) => s + r.cost, 0);
+  let html = `<div class="rb-row rb-head"><span>Role</span><span class="num">Headcount</span><span class="num">FY people cost</span><span class="num">Share</span></div>`;
+  rows.forEach((r) => {
+    const pct = total ? (r.cost / total) * 100 : 0;
+    html += `<div class="rb-row"><span>${r.label}</span><span class="num">${r.count}</span><span class="num">${fmtMkr(r.cost)}</span><span class="num">${pct.toFixed(0)}%</span></div>`;
+  });
+  html += `<div class="rb-row rb-total"><span>Total people cost</span><span class="num"></span><span class="num">${fmtMkr(total)}</span><span class="num">100%</span></div>`;
+  el.innerHTML = html;
+}
+
 function renderScenarioDetail(s, currentByName) {
   const names = [...new Set([...(s.breakdown || []).map((b) => b.name), ...Object.keys(currentByName)])];
   let rows = "";
@@ -342,7 +378,7 @@ function initScenarios() {
 }
 
 function renderAll() {
-  const sections = document.querySelectorAll(".lens-controls, .stats-row, .main-row, .table-panel, .scenarios-panel");
+  const sections = document.querySelectorAll(".lens-controls, .stats-row, .main-row, .table-panel, .role-breakdown-panel, .scenarios-panel");
   let empty = document.getElementById("emptyState");
 
   if (COST_CENTERS.length === 0) {
@@ -362,6 +398,7 @@ function renderAll() {
   renderStats();
   renderTable();
   renderChart();
+  renderRoleBreakdown();
   renderScenarios();
 }
 

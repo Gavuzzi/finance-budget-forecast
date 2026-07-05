@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Almgren Industrier — Budget & Forecast</title>
+<title>Overview — FP&A</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
@@ -45,6 +45,12 @@
         <h2>Cost Centers</h2>
         <p class="table-hint">Built up from headcount and known costs — edit the drivers on the <a href="planning.html">Planning page</a>.</p>
         <div class="budget-table" id="budgetTable"></div>
+      </section>
+
+      <section class="panel role-breakdown-panel">
+        <h2>Cost by Role</h2>
+        <p class="table-hint">The same people cost, sliced by role instead of cost center — total across the org this fiscal year.</p>
+        <div id="roleBreakdown"></div>
       </section>
 
       <section class="panel scenarios-panel">

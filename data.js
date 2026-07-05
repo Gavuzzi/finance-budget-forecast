@@ -417,34 +417,17 @@ async function dbDeleteScenario(id) {
   return true;
 }
 
-// Client-side UUID (works on file:// — uses getRandomValues, not the
-// secure-context-only crypto.randomUUID).
-function uuidv4() {
-  const b = crypto.getRandomValues(new Uint8Array(16));
-  b[6] = (b[6] & 0x0f) | 0x40;
-  b[8] = (b[8] & 0x3f) | 0x80;
-  const h = [...b].map((x) => x.toString(16).padStart(2, "0"));
-  return `${h[0]}${h[1]}${h[2]}${h[3]}-${h[4]}${h[5]}-${h[6]}${h[7]}-${h[8]}${h[9]}-${h[10]}${h[11]}${h[12]}${h[13]}${h[14]}${h[15]}`;
-}
-
-// Stand up a brand-new tenant from the UI: org → owner membership → default
-// assumptions, then switch to it. Order matters so RLS checks pass.
+// Stand up a brand-new tenant via the locked-down server-side function — one
+// atomic call that creates the org, your owner membership, and default
+// assumptions. The client can't touch memberships directly (security).
 async function createOrg() {
   const name = prompt("Name the new organization:");
   if (!name || !name.trim()) return;
 
-  const orgId = uuidv4();
-  const orgRes = await sb.from("organizations").insert({ id: orgId, name: name.trim(), close_month: 0, currency: "SEK" });
-  if (orgRes.error) { flagWriteError(orgRes.error); return; }
+  const { data, error } = await sb.rpc("create_organization", { org_name: name.trim() });
+  if (error) { flagWriteError(error); return; }
 
-  const { data: { user } } = await sb.auth.getUser();
-  const mRes = await sb.from("memberships").insert({ user_id: user.id, org_id: orgId, role: "owner" });
-  if (mRes.error) { flagWriteError(mRes.error); return; }
-
-  const aRes = await sb.from("assumptions").insert({ org_id: orgId });
-  if (aRes.error) { flagWriteError(aRes.error); return; }
-
-  localStorage.setItem(ORG_STORAGE_KEY, orgId);
+  localStorage.setItem(ORG_STORAGE_KEY, data);
   location.reload();
 }
 

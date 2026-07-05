@@ -114,60 +114,78 @@ alter table one_offs        enable row level security;
 alter table monthly_actual  enable row level security;
 alter table scenarios       enable row level security;
 
--- You can only see your own membership rows.
-drop policy if exists "own memberships" on memberships;
-create policy "own memberships" on memberships for all
-  using (user_id = auth.uid())
-  with check (user_id = auth.uid());
+-- ---------------------------------------------------------------------------
+-- Helper functions. SECURITY DEFINER so they can read memberships without
+-- tripping RLS recursion — they only ever check the CURRENT user's own row.
+-- ---------------------------------------------------------------------------
 
--- Organizations: visible if you're a member.
+create or replace function public.is_org_member(p_org uuid)
+  returns boolean language sql security definer stable set search_path = public as $$
+  select exists (select 1 from memberships where org_id = p_org and user_id = auth.uid());
+$$;
+
+create or replace function public.can_edit_org(p_org uuid)
+  returns boolean language sql security definer stable set search_path = public as $$
+  select exists (
+    select 1 from memberships
+    where org_id = p_org and user_id = auth.uid() and role in ('owner', 'editor')
+  );
+$$;
+
+-- The ONLY way to create an org + membership: atomic, and it stops a client from
+-- inserting a membership directly (which would let anyone join any org they know
+-- the id of). Called from the app via sb.rpc('create_organization', {...}).
+create or replace function public.create_organization(org_name text)
+  returns uuid language plpgsql security definer set search_path = public as $$
+declare
+  v_org uuid;
+begin
+  if auth.uid() is null then
+    raise exception 'not authenticated';
+  end if;
+  insert into organizations (name) values (org_name) returning id into v_org;
+  insert into memberships (user_id, org_id, role) values (auth.uid(), v_org, 'owner');
+  insert into assumptions (org_id) values (v_org);
+  return v_org;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Policies. Reads: any member. Writes: owner/editor only (viewers are read-only).
+-- Memberships can ONLY be created by create_organization() above — never by a
+-- client insert — which closes the "add myself to any org" hole.
+-- ---------------------------------------------------------------------------
+
+-- Memberships: read + leave your own; no direct insert/update by clients.
+drop policy if exists "own memberships"        on memberships;
+drop policy if exists "read own memberships"   on memberships;
+drop policy if exists "leave org"              on memberships;
+create policy "read own memberships" on memberships for select using (user_id = auth.uid());
+create policy "leave org"            on memberships for delete using (user_id = auth.uid());
+
+-- Organizations: members read; editors rename / advance the period. Insert is via
+-- create_organization() only; no client delete.
 drop policy if exists "org member access" on organizations;
-create policy "org member access" on organizations for all
-  using (id in (select org_id from memberships where user_id = auth.uid()))
-  with check (id in (select org_id from memberships where user_id = auth.uid()));
+drop policy if exists "create org"        on organizations;
+drop policy if exists "org read"          on organizations;
+drop policy if exists "org edit"          on organizations;
+create policy "org read" on organizations for select using (is_org_member(id));
+create policy "org edit" on organizations for update using (can_edit_org(id)) with check (can_edit_org(id));
 
--- Any signed-in user can create a new organization (the app then creates their
--- owner membership + default assumptions under the policies below).
-drop policy if exists "create org" on organizations;
-create policy "create org" on organizations for insert
-  with check (auth.uid() is not null);
-
--- Every other table: access if the row's org is one you belong to.
--- (Same policy shape repeated per table — explicit on purpose, easy to read.)
-drop policy if exists "member access" on assumptions;
-create policy "member access" on assumptions for all
-  using (org_id in (select org_id from memberships where user_id = auth.uid()))
-  with check (org_id in (select org_id from memberships where user_id = auth.uid()));
-
-drop policy if exists "member access" on roles;
-create policy "member access" on roles for all
-  using (org_id in (select org_id from memberships where user_id = auth.uid()))
-  with check (org_id in (select org_id from memberships where user_id = auth.uid()));
-
-drop policy if exists "member access" on cost_centers;
-create policy "member access" on cost_centers for all
-  using (org_id in (select org_id from memberships where user_id = auth.uid()))
-  with check (org_id in (select org_id from memberships where user_id = auth.uid()));
-
-drop policy if exists "member access" on headcount_lines;
-create policy "member access" on headcount_lines for all
-  using (org_id in (select org_id from memberships where user_id = auth.uid()))
-  with check (org_id in (select org_id from memberships where user_id = auth.uid()));
-
-drop policy if exists "member access" on one_offs;
-create policy "member access" on one_offs for all
-  using (org_id in (select org_id from memberships where user_id = auth.uid()))
-  with check (org_id in (select org_id from memberships where user_id = auth.uid()));
-
-drop policy if exists "member access" on monthly_actual;
-create policy "member access" on monthly_actual for all
-  using (org_id in (select org_id from memberships where user_id = auth.uid()))
-  with check (org_id in (select org_id from memberships where user_id = auth.uid()));
-
-drop policy if exists "member access" on scenarios;
-create policy "member access" on scenarios for all
-  using (org_id in (select org_id from memberships where user_id = auth.uid()))
-  with check (org_id in (select org_id from memberships where user_id = auth.uid()));
+-- Every data table: read = member, write = editor. Two policies each (OR'd),
+-- generated in a loop so they stay identical and there's no place to slip a hole.
+do $$
+declare t text;
+begin
+  foreach t in array array['assumptions','roles','cost_centers','headcount_lines','one_offs','monthly_actual','scenarios']
+  loop
+    execute format('drop policy if exists "member access" on %I', t);
+    execute format('drop policy if exists %I on %I', t || '_read', t);
+    execute format('drop policy if exists %I on %I', t || '_write', t);
+    execute format('create policy %I on %I for select using (is_org_member(org_id))', t || '_read', t);
+    execute format('create policy %I on %I for all using (can_edit_org(org_id)) with check (can_edit_org(org_id))', t || '_write', t);
+  end loop;
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- Seed: one tenant ("Almgren Industrier") ported from the demo fixtures.
