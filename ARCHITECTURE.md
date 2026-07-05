@@ -63,7 +63,7 @@ Every table carries `org_id`. Every row is owned by exactly one tenant.
 ## Build phases
 
 0. **Decide** the frontend stack; spin up a clean Supabase project.
-1. **Schema + RLS**, seed one org ("Almgren") from the current fixtures.
+1. **Schema + RLS**, seed one org ("Meridian Manufacturing AB") from the current fixtures.
 2. **Auth + read** from the DB; render the UI *from config*, not from hardcoded fixtures.
 3. **Writes → DB** (replace the localStorage layer entirely).
 4. **Add-a-client = new org + config rows** — prove config-not-code by standing up a

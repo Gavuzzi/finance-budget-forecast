@@ -429,8 +429,9 @@
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%) translateY(20px);
-  background: var(--red);
-  color: #fff;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--panel-border);
   padding: 12px 18px;
   border-radius: 10px;
   font-size: 0.88rem;
@@ -442,10 +443,83 @@
   z-index: 2000;
 }
 
+.save-toast.error { background: var(--red); color: #fff; border-color: transparent; }
+
 .save-toast.show {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
+
+/* Public demo: landing CTA + persistent banner */
+.login-tagline { color: var(--text-dim); font-size: 0.92rem; line-height: 1.5; margin: 2px 0 10px; }
+
+.login-demo {
+  margin-top: 2px;
+  background: var(--accent);
+  border: none;
+  color: #0e141f;
+  font-weight: 700;
+  padding: 13px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.98rem;
+  font-family: inherit;
+}
+.login-demo:hover { background: var(--accent-soft); }
+.login-demo-sub { text-align: center; color: var(--text-dim); font-size: 0.78rem; margin: -6px 0 4px; }
+
+.login-signin { border-top: 1px solid var(--panel-border); padding-top: 12px; }
+.login-signin summary {
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  font-weight: 600;
+  list-style: none;
+  text-align: center;
+}
+.login-signin summary::-webkit-details-marker { display: none; }
+.login-signin summary:hover { color: var(--accent-soft); }
+.login-signin form { display: flex; flex-direction: column; gap: 14px; margin-top: 14px; }
+
+.demo-banner {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  color: var(--text);
+  padding: 9px 10px 9px 16px;
+  border-radius: 999px;
+  font-size: 0.84rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  z-index: 1500;
+  max-width: calc(100% - 24px);
+}
+.demo-active .app-main { padding-bottom: 72px; }
+.demo-banner strong { font-weight: 700; }
+.demo-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px rgba(77,124,199,0.25);
+  flex: 0 0 auto;
+}
+.demo-banner button {
+  background: var(--accent);
+  border: none;
+  color: #0e141f;
+  font-weight: 700;
+  font-size: 0.8rem;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.demo-banner button:hover { background: var(--accent-soft); }
 
 :root {
   --bg: #0e141f;

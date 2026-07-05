@@ -188,7 +188,7 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
--- Seed: one tenant ("Almgren Industrier") ported from the demo fixtures.
+-- Seed: one tenant ("Meridian Manufacturing AB") ported from the demo fixtures.
 -- Guarded so re-running the whole file won't duplicate it.
 -- The SQL editor runs as an admin role, so this bypasses RLS (expected).
 -- ---------------------------------------------------------------------------
@@ -216,7 +216,7 @@ begin
   end if;
 
   insert into organizations (id, name, close_month, currency)
-    values (v_org, 'Almgren Industrier', 6, 'SEK');
+    values (v_org, 'Meridian Manufacturing AB', 6, 'SEK');
 
   insert into assumptions (org_id, employer_contribution_pct, equipment_monthly, other_overhead_pct)
     values (v_org, 31.42, 1200, 4);

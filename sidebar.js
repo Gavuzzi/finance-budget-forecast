@@ -8,14 +8,14 @@
 //   window.refreshAfterPeriodChange — fired after a month is closed (pages re-render their data)
 
 const NAV = [
-  { id: "overview", label: "Overview", href: "index.html" },
+  { id: "overview", label: "Overview", href: "app.html" },
   { id: "monthly", label: "Monthly", href: "monthly.html" },
   { id: "planning", label: "Planning", href: "planning.html" },
   { id: "assumptions", label: "Assumptions", href: "assumptions.html" },
 ];
 
 function currentPageId() {
-  const file = (location.pathname.split("/").pop() || "index.html").toLowerCase();
+  const file = (location.pathname.split("/").pop() || "app.html").toLowerCase();
   if (file.startsWith("monthly")) return "monthly";
   if (file.startsWith("planning")) return "planning";
   if (file.startsWith("assumptions")) return "assumptions";

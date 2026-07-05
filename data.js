@@ -195,8 +195,8 @@ async function loadData(orgId) {
 // the real app — purely a development affordance.
 function loadPreviewData() {
   USER_ORGS = [
-    { id: "preview-1", name: "Almgren Industrier", close_month: 6, currency: "SEK" },
-    { id: "preview-2", name: "Nordstjärna Konsult", close_month: 6, currency: "SEK" },
+    { id: "preview-1", name: "Meridian Manufacturing AB", close_month: 6, currency: "SEK" },
+    { id: "preview-2", name: "Vantage Consulting AB", close_month: 6, currency: "SEK" },
   ];
   CURRENT_ORG_ID = "preview-1";
   CLOSE_MONTH = 6;
@@ -245,8 +245,8 @@ function loadPreviewData() {
 
 // Surfaces a save failure to the user (silence = success). RLS or network
 // errors land here rather than failing silently.
-function flagWriteError(error) {
-  console.error("Save failed:", error);
+// Brief bottom toast. kind "error" (red) for save failures, "info" for notices.
+function showToast(message, kind = "info") {
   let el = document.getElementById("saveToast");
   if (!el) {
     el = document.createElement("div");
@@ -254,10 +254,16 @@ function flagWriteError(error) {
     el.className = "save-toast";
     document.body.appendChild(el);
   }
-  el.textContent = "Save failed — " + error.message;
+  el.classList.toggle("error", kind === "error");
+  el.textContent = message;
   el.classList.add("show");
   clearTimeout(el._timer);
   el._timer = setTimeout(() => el.classList.remove("show"), 5000);
+}
+
+function flagWriteError(error) {
+  console.error("Save failed:", error);
+  showToast("Save failed — " + error.message, "error");
 }
 
 async function dbUpdateAssumptions() {
@@ -421,6 +427,7 @@ async function dbDeleteScenario(id) {
 // atomic call that creates the org, your owner membership, and default
 // assumptions. The client can't touch memberships directly (security).
 async function createOrg() {
+  if (DEMO_MODE) { showToast("Sign in to create your own workspace."); return; }
   const name = prompt("Name the new organization:");
   if (!name || !name.trim()) return;
 
@@ -472,6 +479,7 @@ function emptyOrgHtml() {
 // One-click onboarding: fill the current (empty) org with a small working sample
 // company so a new user starts from something real instead of a blank app.
 async function seedExampleData() {
+  if (DEMO_MODE) { showToast("Sign in to save your own data."); return false; }
   const roleDefs = [["Manager", 55000], ["Specialist", 42000], ["Associate", 33000], ["Support", 30000]];
   const roleIds = {};
   for (const [label, base] of roleDefs) {

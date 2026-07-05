@@ -1,6 +1,6 @@
 -- ============================================================================
--- Second tenant — "Nordstjärna Konsult AB", a small Gothenburg consulting firm.
--- Deliberately a DIFFERENT shape from Almgren (different cost centers, roles,
+-- Second tenant — "Vantage Consulting AB", a small consulting firm.
+-- Deliberately a DIFFERENT shape from the manufacturer (different cost centers, roles,
 -- assumptions, and scale) to prove config-not-code: the same app renders a
 -- completely different company with zero code changes.
 --
@@ -25,7 +25,7 @@ begin
   end if;
 
   insert into organizations (id, name, close_month, currency)
-    values (v_org, 'Nordstjärna Konsult', 6, 'SEK');
+    values (v_org, 'Vantage Consulting AB', 6, 'SEK');
 
   insert into assumptions (org_id, employer_contribution_pct, equipment_monthly, other_overhead_pct)
     values (v_org, 31.42, 1500, 6);

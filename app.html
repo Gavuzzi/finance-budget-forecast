@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Overview — FP&A</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="app-main">
+      <header class="page-head">
+        <div class="page-head-text">
+          <h1>Overview</h1>
+          <p class="page-sub">Budget &amp; Forecast — FY2026</p>
+        </div>
+        <button class="print-btn print-hide" id="printBtn" type="button">Print / Save as PDF</button>
+      </header>
+
+      <div class="print-only print-header" id="printHeader"></div>
+
+      <div id="onboardSlot"></div>
+
+      <section class="lens-controls">
+        <div class="lens-toggle" role="tablist">
+          <button class="lens-btn active" data-lens="fy" type="button">This Fiscal Year</button>
+          <button class="lens-btn" data-lens="rolling" type="button">Rolling 12 Months</button>
+        </div>
+      </section>
+
+      <section class="stats-row" id="statsRow"></section>
+
+      <section class="main-row single">
+        <div class="panel chart-panel">
+          <h2 id="chartTitle">Spend — Budget vs Actual vs Forecast</h2>
+          <canvas id="trendChart"></canvas>
+        </div>
+      </section>
+
+      <section class="panel table-panel">
+        <h2>Cost Centers</h2>
+        <p class="table-hint">Built up from headcount and known costs — edit the drivers on the <a href="planning.html">Planning page</a>.</p>
+        <div class="budget-table" id="budgetTable"></div>
+      </section>
+
+      <section class="panel role-breakdown-panel">
+        <h2>Cost by Role</h2>
+        <p class="table-hint">The same people cost, sliced by role instead of cost center — total across the org this fiscal year.</p>
+        <div id="roleBreakdown"></div>
+      </section>
+
+      <section class="panel scenarios-panel">
+        <h2>Scenarios</h2>
+        <p class="table-hint">Snapshot the current plan's full-year total, then compare alternatives against the live plan. (Change drivers on Planning between snapshots.)</p>
+        <button class="add-cc-btn" id="saveScenarioBtn" type="button">+ Save current as scenario</button>
+        <div class="scenario-list" id="scenarioList"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="lib.js"></script>
+  <script src="data.js"></script>
+  <script src="sidebar.js"></script>
+  <script src="script.js"></script>
+  <script>requireAuthAndLoad(() => { renderSidebar(); window.initPage(); });</script>
+</body>
+</html>
