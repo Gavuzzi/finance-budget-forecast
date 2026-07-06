@@ -188,22 +188,39 @@ Cost-only tool (honest, simpler) **or** add revenue (BAS 3xxx → revenue + marg
 - [ ] `[B]` Account-range matcher (works even untagged)
 - [ ] `[B]` Coverage % + **Unassigned** line — never silently drop
 - [ ] `[B]` Currency suffix respects `organizations.currency`
+- [ ] `[B]` Store transaction-level detail at sync → enables **drill-to-transaction** *(blind spot #3)*
+- [ ] `[B]` Load prior-year actuals as a baseline *(blind spot #5)*
 
 ### Phase 2 — Onboarding superpower
 - [ ] `[B]` Master-data load (`/3/costcenters`, `/3/projects`) → auto-create + auto-map
 - [ ] `[B]` **Link-or-create** reconciliation review for unmapped codes
+- [ ] `[B]` **Budget vs forecast as versioned series** — locked/approved budget baseline + living forecast *(blind spot #1)*
 
 ### Phase 3 — Breadth
 - [ ] `[B]` Project matcher + configurable dimension precedence
 - [ ] `[B]` Presets (consultancy / manufacturer / retail / service)
 - [ ] `[B]` Revenue (if chosen above) — actuals from class 3 + simple plan + margin view
 - [ ] `[B]` Cost forecast methods: recurring (start/end/escalation), % of driver, per-unit, manual profile
+- [ ] `[B]` **Re-forecast from actuals** (run-rate / trend) as a forecast mode *(blind spot #4)*
+- [ ] `[B]` Variance "why" — bridge + commentary + drill-to-transaction UI *(blind spot #3/#5)*
 - [ ] `[B]` Rename `cost_centers` → reporting lines (cosmetic, once)
 
 ### Phase 4 — Depth & polish
 - [ ] `[B]` Simple allocation (corporate unallocated) + before/after views
 - [ ] `[B]` Noise filters (voucher series / account exclusions)
 - [ ] `[B]` "Spread annual costs" periodization toggle
+- [ ] `[B]` Excel export *(blind spot #5)*
+- [ ] `[B]` Scheduled auto-sync (Supabase cron) — "always current" *(blind spot #5)*
+
+### Phase 5 — Cash flow (major module · decision pending)
+A second forecast lens: **bank-balance projection, not P&L.** Different data
+(unpaid customer/supplier invoices + due dates, VAT settlement, salary/tax dates)
+and a running-balance view. Potentially *more* valuable to SMEs than the P&L —
+"can I make payroll?" — but a big, separate build. *(blind spot #2)*
+- [ ] `[F/B]` Decide if in scope
+- [ ] `[B]` Pull open invoices + due dates from Fortnox → projected in/outflows
+- [ ] `[B]` VAT + payroll/tax payment timing
+- [ ] `[B]` Running bank-balance forecast view
 
 ### Compliance gate — before onboarding a REAL client
 - [ ] `[F]` Confirm Fortnox **production** API access (partner agreement if needed)
