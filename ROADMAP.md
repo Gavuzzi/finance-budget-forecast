@@ -85,16 +85,58 @@ When master-data sync (or the actuals sync) finds a **Fortnox code that isn't ma
 
 This prevents duplicates (planned-by-hand + created-in-Fortnox showing up twice) and *is* the plan→actual bridge.
 
+## Cost & revenue forecast methods
+
+Each reporting line's plan is computed by a **forecast method** — a small, bounded
+set (not open-ended types; config, not code). Design the line to carry a `method`
+field now; build the methods in Phase 3.
+
+- **Headcount** — role × count × loaded rate, over a period *(built)*
+- **Fixed recurring** — amount/month · start–end · optional annual escalation %
+- **One-off** — amount in a month *(built)*
+- **% of a driver** — % of revenue, or % of another line (variable / revenue-linked)
+- **Per-unit × volume** — rate × a volume assumption (materials, shipping)
+- **Manual profile** — type the 12 months (escape hatch for seasonal/irregular)
+
+Today the model has only headcount + one-off + a single flat **"other monthly" blob**
+per line — that blob should become proper recurring lines with start/end.
+
+Revenue is modelled the same way: actuals auto-synced from BAS class 3; the plan
+kept simple (typed target or growth %) — no revenue-driver engine. **Revenue +
+variable (% / per-unit) methods together are what make the P&L flex with volume** —
+change a revenue/volume assumption and the whole statement moves. That's the thing
+spreadsheets can't do reliably.
+
 ## Currency — deliberately minimal
 
 Swedish books are kept in **SEK by law**; foreign transactions are booked in SEK in the GL, so the sync always pulls SEK. Multi-currency/FX is a trap for ~2% of customers.
 - **Do:** make the unit suffix respect `organizations.currency` (kr/tkr/mkr vs €).
 - **Don't:** build FX conversion. Revisit only if we leave Sweden/Fortnox.
 
-## Open questions
-- Allocation key UX — how simple can we make "spread shared costs by headcount/revenue"?
+## Not yet designed — bigger open questions
+
+**Planning discipline / time**
+- **Budget vs forecast as distinct, versioned series.** A *locked, approved* budget baseline vs a *living* forecast. Today `annual_budget` is just an editable number — no approved-and-locked version, no "forecast as of June vs as of May." Core FP&A (obvious in SAP); currently under-modelled.
+- **Re-forecast from actuals.** The forecast is purely driver-derived and ignores what actuals say (run-rate). Real re-forecasting blends actuals-to-date into the remaining months.
+- **Prior-year history as a baseline.** Forecasting often leans on last year (× growth). We pull current-year actuals only; loading 2–3 years unlocks baselines + trend comparison.
+
+**Trust / traceability**
+- **Drill to transaction.** From a monthly line back to the Fortnox vouchers behind it ("what's in this number?"). Pairs with reconciliation; critical for trust.
+
+**A whole missing view (strategic fork)**
+- **Cash flow.** We do P&L (accrual). SMEs often worry most about *cash* — when money actually moves (payment terms, VAT timing, receivables/payables). A cash forecast is a different, big build — decide if it's ever in scope.
+
+**Outputs / operations**
+- **Excel export** — finance people live in Excel; expected, cheap, high-satisfaction.
+- **Scheduled auto-sync** (Supabase cron) — the "always current" promise vs manual "Sync now."
+- **Variance "why"** — bridge/walk + commentary + drill (where controllers spend their time). We have a basic variance number + a note field.
+
+**Smaller / existing knobs**
+- Allocation key UX — how simple can "spread shared costs by headcount/revenue" be?
 - Master-data re-sync conflict rules (renamed lines, deactivated cost-centres).
-- Do presets ship as data (seed rows) or as an onboarding wizard step?
+- Presets: seed data vs onboarding wizard step?
+
+**Explicitly out of scope for now:** balance sheet, group consolidation, approval workflow, alerts.
 
 ---
 
@@ -154,7 +196,8 @@ Cost-only tool (honest, simpler) **or** add revenue (BAS 3xxx → revenue + marg
 ### Phase 3 — Breadth
 - [ ] `[B]` Project matcher + configurable dimension precedence
 - [ ] `[B]` Presets (consultancy / manufacturer / retail / service)
-- [ ] `[B]` Revenue (if chosen above)
+- [ ] `[B]` Revenue (if chosen above) — actuals from class 3 + simple plan + margin view
+- [ ] `[B]` Cost forecast methods: recurring (start/end/escalation), % of driver, per-unit, manual profile
 - [ ] `[B]` Rename `cost_centers` → reporting lines (cosmetic, once)
 
 ### Phase 4 — Depth & polish
