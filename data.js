@@ -21,6 +21,7 @@ const FY_MONTHS = 12;
 
 // Populated by loadData() from the database.
 let CLOSE_MONTH = 6;
+let DISPLAY_UNIT = "mkr"; // "kr" | "tkr" | "mkr" — set per org in loadData/loadPreviewData
 let CURRENT_ORG_ID = null;
 let USER_ORGS = [];
 let SCENARIOS = [];
@@ -133,6 +134,7 @@ async function loadData(orgId) {
   const org = USER_ORGS.find((o) => o.id === saved) || USER_ORGS[0];
   CURRENT_ORG_ID = org.id;
   CLOSE_MONTH = org.close_month;
+  DISPLAY_UNIT = org.display_unit || "tkr"; // SME default; falls back gracefully if the column isn't set
   localStorage.setItem(ORG_STORAGE_KEY, CURRENT_ORG_ID);
 
   // Everything else is filtered to the active org (there may be several now).
@@ -204,6 +206,7 @@ function loadPreviewData() {
   ];
   CURRENT_ORG_ID = "preview-1";
   CLOSE_MONTH = 6;
+  DISPLAY_UNIT = "mkr"; // demo figures are millions-scale — keep the portfolio clean
   Object.assign(ASSUMPTIONS, { employerContributionPct: 31.42, equipmentMonthly: 1200, otherOverheadPct: 4 });
 
   ROLE_CATALOG.length = 0;
@@ -444,8 +447,19 @@ async function createOrg() {
 
 // ---- Shared formatting -----------------------------------------------------
 
+// Display unit is per-org: real orgs default to thousands (tkr, the SME standard),
+// while the sample/demo uses millions (mkr) because its figures are much larger.
+// DISPLAY_UNIT is set in loadData / loadPreviewData before anything renders.
+const UNITS = {
+  kr:  { div: 1,         suffix: "kr",  dec: 0 },
+  tkr: { div: 1000,      suffix: "tkr", dec: 0 },
+  mkr: { div: 1_000_000, suffix: "mkr", dec: 1 },
+};
+function unitCfg() { return UNITS[DISPLAY_UNIT] || UNITS.mkr; }
+
 function fmtMkr(n) {
-  return (n / 1_000_000).toLocaleString("sv-SE", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " mkr";
+  const u = unitCfg();
+  return (n / u.div).toLocaleString("sv-SE", { minimumFractionDigits: u.dec, maximumFractionDigits: u.dec }) + " " + u.suffix;
 }
 
 function fmtMkrSigned(n) {

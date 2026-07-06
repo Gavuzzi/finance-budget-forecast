@@ -212,7 +212,7 @@ function renderChart() {
       scales: {
         x: { ticks: { color: colors.text }, grid: { color: colors.grid } },
         y: {
-          ticks: { color: colors.text, callback: (v) => (v / 1_000_000).toFixed(1) + " mkr" },
+          ticks: { color: colors.text, callback: (v) => fmtMkr(v) },
           grid: { color: colors.grid },
         },
       },

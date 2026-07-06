@@ -1,8 +1,9 @@
 let currentLens = "fy"; // "fy" | "rolling"
 
-// Compact cell value — just the number in mkr (the unit is stated once in the hint).
+// Compact cell value — just the number in the org's display unit (stated once in the hint).
 function fmtCell(n) {
-  return (n / 1_000_000).toLocaleString("sv-SE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const u = unitCfg();
+  return (n / u.div).toLocaleString("sv-SE", { minimumFractionDigits: u.dec, maximumFractionDigits: u.dec });
 }
 
 function lensMonths() {
@@ -40,6 +41,9 @@ function renderMonthlyGrid() {
   }
   sections.forEach((el) => (el.style.display = ""));
   if (empty) empty.style.display = "none";
+
+  const unitEl = document.getElementById("unitLabel");
+  if (unitEl) unitEl.textContent = DISPLAY_UNIT;
 
   const months = lensMonths();
   const isFy = currentLens === "fy";
