@@ -1,0 +1,447 @@
+#FLAGGA 0
+#PROGRAM "FPA Seed" 1.0
+#FORMAT PC8
+#GEN 20260101
+#SIETYP 4
+#FNAMN "FP&A Sandbox"
+#RAR 0 20260101 20261231
+#KONTO 1510 "Kundfordringar"
+#KONTO 1930 "Bank"
+#KONTO 2440 "Leverantorsskulder"
+#KONTO 3010 "Forsaljning"
+#KONTO 4010 "Inkop material"
+#KONTO 5010 "Lokalhyra"
+#KONTO 5410 "Forbrukningsinventarier"
+#KONTO 6310 "Foretagsforsakring"
+#KONTO 6540 "IT-tjanster"
+#KONTO 7010 "Loner"
+#DIM 1 "Kostnadsstalle"
+#OBJEKT 1 "10" "Produktion"
+#OBJEKT 1 "20" "Forsaljning"
+#OBJEKT 1 "30" "Administration"
+#DIM 6 "Projekt"
+#OBJEKT 6 "P01" "Projekt Alfa"
+#VER "A" "1" 20260110 "Kundfaktura 1 a"
+{
+#TRANS 1510 {} 122500.00
+#TRANS 3010 {} -122500.00
+}
+#VER "A" "2" 20260120 "Kundfaktura 1 b"
+{
+#TRANS 1510 {} 61500.00
+#TRANS 3010 {} -61500.00
+}
+#VER "A" "3" 20260125 "Loner 1"
+{
+#TRANS 7010 {1 "10"} 70000.00
+#TRANS 7010 {1 "20"} 45000.00
+#TRANS 7010 {1 "30"} 35000.00
+#TRANS 1930 {} -150000.00
+}
+#VER "A" "4" 20260101 "Lokalhyra 1"
+{
+#TRANS 5010 {1 "30"} 25000.00
+#TRANS 1930 {} -25000.00
+}
+#VER "A" "5" 20260115 "Inkop material 1"
+{
+#TRANS 4010 {1 "10"} 30500.00
+#TRANS 2440 {} -30500.00
+}
+#VER "A" "6" 20260105 "IT-tjanster 1"
+{
+#TRANS 6540 {1 "30"} 8000.00
+#TRANS 1930 {} -8000.00
+}
+#VER "A" "7" 20260210 "Kundfaktura 2 a"
+{
+#TRANS 1510 {} 125000.00
+#TRANS 3010 {} -125000.00
+}
+#VER "A" "8" 20260220 "Kundfaktura 2 b"
+{
+#TRANS 1510 {} 63000.00
+#TRANS 3010 {} -63000.00
+}
+#VER "A" "9" 20260225 "Loner 2"
+{
+#TRANS 7010 {1 "10"} 70000.00
+#TRANS 7010 {1 "20"} 45000.00
+#TRANS 7010 {1 "30"} 35000.00
+#TRANS 1930 {} -150000.00
+}
+#VER "A" "10" 20260201 "Lokalhyra 2"
+{
+#TRANS 5010 {1 "30"} 25000.00
+#TRANS 1930 {} -25000.00
+}
+#VER "A" "11" 20260215 "Inkop material 2"
+{
+#TRANS 4010 {1 "10"} 31000.00
+#TRANS 2440 {} -31000.00
+}
+#VER "A" "12" 20260205 "IT-tjanster 2"
+{
+#TRANS 6540 {1 "30"} 8000.00
+#TRANS 1930 {} -8000.00
+}
+#VER "A" "13" 20260218 "Projektkostnad P01 2"
+{
+#TRANS 5410 {1 "10" 6 "P01"} 15000.00
+#TRANS 2440 {} -15000.00
+}
+#VER "A" "14" 20260310 "Kundfaktura 3 a"
+{
+#TRANS 1510 {} 127500.00
+#TRANS 3010 {} -127500.00
+}
+#VER "A" "15" 20260320 "Kundfaktura 3 b"
+{
+#TRANS 1510 {} 64500.00
+#TRANS 3010 {} -64500.00
+}
+#VER "A" "16" 20260325 "Loner 3"
+{
+#TRANS 7010 {1 "10"} 70000.00
+#TRANS 7010 {1 "20"} 45000.00
+#TRANS 7010 {1 "30"} 35000.00
+#TRANS 1930 {} -150000.00
+}
+#VER "A" "17" 20260301 "Lokalhyra 3"
+{
+#TRANS 5010 {1 "30"} 25000.00
+#TRANS 1930 {} -25000.00
+}
+#VER "A" "18" 20260315 "Inkop material 3"
+{
+#TRANS 4010 {1 "10"} 31500.00
+#TRANS 2440 {} -31500.00
+}
+#VER "A" "19" 20260305 "IT-tjanster 3"
+{
+#TRANS 6540 {1 "30"} 8000.00
+#TRANS 1930 {} -8000.00
+}
+#VER "A" "20" 20260410 "Kundfaktura 4 a"
+{
+#TRANS 1510 {} 130000.00
+#TRANS 3010 {} -130000.00
+}
+#VER "A" "21" 20260420 "Kundfaktura 4 b"
+{
+#TRANS 1510 {} 66000.00
+#TRANS 3010 {} -66000.00
+}
+#VER "A" "22" 20260425 "Loner 4"
+{
+#TRANS 7010 {1 "10"} 70000.00
+#TRANS 7010 {1 "20"} 45000.00
+#TRANS 7010 {1 "30"} 35000.00
+#TRANS 1930 {} -150000.00
+}
+#VER "A" "23" 20260401 "Lokalhyra 4"
+{
+#TRANS 5010 {1 "30"} 25000.00
+#TRANS 1930 {} -25000.00
+}
+#VER "A" "24" 20260415 "Inkop material 4"
+{
+#TRANS 4010 {1 "10"} 32000.00
+#TRANS 2440 {} -32000.00
+}
+#VER "A" "25" 20260405 "IT-tjanster 4"
+{
+#TRANS 6540 {1 "30"} 8000.00
+#TRANS 1930 {} -8000.00
+}
+#VER "A" "26" 20260418 "Projektkostnad P01 4"
+{
+#TRANS 5410 {1 "10" 6 "P01"} 15000.00
+#TRANS 2440 {} -15000.00
+}
+#VER "A" "27" 20260510 "Kundfaktura 5 a"
+{
+#TRANS 1510 {} 132500.00
+#TRANS 3010 {} -132500.00
+}
+#VER "A" "28" 20260520 "Kundfaktura 5 b"
+{
+#TRANS 1510 {} 67500.00
+#TRANS 3010 {} -67500.00
+}
+#VER "A" "29" 20260525 "Loner 5"
+{
+#TRANS 7010 {1 "10"} 70000.00
+#TRANS 7010 {1 "20"} 45000.00
+#TRANS 7010 {1 "30"} 35000.00
+#TRANS 1930 {} -150000.00
+}
+#VER "A" "30" 20260501 "Lokalhyra 5"
+{
+#TRANS 5010 {1 "30"} 25000.00
+#TRANS 1930 {} -25000.00
+}
+#VER "A" "31" 20260515 "Inkop material 5"
+{
+#TRANS 4010 {1 "10"} 32500.00
+#TRANS 2440 {} -32500.00
+}
+#VER "A" "32" 20260505 "IT-tjanster 5"
+{
+#TRANS 6540 {1 "30"} 8000.00
+#TRANS 1930 {} -8000.00
+}
+#VER "A" "33" 20260610 "Kundfaktura 6 a"
+{
+#TRANS 1510 {} 135000.00
+#TRANS 3010 {} -135000.00
+}
+#VER "A" "34" 20260620 "Kundfaktura 6 b"
+{
+#TRANS 1510 {} 69000.00
+#TRANS 3010 {} -69000.00
+}
+#VER "A" "35" 20260625 "Loner 6"
+{
+#TRANS 7010 {1 "10"} 70000.00
+#TRANS 7010 {1 "20"} 45000.00
+#TRANS 7010 {1 "30"} 35000.00
+#TRANS 1930 {} -150000.00
+}
+#VER "A" "36" 20260601 "Lokalhyra 6"
+{
+#TRANS 5010 {1 "30"} 25000.00
+#TRANS 1930 {} -25000.00
+}
+#VER "A" "37" 20260615 "Inkop material 6"
+{
+#TRANS 4010 {1 "10"} 33000.00
+#TRANS 2440 {} -33000.00
+}
+#VER "A" "38" 20260605 "IT-tjanster 6"
+{
+#TRANS 6540 {1 "30"} 8000.00
+#TRANS 1930 {} -8000.00
+}
+#VER "A" "39" 20260618 "Projektkostnad P01 6"
+{
+#TRANS 5410 {1 "10" 6 "P01"} 15000.00
+#TRANS 2440 {} -15000.00
+}
+#VER "A" "40" 20260710 "Kundfaktura 7 a"
+{
+#TRANS 1510 {} 137500.00
+#TRANS 3010 {} -137500.00
+}
+#VER "A" "41" 20260720 "Kundfaktura 7 b"
+{
+#TRANS 1510 {} 70500.00
+#TRANS 3010 {} -70500.00
+}
+#VER "A" "42" 20260725 "Loner 7"
+{
+#TRANS 7010 {1 "10"} 70000.00
+#TRANS 7010 {1 "20"} 45000.00
+#TRANS 7010 {1 "30"} 35000.00
+#TRANS 1930 {} -150000.00
+}
+#VER "A" "43" 20260701 "Lokalhyra 7"
+{
+#TRANS 5010 {1 "30"} 25000.00
+#TRANS 1930 {} -25000.00
+}
+#VER "A" "44" 20260715 "Inkop material 7"
+{
+#TRANS 4010 {1 "10"} 33500.00
+#TRANS 2440 {} -33500.00
+}
+#VER "A" "45" 20260705 "IT-tjanster 7"
+{
+#TRANS 6540 {1 "30"} 8000.00
+#TRANS 1930 {} -8000.00
+}
+#VER "A" "46" 20260810 "Kundfaktura 8 a"
+{
+#TRANS 1510 {} 140000.00
+#TRANS 3010 {} -140000.00
+}
+#VER "A" "47" 20260820 "Kundfaktura 8 b"
+{
+#TRANS 1510 {} 72000.00
+#TRANS 3010 {} -72000.00
+}
+#VER "A" "48" 20260825 "Loner 8"
+{
+#TRANS 7010 {1 "10"} 70000.00
+#TRANS 7010 {1 "20"} 45000.00
+#TRANS 7010 {1 "30"} 35000.00
+#TRANS 1930 {} -150000.00
+}
+#VER "A" "49" 20260801 "Lokalhyra 8"
+{
+#TRANS 5010 {1 "30"} 25000.00
+#TRANS 1930 {} -25000.00
+}
+#VER "A" "50" 20260815 "Inkop material 8"
+{
+#TRANS 4010 {1 "10"} 34000.00
+#TRANS 2440 {} -34000.00
+}
+#VER "A" "51" 20260805 "IT-tjanster 8"
+{
+#TRANS 6540 {1 "30"} 8000.00
+#TRANS 1930 {} -8000.00
+}
+#VER "A" "52" 20260818 "Projektkostnad P01 8"
+{
+#TRANS 5410 {1 "10" 6 "P01"} 15000.00
+#TRANS 2440 {} -15000.00
+}
+#VER "A" "53" 20260910 "Kundfaktura 9 a"
+{
+#TRANS 1510 {} 142500.00
+#TRANS 3010 {} -142500.00
+}
+#VER "A" "54" 20260920 "Kundfaktura 9 b"
+{
+#TRANS 1510 {} 73500.00
+#TRANS 3010 {} -73500.00
+}
+#VER "A" "55" 20260925 "Loner 9"
+{
+#TRANS 7010 {1 "10"} 70000.00
+#TRANS 7010 {1 "20"} 45000.00
+#TRANS 7010 {1 "30"} 35000.00
+#TRANS 1930 {} -150000.00
+}
+#VER "A" "56" 20260901 "Lokalhyra 9"
+{
+#TRANS 5010 {1 "30"} 25000.00
+#TRANS 1930 {} -25000.00
+}
+#VER "A" "57" 20260915 "Inkop material 9"
+{
+#TRANS 4010 {1 "10"} 34500.00
+#TRANS 2440 {} -34500.00
+}
+#VER "A" "58" 20260905 "IT-tjanster 9"
+{
+#TRANS 6540 {1 "30"} 8000.00
+#TRANS 1930 {} -8000.00
+}
+#VER "A" "59" 20261010 "Kundfaktura 10 a"
+{
+#TRANS 1510 {} 145000.00
+#TRANS 3010 {} -145000.00
+}
+#VER "A" "60" 20261020 "Kundfaktura 10 b"
+{
+#TRANS 1510 {} 75000.00
+#TRANS 3010 {} -75000.00
+}
+#VER "A" "61" 20261025 "Loner 10"
+{
+#TRANS 7010 {1 "10"} 70000.00
+#TRANS 7010 {1 "20"} 45000.00
+#TRANS 7010 {1 "30"} 35000.00
+#TRANS 1930 {} -150000.00
+}
+#VER "A" "62" 20261001 "Lokalhyra 10"
+{
+#TRANS 5010 {1 "30"} 25000.00
+#TRANS 1930 {} -25000.00
+}
+#VER "A" "63" 20261015 "Inkop material 10"
+{
+#TRANS 4010 {1 "10"} 35000.00
+#TRANS 2440 {} -35000.00
+}
+#VER "A" "64" 20261005 "IT-tjanster 10"
+{
+#TRANS 6540 {1 "30"} 8000.00
+#TRANS 1930 {} -8000.00
+}
+#VER "A" "65" 20261018 "Projektkostnad P01 10"
+{
+#TRANS 5410 {1 "10" 6 "P01"} 15000.00
+#TRANS 2440 {} -15000.00
+}
+#VER "A" "66" 20261110 "Kundfaktura 11 a"
+{
+#TRANS 1510 {} 147500.00
+#TRANS 3010 {} -147500.00
+}
+#VER "A" "67" 20261120 "Kundfaktura 11 b"
+{
+#TRANS 1510 {} 76500.00
+#TRANS 3010 {} -76500.00
+}
+#VER "A" "68" 20261125 "Loner 11"
+{
+#TRANS 7010 {1 "10"} 70000.00
+#TRANS 7010 {1 "20"} 45000.00
+#TRANS 7010 {1 "30"} 35000.00
+#TRANS 1930 {} -150000.00
+}
+#VER "A" "69" 20261101 "Lokalhyra 11"
+{
+#TRANS 5010 {1 "30"} 25000.00
+#TRANS 1930 {} -25000.00
+}
+#VER "A" "70" 20261115 "Inkop material 11"
+{
+#TRANS 4010 {1 "10"} 35500.00
+#TRANS 2440 {} -35500.00
+}
+#VER "A" "71" 20261105 "IT-tjanster 11"
+{
+#TRANS 6540 {1 "30"} 8000.00
+#TRANS 1930 {} -8000.00
+}
+#VER "A" "72" 20261210 "Kundfaktura 12 a"
+{
+#TRANS 1510 {} 150000.00
+#TRANS 3010 {} -150000.00
+}
+#VER "A" "73" 20261220 "Kundfaktura 12 b"
+{
+#TRANS 1510 {} 78000.00
+#TRANS 3010 {} -78000.00
+}
+#VER "A" "74" 20261225 "Loner 12"
+{
+#TRANS 7010 {1 "10"} 70000.00
+#TRANS 7010 {1 "20"} 45000.00
+#TRANS 7010 {1 "30"} 35000.00
+#TRANS 1930 {} -150000.00
+}
+#VER "A" "75" 20261201 "Lokalhyra 12"
+{
+#TRANS 5010 {1 "30"} 25000.00
+#TRANS 1930 {} -25000.00
+}
+#VER "A" "76" 20261215 "Inkop material 12"
+{
+#TRANS 4010 {1 "10"} 36000.00
+#TRANS 2440 {} -36000.00
+}
+#VER "A" "77" 20261205 "IT-tjanster 12"
+{
+#TRANS 6540 {1 "30"} 8000.00
+#TRANS 1930 {} -8000.00
+}
+#VER "A" "78" 20261218 "Projektkostnad P01 12"
+{
+#TRANS 5410 {1 "10" 6 "P01"} 15000.00
+#TRANS 2440 {} -15000.00
+}
+#VER "A" "79" 20260331 "Foretagsforsakring helar"
+{
+#TRANS 6310 {1 "30"} 48000.00
+#TRANS 1930 {} -48000.00
+}
+#VER "A" "80" 20260205 "Rattelse kundfaktura jan"
+{
+#TRANS 3010 {} 5000.00
+#TRANS 1510 {} -5000.00
+}
