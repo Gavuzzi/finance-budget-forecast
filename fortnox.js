@@ -80,11 +80,35 @@ async function runFortnoxSync(btn) {
       msg += ` Unmapped Fortnox codes: ${out.unmapped_cost_centers.join(", ")}.`;
     }
     showToast(msg);
-    setTimeout(() => location.reload(), 1200);
+    renderReconciliation(out);
   } catch (e) {
     showToast("Sync failed — " + e.message, "error");
+  } finally {
     if (btn) { btn.disabled = false; btn.textContent = "Sync now"; }
   }
+}
+
+function fmtKr(n) { return (n || 0).toLocaleString("sv-SE") + " kr"; }
+
+// Show the full-P&L reconciliation returned by the sync, to compare against
+// Fortnox's own Resultatrapport. This is the Phase 0 tie-out check.
+function renderReconciliation(out) {
+  const r = out.reconciliation;
+  const host = document.getElementById("fnReconciliation");
+  if (!host || !r) return;
+  host.innerHTML = `
+    <div class="fn-recon">
+      <h4>Sync reconciliation — compare to Fortnox's Resultatrapport</h4>
+      <table class="fn-recon-table">
+        <tr><td>Revenue (class 3)</td><td class="num">${fmtKr(r.revenue)}</td></tr>
+        <tr><td>COGS (class 4)</td><td class="num">${fmtKr(r.cogs)}</td></tr>
+        <tr><td>Operating (class 5–6)</td><td class="num">${fmtKr(r.opex)}</td></tr>
+        <tr><td>Personnel (class 7)</td><td class="num">${fmtKr(r.personnel)}</td></tr>
+        <tr class="fn-recon-total"><td>Total cost</td><td class="num">${fmtKr(r.total_cost)}</td></tr>
+        <tr class="fn-recon-total"><td>Result</td><td class="num">${fmtKr(r.result)}</td></tr>
+      </table>
+      <p class="fn-recon-note">Read from ${r.vouchers} vouchers / ${r.rows} rows. Captured into cost centres: ${fmtKr(r.captured_cost)}${r.unmapped_cost ? ` · unmapped: ${fmtKr(r.unmapped_cost)}` : ""}.</p>
+    </div>`;
 }
 
 // ---- Panel UI --------------------------------------------------------------
@@ -121,6 +145,7 @@ function connectedHtml(status) {
         <button class="integ-link" id="fnMapToggle" type="button">Cost-centre mapping</button>
       </div>
       ${err}
+      <div id="fnReconciliation"></div>
       <div class="integ-mapping" id="fnMapping" hidden></div>
     </div>`;
 }

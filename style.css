@@ -751,6 +751,14 @@ html, body {
 }
 .integ-map-row input:focus { outline: none; border-color: var(--accent); }
 
+.fn-recon { margin-top: 14px; border-top: 1px solid var(--panel-border); padding-top: 13px; }
+.fn-recon h4 { font-size: 0.9rem; margin: 0 0 10px; color: var(--text); }
+.fn-recon-table { width: 100%; max-width: 420px; border-collapse: collapse; font-size: 0.9rem; }
+.fn-recon-table td { padding: 5px 0; color: var(--text-dim); }
+.fn-recon-table td.num { text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
+.fn-recon-total td { border-top: 1px solid var(--panel-border); font-weight: 700; color: var(--text); padding-top: 8px; }
+.fn-recon-note { font-size: 0.78rem; color: var(--text-dim); margin-top: 10px; }
+
 .theme-toggle {
   background: var(--bg);
   border: 1px solid var(--panel-border);

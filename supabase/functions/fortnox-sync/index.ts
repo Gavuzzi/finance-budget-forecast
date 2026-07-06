@@ -96,10 +96,13 @@ Deno.serve(async (req) => {
     const codeToCc = new Map<string, string>();
     (maps ?? []).forEach((m: any) => m.cost_center_id && codeToCc.set(m.external_code, m.cost_center_id));
 
-    // 3. Page through vouchers → aggregate expense rows by (cost centre × month).
+    // 3. Page through vouchers → aggregate cost rows by (cost centre × month),
+    //    and compute a full-P&L reconciliation from EVERY row (mapping-independent).
     const totals = new Map<string, number>();
     const unmapped = new Set<string>();
-    let page = 1, fetched = 0;
+    let page = 1, fetched = 0, rowCount = 0;
+    let revRaw = 0, cogs = 0, opex = 0, personnel = 0;   // raw P&L by BAS class
+    let capturedCost = 0, unmappedCost = 0;
 
     while (fetched < MAX_VOUCHERS) {
       const list = await fortnoxGet(`/vouchers?page=${page}&limit=500`, accessToken); // VERIFY params
@@ -117,13 +120,25 @@ Deno.serve(async (req) => {
 
         for (const r of rows) {
           const acct = Number(r.Account);
-          if (!(acct >= 5000 && acct < 8000)) continue;      // operating + personnel costs
           const amount = (Number(r.Debit) || 0) - (Number(r.Credit) || 0);
           if (!amount) continue;
+          rowCount++;
+          const cls = Math.floor(acct / 1000); // BAS class (first digit)
+
+          // Reconciliation: full P&L from every row, regardless of mapping/scope.
+          if (cls === 3) revRaw += amount;              // revenue (credit-normal → negative)
+          else if (cls === 4) cogs += amount;           // COGS
+          else if (cls === 5 || cls === 6) opex += amount;
+          else if (cls === 7) personnel += amount;
+          // classes 1,2 (balance sheet) and 8 (financial) are outside the operating result
+
+          // Cost capture into reporting lines: operating costs (BAS 4–7) only.
+          if (!(acct >= 4000 && acct < 8000)) continue;
           const code = String(r.CostCenter ?? "").trim();
-          if (!code) continue;                                // untagged → can't place it
+          if (!code) continue;                          // untagged → can't place it
           const ccId = codeToCc.get(code);
-          if (!ccId) { unmapped.add(code); continue; }
+          if (!ccId) { unmapped.add(code); unmappedCost += amount; continue; }
+          capturedCost += amount;
           const key = `${ccId}|${month}`;
           totals.set(key, (totals.get(key) ?? 0) + amount);
         }
@@ -148,7 +163,26 @@ Deno.serve(async (req) => {
       last_synced_at: new Date().toISOString(), last_sync_error: null,
     }).eq("org_id", org_id);
 
-    return json({ ok: true, months_updated: rows.length, close_month: maxMonth, unmapped_cost_centers: [...unmapped] });
+    const revenue = -revRaw;                 // flip credit-normal revenue to positive
+    const totalCost = cogs + opex + personnel;
+    return json({
+      ok: true,
+      months_updated: rows.length,
+      close_month: maxMonth,
+      unmapped_cost_centers: [...unmapped],
+      reconciliation: {
+        revenue: Math.round(revenue),
+        cogs: Math.round(cogs),
+        opex: Math.round(opex),
+        personnel: Math.round(personnel),
+        total_cost: Math.round(totalCost),
+        result: Math.round(revenue - totalCost),
+        captured_cost: Math.round(capturedCost),
+        unmapped_cost: Math.round(unmappedCost),
+        vouchers: fetched,
+        rows: rowCount,
+      },
+    });
   } catch (e) {
     console.error("fortnox-sync error:", e);
     await admin.from("integration_status").update({ last_sync_error: String(e) }).eq("org_id", org_id);
