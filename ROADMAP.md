@@ -121,29 +121,48 @@ Swedish books are kept in **SEK by law**; foreign transactions are booked in SEK
 
 ---
 
-## Build backlog (prioritized)
+## Step-by-step plan (validation-first)
 
-**Phase 1 — universal ingestion (do any company, even untagged)**
-- [ ] Add `dimension` (`costcenter|project|account`) + `source` (`fortnox|manual`) + `state` (`planned|linked`) to the mapping/reporting-line model
-- [ ] **Account-range matcher** in `fortnox-sync` (testable now against the sandbox)
-- [ ] Coverage transparency (% tagged) + **Unassigned** line — never silently drop
-- [ ] Currency suffix respects `organizations.currency`
+**Principle: prove the foundation before building on it.** No new features until
+the current sync ties out to Fortnox's own P&L at realistic scale.
+`[F]` = Felix does it in Fortnox/Supabase · `[B]` = a build task.
 
-**Phase 2 — onboarding superpower (master-data load)**
-- [ ] Master-data sync: pull `/3/costcenters` + `/3/projects` from Fortnox
-- [ ] Auto-create + auto-map reporting lines from loaded structure
-- [ ] **Link-or-create** reconciliation review for unmapped codes
+### Phase 0 — Prove the foundation (do this first)
+Goal: the sync's numbers match Fortnox's result report, at real scale, reliably.
+- [ ] `[F]` **Realistic sandbox** — a full year: dozens of vouchers across BAS 4/5/6/7, several cost-centres, a project or two, a lumpy annual cost, one correction/reversal. *(kills toy-data blindness)*
+- [ ] `[B]` **Reconciliation / tie-out** — after a sync, compare our per-period total to Fortnox's own result report; show ✓ matches / ✗ off by X. *(Risk #1 — trust)* — **done when our total = Fortnox's P&L per closed month.**
+- [ ] `[B]` **Configurable account scope** — default BAS 5–7; explicit decision on 4xxx (COGS). *(crude-filter miscount)*
+- [ ] `[B]` **Incremental + resilient sync** — only since last run; batch + backoff; drop the silent `MAX_VOUCHERS` cap; full pagination. *(Risk #2 — scale/timeout)*
+- [ ] `[B]` **Period refresh, not blind upsert** — delete + reload a period so corrections/deletions propagate. *(stale-actuals drift)*
+- [ ] `[B]` **Real "closed" month** — stop auto-advancing to "last month with a booking"; use Fortnox's locked-period info, or keep it user-confirmed. *(fake favourable variance)*
 
-**Phase 3 — breadth**
-- [ ] Project matcher + configurable dimension precedence
-- [ ] Business-type **presets** (consultancy / manufacturer / retail / service)
-- [ ] Rename `cost_centers` → reporting lines (cosmetic, do once)
+**Gate:** foundation ties out → only now build features.
 
-**Phase 4 — depth & polish**
-- [ ] Optional simple allocation (by key; corporate unallocated) + before/after views
-- [ ] Noise filters (voucher series / account exclusions)
-- [ ] "Spread annual costs" periodization toggle
+### Decision — Revenue (make this call before Phase 1)
+Cost-only tool (honest, simpler) **or** add revenue (BAS 3xxx → revenue + margin per line/project). Shapes everything after, especially the consultancy/project segment.
 
-**Ongoing**
-- [ ] Validate the `VERIFY` spots in `fortnox-sync` (voucher list shape, pagination) against a richer sandbox
-- [ ] Research + encode preset definitions (setups by industry)
+### Phase 1 — Universal ingestion
+- [ ] `[B]` `dimension` (`costcenter|project|account`) + `source` (`fortnox|manual`) + `state` (`planned|linked`) on the model
+- [ ] `[B]` Account-range matcher (works even untagged)
+- [ ] `[B]` Coverage % + **Unassigned** line — never silently drop
+- [ ] `[B]` Currency suffix respects `organizations.currency`
+
+### Phase 2 — Onboarding superpower
+- [ ] `[B]` Master-data load (`/3/costcenters`, `/3/projects`) → auto-create + auto-map
+- [ ] `[B]` **Link-or-create** reconciliation review for unmapped codes
+
+### Phase 3 — Breadth
+- [ ] `[B]` Project matcher + configurable dimension precedence
+- [ ] `[B]` Presets (consultancy / manufacturer / retail / service)
+- [ ] `[B]` Revenue (if chosen above)
+- [ ] `[B]` Rename `cost_centers` → reporting lines (cosmetic, once)
+
+### Phase 4 — Depth & polish
+- [ ] `[B]` Simple allocation (corporate unallocated) + before/after views
+- [ ] `[B]` Noise filters (voucher series / account exclusions)
+- [ ] `[B]` "Spread annual costs" periodization toggle
+
+### Compliance gate — before onboarding a REAL client
+- [ ] `[F]` Confirm Fortnox **production** API access (partner agreement if needed)
+- [ ] `[F/B]` DPA + security review for holding real financial data (GDPR)
+- [ ] `[B]` Read-only posture (token has write scope; we never write) — documented + enforced
