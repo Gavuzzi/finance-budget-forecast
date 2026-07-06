@@ -18,7 +18,6 @@ function monthLabel(m) {
 
 const TIMELINE_LENGTH = 24; // FY2026 (1-12) + FY2027 (13-24)
 const FY_MONTHS = 12;
-const MAX_CLOSE_MONTH = 9; // how far the seeded fixture actuals go
 
 // Populated by loadData() from the database.
 let CLOSE_MONTH = 6;
@@ -111,8 +110,10 @@ function companyMonthAmount(month) {
   return COST_CENTERS.reduce((s, cc) => s + monthAmount(cc, month).value, 0);
 }
 
-function advanceCloseMonth() {
-  if (CLOSE_MONTH < MAX_CLOSE_MONTH) CLOSE_MONTH++;
+// Set which absolute month actuals are booked through (0 = none yet).
+// Months without actual data still fall back to forecast, so any value is safe.
+function setCloseMonth(m) {
+  CLOSE_MONTH = Math.max(0, Math.min(TIMELINE_LENGTH, m));
 }
 
 // ---- Load from Supabase ----------------------------------------------------

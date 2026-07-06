@@ -28,6 +28,8 @@
 
       <p class="table-hint">Figures in mkr. <span class="mt-legend-actual">Solid</span> columns are booked actuals; <span class="mt-legend-forecast">lighter</span> columns are forecast. The accent line marks where actuals end.</p>
 
+      <div id="integrationPanel"></div>
+
       <div class="actuals-import">
         <button class="add-cc-btn" id="importActualsBtn" type="button">Import actuals (CSV)</button>
         <div class="import-panel" id="importPanel" hidden>
@@ -51,6 +53,7 @@
   <script src="lib.js"></script>
   <script src="data.js"></script>
   <script src="sidebar.js"></script>
+  <script src="fortnox.js"></script>
   <script src="monthly.js"></script>
   <script>requireAuthAndLoad(() => { renderSidebar(); window.initPage(); });</script>
 </body>

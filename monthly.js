@@ -144,6 +144,8 @@ function initMonthly() {
     });
   });
   initImport();
+  handleFortnoxRedirect();
+  renderIntegrationPanel(document.getElementById("integrationPanel"));
   renderMonthlyGrid();
 }
 

@@ -695,32 +695,61 @@ html, body {
   color: var(--text-dim);
 }
 
-.period-value {
-  font-size: 0.98rem;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.period-note {
-  font-size: 0.74rem;
-  color: var(--text-dim);
-  margin-top: 4px;
-}
-
-.period-close {
-  margin-top: 8px;
-  background: none;
+.period-select {
+  margin-top: 2px;
+  background: var(--bg);
   border: 1px solid var(--panel-border);
-  color: var(--accent-soft);
-  font-size: 0.82rem;
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.92rem;
   font-weight: 600;
-  padding: 7px 10px;
   border-radius: 8px;
+  padding: 8px 10px;
+  width: 100%;
   cursor: pointer;
-  text-align: left;
 }
 
-.period-close:hover { border-color: var(--accent); }
+.period-select:focus { outline: none; border-color: var(--accent); }
+
+/* Accounting integration panel (Monthly page) */
+.integration-card {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  margin-bottom: 16px;
+}
+.integration-card.connected { border-color: var(--accent); }
+.integ-head { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 1rem; color: var(--text); }
+.integ-logo { font-size: 1.1rem; color: var(--accent-soft); }
+.integ-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--green, #3fb27f); box-shadow: 0 0 0 4px rgba(63,178,127,0.22); flex: 0 0 auto;
+}
+.integ-sub { color: var(--text-dim); font-size: 0.88rem; margin: 7px 0 13px; }
+.integ-warn { color: var(--red); font-size: 0.82rem; margin-top: 8px; }
+.integ-actions { display: flex; gap: 12px; align-items: center; }
+.integ-btn {
+  background: var(--accent); border: none; color: #0e141f; font-weight: 700;
+  font-size: 0.88rem; padding: 9px 16px; border-radius: 8px; cursor: pointer; font-family: inherit;
+}
+.integ-btn:hover:not(:disabled) { background: var(--accent-soft); }
+.integ-btn:disabled { opacity: 0.5; cursor: default; }
+.integ-link {
+  background: none; border: none; color: var(--accent-soft); font-weight: 600;
+  font-size: 0.85rem; cursor: pointer; font-family: inherit;
+}
+.integ-link:hover { text-decoration: underline; }
+.integ-mapping { margin-top: 14px; border-top: 1px solid var(--panel-border); padding-top: 13px; }
+.integ-map-hint { color: var(--text-dim); font-size: 0.82rem; margin-bottom: 11px; }
+.integ-map-rows { display: grid; gap: 8px; max-width: 460px; }
+.integ-map-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 0.88rem; }
+.integ-map-row span { color: var(--text); }
+.integ-map-row input {
+  background: var(--bg); border: 1px solid var(--panel-border); color: var(--text);
+  border-radius: 6px; padding: 6px 10px; font-family: inherit; font-size: 0.85rem; width: 130px;
+}
+.integ-map-row input:focus { outline: none; border-color: var(--accent); }
 
 .theme-toggle {
   background: var(--bg);
@@ -1438,7 +1467,6 @@ html[data-theme="light"] .panel {
   .new-org-btn { display: none; }
 
   .period-box { flex: 1; }
-  .period-close { margin-top: 0; }
 
   .app-main { padding: 18px 16px; gap: 16px; }
 

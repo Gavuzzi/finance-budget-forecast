@@ -5,7 +5,7 @@
 //
 // Pages can hook into two events:
 //   window.onThemeChanged        — fired after the theme flips (Overview uses it to redraw its chart)
-//   window.refreshAfterPeriodChange — fired after a month is closed (pages re-render their data)
+//   window.refreshAfterPeriodChange — fired after the actuals-through month changes (pages re-render)
 
 const NAV = [
   { id: "overview", label: "Overview", href: "app.html" },
@@ -40,10 +40,13 @@ function sidebarHtml() {
     (n) => `<a class="nav-item ${n.id === active ? "active" : ""}" href="${n.href}">${n.label}</a>`
   ).join("");
 
-  const atCap = CLOSE_MONTH >= MAX_CLOSE_MONTH;
-  const periodAction = atCap
-    ? `<span class="period-note">All available months closed</span>`
-    : `<button class="period-close" id="closeMonthBtn" type="button">Close ${monthLabel(CLOSE_MONTH + 1)} →</button>`;
+  const monthOptions = [`<option value="0"${CLOSE_MONTH === 0 ? " selected" : ""}>None yet</option>`]
+    .concat(
+      Array.from({ length: TIMELINE_LENGTH }, (_, i) => i + 1).map(
+        (m) => `<option value="${m}"${m === CLOSE_MONTH ? " selected" : ""}>${monthLabel(m)}</option>`
+      )
+    )
+    .join("");
 
   return `
     <div class="sidebar-brand">
@@ -56,9 +59,8 @@ function sidebarHtml() {
     <nav class="sidebar-nav">${nav}</nav>
     <div class="sidebar-footer">
       <div class="period-box">
-        <span class="period-label">Actuals booked through</span>
-        <span class="period-value">${monthLabel(CLOSE_MONTH)}</span>
-        ${periodAction}
+        <label class="period-label" for="closeMonthSelect">Actuals booked through</label>
+        <select class="period-select" id="closeMonthSelect">${monthOptions}</select>
       </div>
       <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle light/dark theme"></button>
       <button class="logout-btn" id="logoutBtn" type="button">Sign out</button>
@@ -80,14 +82,11 @@ function renderSidebar() {
     applyTheme(getTheme() === "light" ? "dark" : "light");
   });
 
-  const closeBtn = document.getElementById("closeMonthBtn");
-  if (closeBtn) {
-    closeBtn.addEventListener("click", () => {
-      const next = monthLabel(CLOSE_MONTH + 1);
-      if (!confirm(`Close ${next}? This locks in that month's actuals and can't be reopened.`)) return;
-      advanceCloseMonth();
+  const closeSel = document.getElementById("closeMonthSelect");
+  if (closeSel) {
+    closeSel.addEventListener("change", () => {
+      setCloseMonth(parseInt(closeSel.value, 10));
       dbUpdateCloseMonth();
-      renderSidebar(); // refresh the period label + button
       if (typeof window.refreshAfterPeriodChange === "function") window.refreshAfterPeriodChange();
     });
   }
