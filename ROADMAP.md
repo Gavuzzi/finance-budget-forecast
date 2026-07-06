@@ -201,7 +201,7 @@ Cost-only tool (honest, simpler) **or** add revenue (BAS 3xxx → revenue + marg
 - [ ] `[B]` Presets (consultancy / manufacturer / retail / service)
 - [ ] `[B]` Revenue (if chosen above) — actuals from class 3 + simple plan + margin view
 - [ ] `[B]` Cost forecast methods: recurring (start/end/escalation), % of driver, per-unit, manual profile
-- [ ] `[B]` **Re-forecast from actuals** (run-rate / trend) as a forecast mode *(blind spot #4)*
+- [ ] `[B]` **Re-forecast from actuals** (run-rate / trend) — **manual, opt-in, shown as a suggested delta, per-line, reversible; NEVER auto-overwrites a set forecast on sync** *(blind spot #4)*
 - [ ] `[B]` Variance "why" — bridge + commentary + drill-to-transaction UI *(blind spot #3/#5)*
 - [ ] `[B]` Rename `cost_centers` → reporting lines (cosmetic, once)
 
