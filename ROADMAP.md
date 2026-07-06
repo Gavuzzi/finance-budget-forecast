@@ -107,6 +107,22 @@ variable (% / per-unit) methods together are what make the P&L flex with volume*
 change a revenue/volume assumption and the whole statement moves. That's the thing
 spreadsheets can't do reliably.
 
+## Frontend & UI changeability
+
+The engine (`data.js`: model, calculations, Supabase access) is deliberately
+**UI-agnostic** — rendering lives in the per-page files. So the UI can be reworked
+without touching the valuable logic; client feedback on look/flow can never force
+a rewrite of the core.
+
+- **Visual changes** (colour, layout, spacing) = mostly CSS, easy even today (CSS variables already drive theming).
+- **UX-flow changes** = the render layer; changeable, but heavier in today's vanilla-JS + `innerHTML` approach.
+- **The catch:** the backlog roughly *doubles* the UI surface (revenue, cash, versioning, drill-downs, mapping/allocation UIs). Hand-built `innerHTML` templates get slow and error-prone at that scale.
+
+**Plan:** stay vanilla through Phase 0–1 (validate, keep momentum). Around Phase 2–3,
+when the UI surface grows, migrate to a component framework (React/Svelte) — a
+*bounded* project precisely because the engine is separate. Keep the engine
+framework-free the whole way; that's the insurance that makes the swap cheap.
+
 ## Currency — deliberately minimal
 
 Swedish books are kept in **SEK by law**; foreign transactions are booked in SEK in the GL, so the sync always pulls SEK. Multi-currency/FX is a trap for ~2% of customers.
