@@ -64,8 +64,11 @@ function forecastForMonth(cc, month) {
 }
 
 function monthAmount(cc, month) {
-  if (month <= CLOSE_MONTH && cc.actualMonthly[month - 1] != null) {
-    return { value: cc.actualMonthly[month - 1], isActual: true };
+  // A closed month shows the ACTUAL — 0 if nothing was booked to this cost
+  // centre. We never blend the forecast into a closed month; that would
+  // misrepresent reality and break variance. Future months show the forecast.
+  if (month <= CLOSE_MONTH) {
+    return { value: cc.actualMonthly[month - 1] ?? 0, isActual: true };
   }
   return { value: forecastForMonth(cc, month), isActual: false };
 }

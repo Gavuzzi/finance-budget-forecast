@@ -19,7 +19,9 @@ function lensMonths() {
 
 function monthCell(value, isActual, isDivider) {
   const cls = (isActual ? "" : "mt-forecast") + (isDivider ? " mt-divider" : "");
-  return `<td class="num ${cls}">${fmtCell(value)}</td>`;
+  // A booked-but-empty cell (actual = 0) reads as "nothing booked" — show a dash.
+  const display = isActual && value === 0 ? "–" : fmtCell(value);
+  return `<td class="num ${cls}">${display}</td>`;
 }
 
 function renderMonthlyGrid() {
