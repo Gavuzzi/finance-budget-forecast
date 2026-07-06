@@ -187,8 +187,8 @@ Goal: the sync's numbers match Fortnox's result report, at real scale, reliably.
 
 **Gate:** foundation ties out → only now build features.
 
-### Decision — Revenue (make this call before Phase 1)
-Cost-only tool (honest, simpler) **or** add revenue (BAS 3xxx → revenue + margin per line/project). Shapes everything after, especially the consultancy/project segment.
+### Decision — Revenue ✅ DECIDED: include
+Revenue is in scope (actuals from BAS 3xxx + simple typed plan + margin per line/project). Design reporting lines to hold revenue *and* cost from now; build the P&L/margin view in Phase 3. No revenue-driver engine — keep the plan simple.
 
 ### Phase 1 — Universal ingestion
 - [ ] `[B]` `dimension` (`costcenter|project|account`) + `source` (`fortnox|manual`) + `state` (`planned|linked`) on the model
@@ -219,12 +219,12 @@ Cost-only tool (honest, simpler) **or** add revenue (BAS 3xxx → revenue + marg
 - [ ] `[B]` Excel export *(blind spot #5)*
 - [ ] `[B]` Scheduled auto-sync (Supabase cron) — "always current" *(blind spot #5)*
 
-### Phase 5 — Cash flow (major module · decision pending)
+### Phase 5 — Cash flow (major module · ✅ on the map, sequenced last)
 A second forecast lens: **bank-balance projection, not P&L.** Different data
 (unpaid customer/supplier invoices + due dates, VAT settlement, salary/tax dates)
 and a running-balance view. Potentially *more* valuable to SMEs than the P&L —
 "can I make payroll?" — but a big, separate build. *(blind spot #2)*
-- [ ] `[F/B]` Decide if in scope
+- [x] Decided: in scope — the flagship capstone, built last
 - [ ] `[B]` Pull open invoices + due dates from Fortnox → projected in/outflows
 - [ ] `[B]` VAT + payroll/tax payment timing
 - [ ] `[B]` Running bank-balance forecast view
