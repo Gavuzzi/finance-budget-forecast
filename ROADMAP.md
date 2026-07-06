@@ -136,6 +136,11 @@ Swedish books are kept in **SEK by law**; foreign transactions are booked in SEK
 - Master-data re-sync conflict rules (renamed lines, deactivated cost-centres).
 - Presets: seed data vs onboarding wizard step?
 
+**Also noted (smaller / market-fit)**
+- **Salary/cost escalation over time** — a person costs the same forever today; headcount method needs an annual-increase option.
+- **Audit trail / change history** — who changed which number when; finance-grade credibility, pairs with versioning.
+- **Swedish localization** — UI + finance terms in Swedish for the target market; currently English.
+
 **Explicitly out of scope for now:** balance sheet, group consolidation, approval workflow, alerts.
 
 ---
@@ -177,6 +182,8 @@ Goal: the sync's numbers match Fortnox's result report, at real scale, reliably.
 - [ ] `[B]` **Incremental + resilient sync** — only since last run; batch + backoff; drop the silent `MAX_VOUCHERS` cap; full pagination. *(Risk #2 — scale/timeout)*
 - [ ] `[B]` **Period refresh, not blind upsert** — delete + reload a period so corrections/deletions propagate. *(stale-actuals drift)*
 - [ ] `[B]` **Real "closed" month** — stop auto-advancing to "last month with a booking"; use Fortnox's locked-period info, or keep it user-confirmed. *(fake favourable variance)*
+
+- [ ] `[B]` **Support broken fiscal years** (brutet räkenskapsår) — read the org's real fiscal-year start from Fortnox (`/3/financialyears`) instead of hardcoding January (`FY_BASE_YEAR`); today's month mapping breaks for a May–Apr / Jul–Jun / Sep–Aug company.
 
 **Gate:** foundation ties out → only now build features.
 
