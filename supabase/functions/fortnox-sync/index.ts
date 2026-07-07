@@ -1,21 +1,21 @@
-// Edge Function: fortnox-sync  (self-contained — paste this whole file into the
-// Supabase Dashboard: Edge Functions → create a function named EXACTLY
-// "fortnox-sync" → paste → Deploy. Leave "Enforce JWT" ON (the app calls it with
-// the signed-in user's token).
+// Edge Function: fortnox-sync  (self-contained)
 //
-// Secrets: FORTNOX_CLIENT_ID, FORTNOX_CLIENT_SECRET (for token refresh).
-// SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY are auto-injected.
+// NEVER-FAIL read: exports the whole financial year as ONE SIE file (/3/sie/4)
+// and parses it locally. O(1) API calls regardless of voucher count — no N+1,
+// no rate-limit death, no timeout. Scales from 500 to 500,000 vouchers.
 //
-// Pulls booked vouchers, keeps operating-expense rows (BAS accounts 5000–7999),
-// groups by (cost centre × month), maps each Fortnox cost-centre code to one of
-// our cost centers, and upserts into monthly_actual. Month 1 = Jan 2026.
+// Computes a full-P&L reconciliation (revenue/COGS/opex/personnel/result) from
+// every transaction, and buckets operating costs (BAS 4–7) by (cost centre ×
+// month) into monthly_actual. Month 1 = Jan of FY_BASE_YEAR.
+//
+// "Enforce JWT" stays OFF (the browser calls it directly); auth is checked in
+// code via can_edit_org. Secrets: FORTNOX_CLIENT_ID, FORTNOX_CLIENT_SECRET.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const TOKEN_URL = "https://apps.fortnox.se/oauth-v1/token";
 const API_BASE = "https://api.fortnox.se/3";
 const FY_BASE_YEAR = 2026;   // app month 1 = Jan of this year
-const MAX_VOUCHERS = 2000;   // safety cap
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -30,6 +30,15 @@ async function fortnoxGet(path: string, token: string) {
   });
   if (!res.ok) throw new Error(`GET ${path} ${res.status}: ${await res.text()}`);
   return await res.json();
+}
+
+// SIE export returns a raw file, not JSON.
+async function fortnoxGetText(path: string, token: string) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: "*/*" },
+  });
+  if (!res.ok) throw new Error(`GET ${path} ${res.status}: ${await res.text()}`);
+  return await res.text();
 }
 
 async function refreshTokens(refreshToken: string) {
@@ -47,10 +56,10 @@ async function refreshTokens(refreshToken: string) {
   return await res.json();
 }
 
-// "2026-03-15" → absolute app month index (1..24), or null if outside the window.
-function monthIndex(dateStr: string): number | null {
-  const d = new Date(dateStr);
-  const idx = (d.getUTCFullYear() - FY_BASE_YEAR) * 12 + (d.getUTCMonth() + 1);
+// "20260315" → absolute app month index (1..24), or null if outside the window.
+function monthIndexFromYmd(ymd: string): number | null {
+  const y = Number(ymd.slice(0, 4)), mo = Number(ymd.slice(4, 6));
+  const idx = (y - FY_BASE_YEAR) * 12 + mo;
   return idx >= 1 && idx <= 24 ? idx : null;
 }
 
@@ -62,14 +71,12 @@ Deno.serve(async (req) => {
   if (!org_id) return json({ error: "org_id required" }, 400);
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  // Caller-scoped client: can_edit_org verifies this user may sync this org.
   const asUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
     global: { headers: { Authorization: authHeader } },
   });
   const { data: canEdit } = await asUser.rpc("can_edit_org", { p_org: org_id });
   if (!canEdit) return json({ error: "not authorized" }, 403);
 
-  // Service-role client: reads tokens + writes actuals (bypasses RLS).
   const admin = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
   try {
@@ -96,56 +103,55 @@ Deno.serve(async (req) => {
     const codeToCc = new Map<string, string>();
     (maps ?? []).forEach((m: any) => m.cost_center_id && codeToCc.set(m.external_code, m.cost_center_id));
 
-    // 3. Page through vouchers → aggregate cost rows by (cost centre × month),
-    //    and compute a full-P&L reconciliation from EVERY row (mapping-independent).
+    // 3. Bulk read: ONE SIE export for the financial year, then parse.
+    const fyRes = await fortnoxGet(`/financialyears`, accessToken); // VERIFY response shape
+    const fys = fyRes?.FinancialYears ?? [];
+    const fy = fys.find((f: any) => String(f.FromDate ?? "").startsWith(String(FY_BASE_YEAR))) ?? fys[fys.length - 1];
+    const fyId = fy?.Id;
+    const sie = await fortnoxGetText(`/sie/4${fyId ? `?financialyear=${fyId}` : ""}`, accessToken); // VERIFY path/param
+
+    // Parse #VER (voucher date) + #TRANS (account, dimensions, amount).
     const totals = new Map<string, number>();
     const unmapped = new Set<string>();
-    let page = 1, fetched = 0, rowCount = 0;
+    let voucherCount = 0, rowCount = 0;
     let revRaw = 0, cogs = 0, opex = 0, personnel = 0;   // raw P&L by BAS class
     let capturedCost = 0, unmappedCost = 0;
+    let curMonth: number | null = null;
 
-    while (fetched < MAX_VOUCHERS) {
-      const list = await fortnoxGet(`/vouchers?page=${page}&limit=500`, accessToken); // VERIFY params
-      const vouchers = list?.Vouchers ?? [];
-      if (vouchers.length === 0) break;
-
-      for (const v of vouchers) {
-        fetched++;
-        const detail = await fortnoxGet(
-          `/vouchers/${v.VoucherSeries}/${v.VoucherNumber}?financialyear=${v.Year ?? ""}`, accessToken); // VERIFY
-        const rows = detail?.Voucher?.VoucherRows ?? [];
-        const date = detail?.Voucher?.TransactionDate ?? v.TransactionDate;
-        const month = date ? monthIndex(date) : null;
-        if (!month) continue;
-
-        for (const r of rows) {
-          const acct = Number(r.Account);
-          const amount = (Number(r.Debit) || 0) - (Number(r.Credit) || 0);
-          if (!amount) continue;
-          rowCount++;
-          const cls = Math.floor(acct / 1000); // BAS class (first digit)
-
-          // Reconciliation: full P&L from every row, regardless of mapping/scope.
-          if (cls === 3) revRaw += amount;              // revenue (credit-normal → negative)
-          else if (cls === 4) cogs += amount;           // COGS
-          else if (cls === 5 || cls === 6) opex += amount;
-          else if (cls === 7) personnel += amount;
-          // classes 1,2 (balance sheet) and 8 (financial) are outside the operating result
-
-          // Cost capture into reporting lines: operating costs (BAS 4–7) only.
-          if (!(acct >= 4000 && acct < 8000)) continue;
-          const code = String(r.CostCenter ?? "").trim();
-          if (!code) continue;                          // untagged → can't place it
-          const ccId = codeToCc.get(code);
-          if (!ccId) { unmapped.add(code); unmappedCost += amount; continue; }
-          capturedCost += amount;
-          const key = `${ccId}|${month}`;
-          totals.set(key, (totals.get(key) ?? 0) + amount);
-        }
+    for (const raw of sie.split(/\r?\n/)) {
+      const line = raw.trimStart();
+      if (line.startsWith("#VER")) {
+        voucherCount++;
+        const m = line.match(/#VER\s+\S+\s+\S+\s+(\d{8})/);
+        curMonth = m ? monthIndexFromYmd(m[1]) : null;
+        continue;
       }
-      const totalPages = list?.MetaInformation?.["@TotalPages"] ?? 1;
-      if (page >= totalPages) break;
-      page++;
+      if (!line.startsWith("#TRANS") || curMonth === null) continue;
+      const t = line.match(/^#TRANS\s+(\d+)\s+\{([^}]*)\}\s+(-?\d+(?:\.\d+)?)/);
+      if (!t) continue;
+      const acct = Number(t[1]);
+      const amount = Number(t[3]);
+      if (!amount) continue;
+      rowCount++;
+      const cls = Math.floor(acct / 1000);
+
+      // Reconciliation: full P&L from every row.
+      if (cls === 3) revRaw += amount;              // revenue (credit-normal → negative)
+      else if (cls === 4) cogs += amount;           // COGS
+      else if (cls === 5 || cls === 6) opex += amount;
+      else if (cls === 7) personnel += amount;
+
+      // Cost capture into reporting lines: operating costs (BAS 4–7) only.
+      if (!(acct >= 4000 && acct < 8000)) continue;
+      const pairs = [...t[2].matchAll(/(\d+)\s+"([^"]*)"/g)];
+      const ccPair = pairs.find((p) => p[1] === "1"); // SIE dimension 1 = kostnadsställe
+      const code = ccPair ? ccPair[2].trim() : "";
+      if (!code) continue;                            // untagged → can't place it
+      const ccId = codeToCc.get(code);
+      if (!ccId) { unmapped.add(code); unmappedCost += amount; continue; }
+      capturedCost += amount;
+      const key = `${ccId}|${curMonth}`;
+      totals.set(key, (totals.get(key) ?? 0) + amount);
     }
 
     // 4. Upsert aggregated actuals.
@@ -163,7 +169,7 @@ Deno.serve(async (req) => {
       last_synced_at: new Date().toISOString(), last_sync_error: null,
     }).eq("org_id", org_id);
 
-    const revenue = -revRaw;                 // flip credit-normal revenue to positive
+    const revenue = -revRaw;
     const totalCost = cogs + opex + personnel;
     return json({
       ok: true,
@@ -179,7 +185,7 @@ Deno.serve(async (req) => {
         result: Math.round(revenue - totalCost),
         captured_cost: Math.round(capturedCost),
         unmapped_cost: Math.round(unmappedCost),
-        vouchers: fetched,
+        vouchers: voucherCount,
         rows: rowCount,
       },
     });

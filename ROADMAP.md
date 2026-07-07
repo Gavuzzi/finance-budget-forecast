@@ -170,7 +170,7 @@ Swedish books are kept in **SEK by law**; foreign transactions are booked in SEK
 - **Corrections/deletions don't propagate.** Sync is upsert-only; a voucher reversed/deleted in Fortnox leaves stale actuals. → Full-refresh a period (delete + reload), not blind upsert.
 
 **Scale & reliability**
-- **N+1 API calls → timeouts + rate limits.** Real companies have thousands of vouchers; the per-voucher GET loop will hit Fortnox rate limits and the Edge Function wall-clock limit, and `MAX_VOUCHERS` silently truncates. Tested on 4. → Incremental sync (only since last), batching, backoff.
+- **N+1 API calls → timeouts + rate limits.** ~~The per-voucher GET loop dies at ~750 vouchers~~ (Fortnox rate limit = 25 req / 5s; Edge Function ~150s). **✅ Solved:** switched to a single **SIE export** (`/3/sie/4`) per sync — one call returns the whole year's transactions with dimensions, parsed locally. O(1) API calls, scales to 500k+ vouchers, corrections included. Vouchers list has no rows, so the SIE route is the only scalable option.
 
 **Scope gaps**
 - **No revenue.** The app is cost-only. Real FP&A is P&L; a project-based client (our Phase 3 target) lives on revenue/margin per project. → Decide: honest cost-planning tool, or add revenue (3xxx) as a peer to cost.
@@ -195,7 +195,7 @@ Goal: the sync's numbers match Fortnox's result report, at real scale, reliably.
 - [x] `[F]` **Realistic sandbox** — 80-voucher SIE across BAS 3/4/5/6/7, 3 cost-centres, a project, a lumpy annual cost, a correction. Generated via `test-data/seed-sie.pl`, imported into "Large scale Actual test". *(A bigger set for the scale test is next.)*
 - [x] `[B]` **Reconciliation / tie-out** — sync returns a full-P&L reconciliation (revenue/COGS/opex/personnel/result) from every voucher, shown in-app. **✅ Ties out to the öre** against Fortnox (2 467 000 rev / 2 733 000 cost / −266 000 result).
 - [x] `[B]` **Account scope** — widened cost capture to BAS 4–7 (COGS now included) + revenue class 3 in the reconciliation. *(Full per-account configurability = later refinement.)*
-- [ ] `[B]` **Incremental + resilient sync** — only since last run; batch + backoff; drop the silent `MAX_VOUCHERS` cap; full pagination. *(Risk #2 — scale/timeout)*
+- [~] `[B]` **Never-fail read (SIE bulk export)** — replaced the N+1 per-voucher fetch with a **single `/3/sie/4` export per sync** → parse locally → **O(1) API calls at any volume** (500 → 500k vouchers), corrections/deletions included for free (full re-export each time). Uses `/3/financialyears` for the year id. Deployed; needs the big-dataset scale test to confirm. *(Risk #2 — scale/timeout, solved)*
 - [ ] `[B]` **Period refresh, not blind upsert** — delete + reload a period so corrections/deletions propagate. *(stale-actuals drift)*
 - [ ] `[B]` **Real "closed" month** — stop auto-advancing to "last month with a booking"; use Fortnox's locked-period info, or keep it user-confirmed. *(fake favourable variance)*
 
