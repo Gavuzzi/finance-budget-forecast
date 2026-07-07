@@ -98,6 +98,54 @@ function renderMonthlyGrid() {
   document.getElementById("monthlyGrid").innerHTML = html;
 }
 
+// ---- Export (Excel) ---------------------------------------------------------
+// Swedish-Excel-friendly CSV: BOM + "sep=;" + semicolon separators + comma
+// decimals — opens as clean columns in sv-SE Excel with no import wizard.
+function buildExportCsv() {
+  const months = lensMonths();
+  const isFy = currentLens === "fy";
+  const num = (n) => String(Math.round(n)); // whole SEK
+  const lines = [];
+
+  lines.push("sep=;");
+  const orgName = (USER_ORGS.find((o) => o.id === CURRENT_ORG_ID) || {}).name || "";
+  lines.push(`${orgName} — Monthly P&L (SEK); exported ${new Date().toLocaleDateString("sv-SE")}`);
+  lines.push(
+    ["Cost Center", ...months.map(monthLabel), ...(isFy ? ["FY Total", "Budget", "Variance"] : ["12-mo Total"])].join(";")
+  );
+
+  COST_CENTERS.forEach((cc) => {
+    const cells = months.map((m) => num(monthAmount(cc, m).value));
+    if (isFy) {
+      const fy = fySummary(cc);
+      cells.push(num(fy.total), num(fy.budget), num(fy.variance));
+    } else {
+      cells.push(num(rollingSummary(cc).total));
+    }
+    lines.push([cc.name, ...cells].join(";"));
+  });
+
+  const totalCells = months.map((m) => num(companyMonthAmount(m)));
+  if (isFy) {
+    const t = companyFySummary();
+    totalCells.push(num(t.total), num(t.budget), num(t.variance));
+  } else {
+    totalCells.push(num(companyRollingSummary().total));
+  }
+  lines.push(["Total", ...totalCells].join(";"));
+
+  return "﻿" + lines.join("\r\n"); // BOM so Excel reads åäö correctly
+}
+
+function downloadExport() {
+  const blob = new Blob([buildExportCsv()], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `monthly-pnl-${currentLens === "fy" ? "FY2026" : "rolling12"}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 function initImport() {
   const panel = document.getElementById("importPanel");
   const textArea = document.getElementById("csvText");
@@ -149,10 +197,15 @@ function initMonthly() {
       renderMonthlyGrid();
     });
   });
+  document.getElementById("exportBtn").addEventListener("click", downloadExport);
   initImport();
   handleFortnoxRedirect();
   renderIntegrationPanel(document.getElementById("integrationPanel"));
   renderMonthlyGrid();
+  // Dev hook: #csvtest renders the export inline so it can be verified headless.
+  if (location.hash === "#csvtest") {
+    document.getElementById("monthlyGrid").innerHTML = `<pre style="font-size:11px">${buildExportCsv().replace(/</g, "&lt;")}</pre>`;
+  }
 }
 
 // Re-render when a month is closed from the sidebar.
