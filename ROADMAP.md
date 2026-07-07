@@ -12,6 +12,7 @@ knowledge: how SMEs actually keep their books, and how we fit them.
 - **Opinionated, not general.** We are *not* SAC/Anaplan. Their generality is their onboarding pain — that pain is our opening. We do one thing (driver-based FP&A for SMEs) with a small, chosen set of knobs. IKEA, not Lego.
 - **Simplicity is the moat.** Easy onboarding is the differentiator. Anything that reduces setup friction (master-data load, presets, auto-mapping) is core, not polish.
 - **Arrive prepared.** Research the common setups up front and pre-build for them. Show up knowing their world — that reads as senior, not "never seen this before."
+- **Steal proven patterns — always.** Before building ANY feature, tear down how the winners do it (steal list below) and copy the convention; users should never have to learn something twice. Innovation budget goes only to our edge (fitted simplicity + Fortnox auto-actuals). Never copy the anti-pattern: consultant-config complexity.
 
 ## Source-of-truth model (three kinds of data)
 
