@@ -28,6 +28,7 @@ const FY_MONTHS = 12;
 
 // Populated by loadData() from the database.
 let CLOSE_MONTH = 6;
+let CLOSE_MONTH_MANUAL = false; // true = user picked the month; syncs won't touch it
 let DISPLAY_UNIT = "mkr"; // "kr" | "tkr" | "mkr" — set per org in loadData/loadPreviewData
 let CURRENT_ORG_ID = null;
 let USER_ORGS = [];
@@ -141,6 +142,7 @@ async function loadData(orgId) {
   const org = USER_ORGS.find((o) => o.id === saved) || USER_ORGS[0];
   CURRENT_ORG_ID = org.id;
   CLOSE_MONTH = org.close_month;
+  CLOSE_MONTH_MANUAL = !!org.close_month_manual;
   DISPLAY_UNIT = org.display_unit || "tkr"; // SME default; falls back gracefully if the column isn't set
   FY_START_MONTH = org.fy_start_month || 1; // broken fiscal years — set by the Fortnox sync
   FY_START_YEAR = org.fy_start_year || 2026;
@@ -384,7 +386,9 @@ async function dbDeleteOneOff(id) {
 }
 
 async function dbUpdateCloseMonth() {
-  const { error } = await sb.from("organizations").update({ close_month: CLOSE_MONTH }).eq("id", CURRENT_ORG_ID);
+  const { error } = await sb.from("organizations")
+    .update({ close_month: CLOSE_MONTH, close_month_manual: CLOSE_MONTH_MANUAL })
+    .eq("id", CURRENT_ORG_ID);
   if (error) flagWriteError(error);
 }
 

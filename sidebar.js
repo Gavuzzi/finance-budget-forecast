@@ -40,10 +40,15 @@ function sidebarHtml() {
     (n) => `<a class="nav-item ${n.id === active ? "active" : ""}" href="${n.href}">${n.label}</a>`
   ).join("");
 
-  const monthOptions = [`<option value="0"${CLOSE_MONTH === 0 ? " selected" : ""}>None yet</option>`]
+  // "Auto" = the sync decides (only ever fully-elapsed months — Fathom convention).
+  // Picking a month is a manual override the sync will never touch.
+  const monthOptions = [
+    `<option value="auto"${!CLOSE_MONTH_MANUAL ? " selected" : ""}>Auto (${CLOSE_MONTH ? monthLabel(CLOSE_MONTH) : "none yet"})</option>`,
+    `<option value="0"${CLOSE_MONTH_MANUAL && CLOSE_MONTH === 0 ? " selected" : ""}>None yet</option>`,
+  ]
     .concat(
       Array.from({ length: TIMELINE_LENGTH }, (_, i) => i + 1).map(
-        (m) => `<option value="${m}"${m === CLOSE_MONTH ? " selected" : ""}>${monthLabel(m)}</option>`
+        (m) => `<option value="${m}"${CLOSE_MONTH_MANUAL && m === CLOSE_MONTH ? " selected" : ""}>${monthLabel(m)}</option>`
       )
     )
     .join("");
@@ -85,8 +90,14 @@ function renderSidebar() {
   const closeSel = document.getElementById("closeMonthSelect");
   if (closeSel) {
     closeSel.addEventListener("change", () => {
-      setCloseMonth(parseInt(closeSel.value, 10));
+      if (closeSel.value === "auto") {
+        CLOSE_MONTH_MANUAL = false;      // hand control back to the sync
+      } else {
+        CLOSE_MONTH_MANUAL = true;       // manual override — syncs won't touch it
+        setCloseMonth(parseInt(closeSel.value, 10));
+      }
       dbUpdateCloseMonth();
+      renderSidebar();                    // refresh the Auto label/selection
       if (typeof window.refreshAfterPeriodChange === "function") window.refreshAfterPeriodChange();
     });
   }

@@ -167,12 +167,21 @@ async function syncOrg(admin: any, org_id: string) {
   await admin.from("monthly_actual").delete().eq("org_id", org_id);
   if (rows.length) await admin.from("monthly_actual").insert(rows);
 
-  // 5. Advance the actuals boundary + persist the fiscal-year anchor so the
-  //    app labels months correctly (broken fiscal years: May–Apr etc.).
+  // 5. Advance the actuals boundary (Fathom convention: only ever to the last
+  //    FULLY-ELAPSED month — a partially-booked current month must never read
+  //    as closed, or variance shows fake savings) + persist the FY anchor.
+  //    A manual user choice (close_month_manual) always wins; sync won't touch it.
   const maxMonth = rows.reduce((m, r) => Math.max(m, r.month), 0);
+  const now = new Date();
+  const nowIdx = (now.getUTCFullYear() - startYear) * 12 + (now.getUTCMonth() + 1 - startMonth) + 1;
+  const lastElapsed = Math.max(0, Math.min(24, nowIdx - 1)); // current month never counts
+  const autoClose = Math.min(maxMonth, lastElapsed);
+
+  const { data: org } = await admin.from("organizations").select("close_month_manual, close_month").eq("id", org_id).single();
   const orgPatch: Record<string, unknown> = { fy_start_month: startMonth, fy_start_year: startYear };
-  if (maxMonth) orgPatch.close_month = maxMonth;
+  if (!org?.close_month_manual) orgPatch.close_month = autoClose;
   await admin.from("organizations").update(orgPatch).eq("id", org_id);
+  const closeMonthOut = org?.close_month_manual ? org.close_month : autoClose;
 
   // Cost-centre list (from SIE #OBJEKT defs + any codes seen in transactions),
   // with operating cost and mapped status — powers the one-click mapping UI.
@@ -207,7 +216,7 @@ async function syncOrg(admin: any, org_id: string) {
   return {
     ok: true,
     months_updated: rows.length,
-    close_month: maxMonth,
+    close_month: closeMonthOut,
     unmapped_cost_centers: [...unmapped],
     cost_centers,
     reconciliation: recon,
