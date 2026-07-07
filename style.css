@@ -751,6 +751,25 @@ html, body {
 }
 .integ-map-row input:focus { outline: none; border-color: var(--accent); }
 
+/* One-click Fortnox cost-centre mapping */
+.fn-cc-rows { display: grid; gap: 8px; max-width: 560px; }
+.fn-cc-row { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 14px; font-size: 0.88rem; }
+.fn-cc-name { color: var(--text); }
+.fn-cc-code { color: var(--text-dim); font-size: 0.78rem; background: var(--bg); padding: 1px 6px; border-radius: 5px; margin-left: 4px; }
+.fn-cc-cost { color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.fn-cc-mapped { color: var(--green, #3fb27f); font-weight: 600; font-size: 0.82rem; }
+.fn-cc-actions { display: flex; gap: 8px; align-items: center; }
+.fn-cc-import {
+  background: var(--accent); border: none; color: #0e141f; font-weight: 700;
+  font-size: 0.8rem; padding: 5px 12px; border-radius: 7px; cursor: pointer; font-family: inherit;
+}
+.fn-cc-import:hover { background: var(--accent-soft); }
+.fn-cc-link {
+  background: var(--bg); border: 1px solid var(--panel-border); color: var(--text);
+  border-radius: 7px; padding: 5px 8px; font-family: inherit; font-size: 0.8rem; cursor: pointer;
+}
+.fn-cc-link:focus { outline: none; border-color: var(--accent); }
+
 .fn-recon { margin-top: 14px; border-top: 1px solid var(--panel-border); padding-top: 13px; }
 .fn-recon h4 { font-size: 0.9rem; margin: 0 0 10px; color: var(--text); }
 .fn-recon-table { width: 100%; max-width: 420px; border-collapse: collapse; font-size: 0.9rem; }

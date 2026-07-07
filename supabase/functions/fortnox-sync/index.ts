@@ -111,6 +111,8 @@ Deno.serve(async (req) => {
     let revRaw = 0, cogs = 0, opex = 0, personnel = 0;   // raw P&L by BAS class
     let capturedCost = 0, unmappedCost = 0;
     let curMonth: number | null = null;
+    const objektNames = new Map<string, string>();   // SIE dim-1 cost-centre code → name
+    const codeCost = new Map<string, number>();       // cost-centre code → total operating cost
 
     const processLine = (raw: string) => {
       const line = raw.trimStart();
@@ -122,6 +124,11 @@ Deno.serve(async (req) => {
           const idx = (Number(ymd.slice(0, 4)) - startYear) * 12 + (Number(ymd.slice(4, 6)) - startMonth) + 1;
           curMonth = idx >= 1 && idx <= 24 ? idx : null;   // month relative to FY start
         } else curMonth = null;
+        return;
+      }
+      if (line.startsWith("#OBJEKT")) {   // cost-centre / project definitions (dim 1 = kostnadsställe)
+        const o = line.match(/#OBJEKT\s+(\d+)\s+"([^"]*)"\s+"([^"]*)"/);
+        if (o && o[1] === "1") objektNames.set(o[2], o[3]);
         return;
       }
       if (!line.startsWith("#TRANS") || curMonth === null) return;
@@ -145,6 +152,7 @@ Deno.serve(async (req) => {
       const ccPair = pairs.find((p) => p[1] === "1"); // SIE dimension 1 = kostnadsställe
       const code = ccPair ? ccPair[2].trim() : "";
       if (!code) return;                              // untagged → can't place it
+      codeCost.set(code, (codeCost.get(code) ?? 0) + amount);
       const ccId = codeToCc.get(code);
       if (!ccId) { unmapped.add(code); unmappedCost += amount; return; }
       capturedCost += amount;
@@ -179,6 +187,16 @@ Deno.serve(async (req) => {
       last_synced_at: new Date().toISOString(), last_sync_error: null,
     }).eq("org_id", org_id);
 
+    // Cost-centre list (from SIE #OBJEKT defs + any codes seen in transactions),
+    // with operating cost and mapped status — powers the one-click mapping UI.
+    const seenCodes = new Set<string>([...objektNames.keys(), ...codeCost.keys()]);
+    const cost_centers = [...seenCodes].map((code) => ({
+      code,
+      name: objektNames.get(code) ?? code,
+      cost: Math.round(codeCost.get(code) ?? 0),
+      mapped: codeToCc.has(code),
+    })).sort((a, b) => b.cost - a.cost);
+
     const revenue = -revRaw;
     const totalCost = cogs + opex + personnel;
     return json({
@@ -186,6 +204,7 @@ Deno.serve(async (req) => {
       months_updated: rows.length,
       close_month: maxMonth,
       unmapped_cost_centers: [...unmapped],
+      cost_centers,
       reconciliation: {
         revenue: Math.round(revenue),
         cogs: Math.round(cogs),

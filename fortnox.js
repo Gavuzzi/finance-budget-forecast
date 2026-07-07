@@ -11,6 +11,9 @@ const FORTNOX_AUTHORIZE_URL = "https://apps.fortnox.se/oauth-v1/auth";
 const FN_REDIRECT_URI = `${SUPABASE_URL}/functions/v1/fortnox-oauth`;
 const fortnoxConfigured = () => FORTNOX_CLIENT_ID && !FORTNOX_CLIENT_ID.startsWith("SET_");
 
+// The cost centres returned by the last sync (from the SIE), for the mapping UI.
+let lastCostCenters = [];
+
 // ---- Data access -----------------------------------------------------------
 
 async function loadIntegrationStatus() {
@@ -80,6 +83,7 @@ async function runFortnoxSync(btn) {
       msg += ` Unmapped Fortnox codes: ${out.unmapped_cost_centers.join(", ")}.`;
     }
     showToast(msg);
+    lastCostCenters = out.cost_centers || [];
     renderReconciliation(out);
     const ls = document.getElementById("fnLastSynced");
     if (ls) ls.textContent = "Last synced: " + new Date().toLocaleString("sv-SE");
@@ -153,23 +157,55 @@ function connectedHtml(status) {
     </div>`;
 }
 
+// Shows the REAL Fortnox cost centres (name + code + cost) from the last sync,
+// each with a one-click "Import as new reporting line" or "Link to existing".
 async function renderMappingEditor(host) {
-  const current = await loadMappings();
+  if (!lastCostCenters.length) {
+    host.innerHTML = `<p class="integ-map-hint">Hit <strong>Sync now</strong> first — then your Fortnox cost centres appear here to map in one click.</p>`;
+    return;
+  }
+  const options = COST_CENTERS.map((c) => `<option value="${c.id}">${c.name}</option>`).join("");
   host.innerHTML = `
-    <p class="integ-map-hint">Enter each cost center's Fortnox cost-centre code (kostnadsställe). Actuals with that code get booked here.</p>
-    <div class="integ-map-rows">
-      ${COST_CENTERS.map((cc) => `
-        <label class="integ-map-row">
-          <span>${cc.name}</span>
-          <input type="text" data-cc="${cc.id}" value="${current[cc.id] || ""}" placeholder="e.g. 1">
-        </label>`).join("")}
+    <p class="integ-map-hint">Your Fortnox cost centres. <strong>Import</strong> each as a reporting line, or <strong>link</strong> it to an existing one, then re-sync to pull its actuals in. Nothing is dropped.</p>
+    <div class="fn-cc-rows">
+      ${lastCostCenters.map((cc) => `
+        <div class="fn-cc-row" data-code="${cc.code}">
+          <span class="fn-cc-name">${cc.name} <span class="fn-cc-code">${cc.code}</span></span>
+          <span class="fn-cc-cost num">${fmtKr(cc.cost)}</span>
+          ${cc.mapped
+            ? `<span class="fn-cc-mapped">✓ mapped</span>`
+            : `<span class="fn-cc-actions">
+                 <button class="fn-cc-import" type="button">Import</button>
+                 <select class="fn-cc-link"><option value="">Link to…</option>${options}</select>
+               </span>`}
+        </div>`).join("")}
     </div>`;
-  host.querySelectorAll("input[data-cc]").forEach((inp) => {
-    inp.addEventListener("change", async () => {
-      await saveMapping(inp.dataset.cc, inp.value);
-      showToast("Mapping saved.");
-    });
+  host.querySelectorAll(".fn-cc-row").forEach((row) => {
+    const cc = lastCostCenters.find((c) => c.code === row.dataset.code);
+    const imp = row.querySelector(".fn-cc-import");
+    if (imp) imp.addEventListener("click", () => importCostCenter(cc, host));
+    const sel = row.querySelector(".fn-cc-link");
+    if (sel) sel.addEventListener("change", () => { if (sel.value) linkCostCenter(cc, sel.value, host); });
   });
+}
+
+async function importCostCenter(cc, host) {
+  const { data, error } = await sb.from("cost_centers")
+    .insert({ org_id: CURRENT_ORG_ID, name: cc.name, annual_budget: 0, other_monthly: 0 })
+    .select().single();
+  if (error) { showToast("Couldn't create — " + error.message, "error"); return; }
+  COST_CENTERS.push({ id: data.id, name: data.name, annualBudget: 0, otherMonthly: 0, note: "", headcount: [], oneOffs: [], actualMonthly: [] });
+  await saveMapping(data.id, cc.code);
+  cc.mapped = true;
+  showToast(`Imported "${cc.name}" and mapped it.`);
+  renderMappingEditor(host);
+}
+
+async function linkCostCenter(cc, appCcId, host) {
+  await saveMapping(appCcId, cc.code);
+  cc.mapped = true;
+  showToast(`Linked ${cc.code} → ${COST_CENTERS.find((c) => c.id === appCcId)?.name || "line"}.`);
+  renderMappingEditor(host);
 }
 
 function wireIntegrationPanel(host, status) {
@@ -187,10 +223,7 @@ function wireIntegrationPanel(host, status) {
   if (mapToggle && mapping) {
     mapToggle.addEventListener("click", async () => {
       mapping.hidden = !mapping.hidden;
-      if (!mapping.hidden && !mapping.dataset.loaded) {
-        await renderMappingEditor(mapping);
-        mapping.dataset.loaded = "1";
-      }
+      if (!mapping.hidden) await renderMappingEditor(mapping);
     });
   }
 }
