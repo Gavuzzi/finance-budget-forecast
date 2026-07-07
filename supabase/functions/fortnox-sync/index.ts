@@ -172,12 +172,15 @@ Deno.serve(async (req) => {
     }
     if (buf) processLine(buf);
 
-    // 4. Upsert aggregated actuals.
+    // 4. Replace actuals wholesale (not upsert): each sync is a full re-export of
+    //    the current truth, so vouchers deleted/reversed in Fortnox can't leave
+    //    stale rows behind. Fortnox is the source of truth for a connected org.
     const rows = [...totals.entries()].map(([key, amount]) => {
       const [cost_center_id, month] = key.split("|");
       return { org_id, cost_center_id, month: Number(month), amount: Math.round(amount) };
     });
-    if (rows.length) await admin.from("monthly_actual").upsert(rows, { onConflict: "cost_center_id,month" });
+    await admin.from("monthly_actual").delete().eq("org_id", org_id);
+    if (rows.length) await admin.from("monthly_actual").insert(rows);
 
     // 5. Advance the actuals boundary + persist the fiscal-year anchor so the
     //    app labels months correctly (broken fiscal years: May–Apr etc.).
