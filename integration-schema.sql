@@ -31,8 +31,11 @@ create table if not exists integration_status (
   connected         boolean not null default false,
   connected_at      timestamptz,
   last_synced_at    timestamptz,
-  last_sync_error   text
+  last_sync_error   text,
+  last_reconciliation jsonb           -- the P&L from the last sync, so the app shows it on load
 );
+-- Idempotent catch-up for DBs created before the column existed:
+alter table integration_status add column if not exists last_reconciliation jsonb;
 alter table integration_status enable row level security;
 drop policy if exists integration_status_read on integration_status;
 create policy integration_status_read on integration_status

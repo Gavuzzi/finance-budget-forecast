@@ -256,6 +256,10 @@ async function renderIntegrationPanel(host) {
   const status = await loadIntegrationStatus();
   host.innerHTML = status && status.connected ? connectedHtml(status) : disconnectedHtml();
   wireIntegrationPanel(host, status);
+  // Show the last synced P&L immediately, without waiting for another sync.
+  if (status && status.connected && status.last_reconciliation) {
+    renderReconciliation({ reconciliation: status.last_reconciliation });
+  }
 }
 
 // Surface the OAuth callback result (?fortnox=connected|error) as a toast.

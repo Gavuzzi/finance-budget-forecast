@@ -183,10 +183,6 @@ Deno.serve(async (req) => {
     const maxMonth = rows.reduce((m, r) => Math.max(m, r.month), 0);
     if (maxMonth) await admin.from("organizations").update({ close_month: maxMonth }).eq("id", org_id);
 
-    await admin.from("integration_status").update({
-      last_synced_at: new Date().toISOString(), last_sync_error: null,
-    }).eq("org_id", org_id);
-
     // Cost-centre list (from SIE #OBJEKT defs + any codes seen in transactions),
     // with operating cost and mapped status — powers the one-click mapping UI.
     const seenCodes = new Set<string>([...objektNames.keys(), ...codeCost.keys()]);
@@ -199,24 +195,31 @@ Deno.serve(async (req) => {
 
     const revenue = -revRaw;
     const totalCost = cogs + opex + personnel;
+    const recon = {
+      revenue: Math.round(revenue),
+      cogs: Math.round(cogs),
+      opex: Math.round(opex),
+      personnel: Math.round(personnel),
+      total_cost: Math.round(totalCost),
+      result: Math.round(revenue - totalCost),
+      captured_cost: Math.round(capturedCost),
+      unmapped_cost: Math.round(unmappedCost),
+      vouchers: voucherCount,
+      rows: rowCount,
+    };
+
+    // Persist the P&L on the status row so the app shows it on load, not just after a sync.
+    await admin.from("integration_status").update({
+      last_synced_at: new Date().toISOString(), last_sync_error: null, last_reconciliation: recon,
+    }).eq("org_id", org_id);
+
     return json({
       ok: true,
       months_updated: rows.length,
       close_month: maxMonth,
       unmapped_cost_centers: [...unmapped],
       cost_centers,
-      reconciliation: {
-        revenue: Math.round(revenue),
-        cogs: Math.round(cogs),
-        opex: Math.round(opex),
-        personnel: Math.round(personnel),
-        total_cost: Math.round(totalCost),
-        result: Math.round(revenue - totalCost),
-        captured_cost: Math.round(capturedCost),
-        unmapped_cost: Math.round(unmappedCost),
-        vouchers: voucherCount,
-        rows: rowCount,
-      },
+      reconciliation: recon,
     });
   } catch (e) {
     console.error("fortnox-sync error:", e);
