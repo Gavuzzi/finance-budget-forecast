@@ -96,46 +96,47 @@ async function runFortnoxSync(btn) {
 
 function fmtKr(n) { return (n || 0).toLocaleString("sv-SE") + " kr"; }
 
-// Show the full-P&L reconciliation returned by the sync, to compare against
-// Fortnox's own Resultatrapport. This is the Phase 0 tie-out check.
+// Shared P&L table (used by the live sync panel and the demo showcase), with
+// a gross-margin line. `r` = { revenue, cogs, opex, personnel, total_cost, result }.
+function pnlTable(r) {
+  const margin = r.revenue ? Math.round((r.result / r.revenue) * 100) : 0;
+  return `
+    <table class="fn-recon-table">
+      <tr><td>Revenue (class 3)</td><td class="num">${fmtKr(r.revenue)}</td></tr>
+      <tr><td>COGS (class 4)</td><td class="num">${fmtKr(r.cogs)}</td></tr>
+      <tr><td>Operating (class 5–6)</td><td class="num">${fmtKr(r.opex)}</td></tr>
+      <tr><td>Personnel (class 7)</td><td class="num">${fmtKr(r.personnel)}</td></tr>
+      <tr class="fn-recon-total"><td>Total cost</td><td class="num">${fmtKr(r.total_cost)}</td></tr>
+      <tr class="fn-recon-total"><td>Result <span class="fn-margin">${margin}% margin</span></td><td class="num">${fmtKr(r.result)}</td></tr>
+    </table>`;
+}
+
+// Render the P&L pulled from Fortnox after a sync (ties out to the Resultatrapport).
 function renderReconciliation(out) {
   const r = out.reconciliation;
   const host = document.getElementById("fnReconciliation");
   if (!host || !r) return;
   host.innerHTML = `
     <div class="fn-recon">
-      <h4>Sync reconciliation — compare to Fortnox's Resultatrapport</h4>
-      <table class="fn-recon-table">
-        <tr><td>Revenue (class 3)</td><td class="num">${fmtKr(r.revenue)}</td></tr>
-        <tr><td>COGS (class 4)</td><td class="num">${fmtKr(r.cogs)}</td></tr>
-        <tr><td>Operating (class 5–6)</td><td class="num">${fmtKr(r.opex)}</td></tr>
-        <tr><td>Personnel (class 7)</td><td class="num">${fmtKr(r.personnel)}</td></tr>
-        <tr class="fn-recon-total"><td>Total cost</td><td class="num">${fmtKr(r.total_cost)}</td></tr>
-        <tr class="fn-recon-total"><td>Result</td><td class="num">${fmtKr(r.result)}</td></tr>
-      </table>
-      <p class="fn-recon-note">Read from ${r.vouchers} vouchers / ${r.rows} rows. Captured into cost centres: ${fmtKr(r.captured_cost)}${r.unmapped_cost ? ` · unmapped: ${fmtKr(r.unmapped_cost)}` : ""}.</p>
+      <h4>P&amp;L from Fortnox <span class="fn-recon-sub">— ties out to your Resultatrapport</span></h4>
+      ${pnlTable(r)}
+      <p class="fn-recon-note">Read from ${r.vouchers} vouchers / ${r.rows} rows in one call. Into cost centres: ${fmtKr(r.captured_cost)}${r.unmapped_cost ? ` · <span class="fn-recon-warn">unmapped: ${fmtKr(r.unmapped_cost)}</span>` : " · nothing dropped ✓"}.</p>
     </div>`;
 }
 
 // ---- Panel UI --------------------------------------------------------------
 
 function demoIntegrationHtml() {
-  const p = { revenue: 52400000, cogs: 14200000, opex: 12600000, personnel: 15000000 };
-  const totalCost = p.cogs + p.opex + p.personnel;
+  const revenue = 52400000, cogs = 14200000, opex = 12600000, personnel = 15000000;
+  const total_cost = cogs + opex + personnel;
+  const r = { revenue, cogs, opex, personnel, total_cost, result: revenue - total_cost };
   return `
     <div class="integration-card connected">
       <div class="integ-head"><span class="integ-dot"></span> Connected to Fortnox · Meridian Manufacturing AB <span class="integ-demo-tag">demo</span></div>
       <p class="integ-sub">What a live connection looks like: your real accounting, reconciled automatically — no CSV, no re-keying. (Sample data.)</p>
       <div class="fn-recon">
         <h4>Actuals from Fortnox — full-year P&amp;L</h4>
-        <table class="fn-recon-table">
-          <tr><td>Revenue (class 3)</td><td class="num">${fmtKr(p.revenue)}</td></tr>
-          <tr><td>COGS (class 4)</td><td class="num">${fmtKr(p.cogs)}</td></tr>
-          <tr><td>Operating (class 5–6)</td><td class="num">${fmtKr(p.opex)}</td></tr>
-          <tr><td>Personnel (class 7)</td><td class="num">${fmtKr(p.personnel)}</td></tr>
-          <tr class="fn-recon-total"><td>Total cost</td><td class="num">${fmtKr(totalCost)}</td></tr>
-          <tr class="fn-recon-total"><td>Result</td><td class="num">${fmtKr(p.revenue - totalCost)}</td></tr>
-        </table>
+        ${pnlTable(r)}
         <p class="fn-recon-note">Read from 3 214 vouchers in one call · every cost centre auto-mapped · ties out to Fortnox's Resultatrapport.</p>
       </div>
     </div>`;
