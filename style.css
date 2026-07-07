@@ -777,6 +777,7 @@ html, body {
 .fn-recon-table td.num { text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
 .fn-recon-total td { border-top: 1px solid var(--panel-border); font-weight: 700; color: var(--text); padding-top: 8px; }
 .fn-recon-note { font-size: 0.78rem; color: var(--text-dim); margin-top: 10px; }
+.integ-demo-tag { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent-soft); border: 1px solid var(--panel-border); border-radius: 999px; padding: 1px 8px; margin-left: 6px; }
 
 .theme-toggle {
   background: var(--bg);

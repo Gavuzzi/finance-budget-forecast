@@ -120,11 +120,24 @@ function renderReconciliation(out) {
 // ---- Panel UI --------------------------------------------------------------
 
 function demoIntegrationHtml() {
+  const p = { revenue: 52400000, cogs: 14200000, opex: 12600000, personnel: 15000000 };
+  const totalCost = p.cogs + p.opex + p.personnel;
   return `
-    <div class="integration-card">
-      <div class="integ-head"><span class="integ-logo">⇄</span> Connect your accounting</div>
-      <p class="integ-sub">In the live app, connect <strong>Fortnox</strong> once and every month's actuals import themselves — no CSV, no re-keying. This demo uses sample data.</p>
-      <button class="integ-btn" type="button" disabled>Connect Fortnox (demo)</button>
+    <div class="integration-card connected">
+      <div class="integ-head"><span class="integ-dot"></span> Connected to Fortnox · Meridian Manufacturing AB <span class="integ-demo-tag">demo</span></div>
+      <p class="integ-sub">What a live connection looks like: your real accounting, reconciled automatically — no CSV, no re-keying. (Sample data.)</p>
+      <div class="fn-recon">
+        <h4>Actuals from Fortnox — full-year P&amp;L</h4>
+        <table class="fn-recon-table">
+          <tr><td>Revenue (class 3)</td><td class="num">${fmtKr(p.revenue)}</td></tr>
+          <tr><td>COGS (class 4)</td><td class="num">${fmtKr(p.cogs)}</td></tr>
+          <tr><td>Operating (class 5–6)</td><td class="num">${fmtKr(p.opex)}</td></tr>
+          <tr><td>Personnel (class 7)</td><td class="num">${fmtKr(p.personnel)}</td></tr>
+          <tr class="fn-recon-total"><td>Total cost</td><td class="num">${fmtKr(totalCost)}</td></tr>
+          <tr class="fn-recon-total"><td>Result</td><td class="num">${fmtKr(p.revenue - totalCost)}</td></tr>
+        </table>
+        <p class="fn-recon-note">Read from 3 214 vouchers in one call · every cost centre auto-mapped · ties out to Fortnox's Resultatrapport.</p>
+      </div>
     </div>`;
 }
 
