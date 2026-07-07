@@ -32,15 +32,6 @@ async function fortnoxGet(path: string, token: string) {
   return await res.json();
 }
 
-// SIE export returns a raw file, not JSON.
-async function fortnoxGetText(path: string, token: string) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { Authorization: `Bearer ${token}`, Accept: "*/*" },
-  });
-  if (!res.ok) throw new Error(`GET ${path} ${res.status}: ${await res.text()}`);
-  return await res.text();
-}
-
 async function refreshTokens(refreshToken: string) {
   const id = Deno.env.get("FORTNOX_CLIENT_ID")!;
   const secret = Deno.env.get("FORTNOX_CLIENT_SECRET")!;
@@ -103,14 +94,18 @@ Deno.serve(async (req) => {
     const codeToCc = new Map<string, string>();
     (maps ?? []).forEach((m: any) => m.cost_center_id && codeToCc.set(m.external_code, m.cost_center_id));
 
-    // 3. Bulk read: ONE SIE export for the financial year, then parse.
+    // 3. Bulk read: ONE SIE export for the financial year, STREAM-parsed line by
+    //    line so memory stays constant no matter how many vouchers (500 → millions).
     const fyRes = await fortnoxGet(`/financialyears`, accessToken); // VERIFY response shape
     const fys = fyRes?.FinancialYears ?? [];
     const fy = fys.find((f: any) => String(f.FromDate ?? "").startsWith(String(FY_BASE_YEAR))) ?? fys[fys.length - 1];
     const fyId = fy?.Id;
-    const sie = await fortnoxGetText(`/sie/4${fyId ? `?financialyear=${fyId}` : ""}`, accessToken); // VERIFY path/param
 
-    // Parse #VER (voucher date) + #TRANS (account, dimensions, amount).
+    const sieRes = await fetch(`${API_BASE}/sie/4${fyId ? `?financialyear=${fyId}` : ""}`, { // VERIFY path/param
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: "*/*" },
+    });
+    if (!sieRes.ok || !sieRes.body) throw new Error(`SIE ${sieRes.status}: ${await sieRes.text()}`);
+
     const totals = new Map<string, number>();
     const unmapped = new Set<string>();
     let voucherCount = 0, rowCount = 0;
@@ -118,20 +113,20 @@ Deno.serve(async (req) => {
     let capturedCost = 0, unmappedCost = 0;
     let curMonth: number | null = null;
 
-    for (const raw of sie.split(/\r?\n/)) {
+    const processLine = (raw: string) => {
       const line = raw.trimStart();
       if (line.startsWith("#VER")) {
         voucherCount++;
         const m = line.match(/#VER\s+\S+\s+\S+\s+(\d{8})/);
         curMonth = m ? monthIndexFromYmd(m[1]) : null;
-        continue;
+        return;
       }
-      if (!line.startsWith("#TRANS") || curMonth === null) continue;
+      if (!line.startsWith("#TRANS") || curMonth === null) return;
       const t = line.match(/^#TRANS\s+(\d+)\s+\{([^}]*)\}\s+(-?\d+(?:\.\d+)?)/);
-      if (!t) continue;
+      if (!t) return;
       const acct = Number(t[1]);
       const amount = Number(t[3]);
-      if (!amount) continue;
+      if (!amount) return;
       rowCount++;
       const cls = Math.floor(acct / 1000);
 
@@ -142,17 +137,29 @@ Deno.serve(async (req) => {
       else if (cls === 7) personnel += amount;
 
       // Cost capture into reporting lines: operating costs (BAS 4–7) only.
-      if (!(acct >= 4000 && acct < 8000)) continue;
+      if (!(acct >= 4000 && acct < 8000)) return;
       const pairs = [...t[2].matchAll(/(\d+)\s+"([^"]*)"/g)];
       const ccPair = pairs.find((p) => p[1] === "1"); // SIE dimension 1 = kostnadsställe
       const code = ccPair ? ccPair[2].trim() : "";
-      if (!code) continue;                            // untagged → can't place it
+      if (!code) return;                              // untagged → can't place it
       const ccId = codeToCc.get(code);
-      if (!ccId) { unmapped.add(code); unmappedCost += amount; continue; }
+      if (!ccId) { unmapped.add(code); unmappedCost += amount; return; }
       capturedCost += amount;
       const key = `${ccId}|${curMonth}`;
       totals.set(key, (totals.get(key) ?? 0) + amount);
+    };
+
+    const reader = sieRes.body.pipeThrough(new TextDecoderStream("latin1")).getReader();
+    let buf = "";
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += value;
+      const lines = buf.split("\n");
+      buf = lines.pop() ?? "";       // keep the trailing partial line
+      for (const l of lines) processLine(l);
     }
+    if (buf) processLine(buf);
 
     // 4. Upsert aggregated actuals.
     const rows = [...totals.entries()].map(([key, amount]) => {
