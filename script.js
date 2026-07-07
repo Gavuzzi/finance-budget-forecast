@@ -442,10 +442,32 @@ window.addEventListener("afterprint", () => {
   if (_printPrevTheme && _printPrevTheme !== "light") applyTheme(_printPrevTheme);
 });
 
+// The actuals P&L pulled from Fortnox (persisted from the last sync), shown on
+// the Overview so the headline view reflects the full picture, not just costs.
+async function renderFortnoxPnl() {
+  const panel = document.getElementById("fortnoxPnl");
+  const body = document.getElementById("fortnoxPnlBody");
+  if (!panel || !body || typeof pnlTable !== "function") return;
+  let recon = null;
+  if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) {
+    const revenue = 52400000, cogs = 14200000, opex = 12600000, personnel = 15000000;
+    const total_cost = cogs + opex + personnel;
+    recon = { revenue, cogs, opex, personnel, total_cost, result: revenue - total_cost, vouchers: 3214 };
+  } else {
+    const status = await loadIntegrationStatus();
+    recon = status && status.last_reconciliation;
+  }
+  if (!recon) { panel.hidden = true; return; }
+  body.innerHTML = pnlTable(recon) +
+    `<p class="fn-recon-note">Full-year actuals synced from Fortnox — ties out to your Resultatrapport.${recon.vouchers ? ` Read from ${Number(recon.vouchers).toLocaleString("sv-SE")} vouchers.` : ""}</p>`;
+  panel.hidden = false;
+}
+
 window.initPage = () => {
   initLensControls();
   initScenarios();
   initPrint();
   renderOnboard();
   renderAll();
+  renderFortnoxPnl();
 };

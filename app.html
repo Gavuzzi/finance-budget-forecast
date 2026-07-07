@@ -34,6 +34,11 @@
 
       <section class="stats-row" id="statsRow"></section>
 
+      <section class="panel fortnox-pnl-panel" id="fortnoxPnl" hidden>
+        <h2>Actuals P&amp;L <span class="pnl-src">— from Fortnox</span></h2>
+        <div id="fortnoxPnlBody"></div>
+      </section>
+
       <section class="main-row single">
         <div class="panel chart-panel">
           <h2 id="chartTitle">Spend — Budget vs Actual vs Forecast</h2>
@@ -66,6 +71,7 @@
   <script src="lib.js"></script>
   <script src="data.js"></script>
   <script src="sidebar.js"></script>
+  <script src="fortnox.js"></script>
   <script src="script.js"></script>
   <script>requireAuthAndLoad(() => { renderSidebar(); window.initPage(); });</script>
 </body>

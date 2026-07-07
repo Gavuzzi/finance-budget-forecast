@@ -778,6 +778,8 @@ html, body {
 .fn-recon-total td { border-top: 1px solid var(--panel-border); font-weight: 700; color: var(--text); padding-top: 8px; }
 .fn-recon-note { font-size: 0.78rem; color: var(--text-dim); margin-top: 10px; }
 .fn-recon-sub { font-weight: 400; color: var(--text-dim); font-size: 0.8rem; }
+.pnl-src { font-weight: 400; color: var(--text-dim); font-size: 0.9rem; }
+.fortnox-pnl-panel .fn-recon-table { max-width: 480px; }
 .fn-recon-warn { color: var(--red); }
 .fn-margin { font-size: 0.72rem; font-weight: 600; color: var(--green, #3fb27f); background: rgba(63,178,127,0.12); padding: 1px 7px; border-radius: 999px; margin-left: 8px; }
 .fn-cc-maplabel { font-size: 0.78rem; color: var(--text-dim); margin-top: 12px; }
