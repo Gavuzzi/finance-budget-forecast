@@ -192,9 +192,9 @@ the current sync ties out to Fortnox's own P&L at realistic scale.
 
 ### Phase 0 — Prove the foundation (do this first)
 Goal: the sync's numbers match Fortnox's result report, at real scale, reliably.
-- [ ] `[F]` **Realistic sandbox** — a full year: dozens of vouchers across BAS 4/5/6/7, several cost-centres, a project or two, a lumpy annual cost, one correction/reversal. *(kills toy-data blindness)*
-- [ ] `[B]` **Reconciliation / tie-out** — after a sync, compare our per-period total to Fortnox's own result report; show ✓ matches / ✗ off by X. *(Risk #1 — trust)* — **done when our total = Fortnox's P&L per closed month.**
-- [ ] `[B]` **Configurable account scope** — default BAS 5–7; explicit decision on 4xxx (COGS). *(crude-filter miscount)*
+- [x] `[F]` **Realistic sandbox** — 80-voucher SIE across BAS 3/4/5/6/7, 3 cost-centres, a project, a lumpy annual cost, a correction. Generated via `test-data/seed-sie.pl`, imported into "Large scale Actual test". *(A bigger set for the scale test is next.)*
+- [x] `[B]` **Reconciliation / tie-out** — sync returns a full-P&L reconciliation (revenue/COGS/opex/personnel/result) from every voucher, shown in-app. **✅ Ties out to the öre** against Fortnox (2 467 000 rev / 2 733 000 cost / −266 000 result).
+- [x] `[B]` **Account scope** — widened cost capture to BAS 4–7 (COGS now included) + revenue class 3 in the reconciliation. *(Full per-account configurability = later refinement.)*
 - [ ] `[B]` **Incremental + resilient sync** — only since last run; batch + backoff; drop the silent `MAX_VOUCHERS` cap; full pagination. *(Risk #2 — scale/timeout)*
 - [ ] `[B]` **Period refresh, not blind upsert** — delete + reload a period so corrections/deletions propagate. *(stale-actuals drift)*
 - [ ] `[B]` **Real "closed" month** — stop auto-advancing to "last month with a booking"; use Fortnox's locked-period info, or keep it user-confirmed. *(fake favourable variance)*
