@@ -137,7 +137,15 @@ function demoIntegrationHtml() {
       <div class="fn-recon">
         <h4>Actuals from Fortnox — full-year P&amp;L</h4>
         ${pnlTable(r)}
-        <p class="fn-recon-note">Read from 3 214 vouchers in one call · every cost centre auto-mapped · ties out to Fortnox's Resultatrapport.</p>
+        <p class="fn-recon-note">Read from 3 214 vouchers in one call · ties out to Fortnox's Resultatrapport.</p>
+        <div class="fn-cc-maplabel">Cost centres — auto-mapped from your ledger:</div>
+        <div class="fn-cc-chips">
+          <span class="fn-cc-chip">✓ Production</span>
+          <span class="fn-cc-chip">✓ Sales &amp; Marketing</span>
+          <span class="fn-cc-chip">✓ R&amp;D</span>
+          <span class="fn-cc-chip">✓ Administration</span>
+          <span class="fn-cc-chip">✓ IT</span>
+        </div>
       </div>
     </div>`;
 }
