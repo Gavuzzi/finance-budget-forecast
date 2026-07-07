@@ -244,7 +244,7 @@ Revenue is in scope (actuals from BAS 3xxx + simple typed plan + margin per line
 - [ ] `[B]` Simple allocation (corporate unallocated) + before/after views
 - [ ] `[B]` Noise filters (voucher series / account exclusions)
 - [ ] `[B]` "Spread annual costs" periodization toggle
-- [ ] `[B]` Excel export *(blind spot #5)*
+- [x] `[B]` Excel export — one-click CSV of the Monthly grid (sv-Excel format: BOM + sep=;), FY + rolling lenses *(blind spot #5 — done early, it was cheap)*
 - [ ] `[B]` Scheduled auto-sync (Supabase cron) — "always current" *(blind spot #5)*
 
 ### Phase 5 — Cash flow (major module · ✅ on the map, sequenced last)
