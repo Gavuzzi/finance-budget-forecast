@@ -4,18 +4,22 @@ Everything is built. This is the switch-on checklist. **No local tools needed** 
 you deploy the functions straight from the Supabase Dashboard in your browser.
 
 ## What it does
-Connect a Fortnox company once → a server-side job pulls booked vouchers, keeps
-operating-expense rows (BAS accounts 5000–7999), groups them by **cost centre ×
-month**, maps each Fortnox cost-centre code to one of your cost centers, and
-writes them into `monthly_actual`. The "actuals booked through" month advances
-itself. No CSV, no re-keying.
+Connect a Fortnox company once → each sync **exports the whole financial year as one
+SIE file** (`/3/sie/4`), stream-parses it, and produces a full **P&L** (revenue,
+COGS, operating, personnel, result) that ties out to Fortnox's Resultatrapport.
+Operating costs (BAS 4–7) are grouped by **cost centre × month** and written into
+`monthly_actual`. **One API call at any volume** — 500 or 500,000 vouchers (proven:
+55k vouchers in ~3s). No CSV, no re-keying; corrections propagate automatically
+(each sync re-exports the current truth).
 
 ## Architecture
 ```
 Browser "Connect Fortnox" → Fortnox consent → redirect w/ code
    Edge fn fortnox-oauth → exchange code (holds SECRET) → store tokens
-Browser "Sync now" → Edge fn fortnox-sync → /3/vouchers
-   → expense rows × cost centre × month → map → monthly_actual
+Browser "Sync now" → Edge fn fortnox-sync
+   → GET /3/financialyears        (real fiscal-year start — handles broken years)
+   → GET /3/sie/4                 (whole year, ONE call) → stream-parse #VER/#TRANS
+   → full P&L + cost-centre × month → map → monthly_actual
 ```
 Secrets never touch the browser: tokens live in `integrations` (RLS, no policies =
 service-role only). The client reads `integration_status` only.
@@ -33,7 +37,11 @@ service-role only). The client reads `integration_status` only.
 
 **3. Deploy the two functions — Supabase Dashboard → Edge Functions → "Create a function":**
 - Name it **exactly** `fortnox-oauth` → paste all of `supabase/functions/fortnox-oauth/index.ts` → **Deploy** → open its **Settings** tab → turn **OFF "Enforce JWT"** (it's a public redirect target).
-- Name it **exactly** `fortnox-sync` → paste all of `supabase/functions/fortnox-sync/index.ts` → **Deploy** → leave "Enforce JWT" **ON**.
+- Name it **exactly** `fortnox-sync` → paste all of `supabase/functions/fortnox-sync/index.ts` → **Deploy** → turn **OFF "Verify JWT"** (the browser calls it directly; auth is checked in-code via `can_edit_org`).
+
+> **Deploying updates:** the Supabase CLI is now set up, so changes deploy with
+> `supabase functions deploy fortnox-sync --project-ref cgqfiugjsiwlefhguqnc`
+> (config pins `verify_jwt = false` for both). The dashboard copy-paste above is the fallback.
 
 **4. Secrets — Dashboard → Edge Functions → Secrets** (add these three; the SUPABASE_* ones are automatic):
 - `FORTNOX_CLIENT_ID` = `3HheIYa28iIf`
