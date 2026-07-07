@@ -81,6 +81,8 @@ async function runFortnoxSync(btn) {
     }
     showToast(msg);
     renderReconciliation(out);
+    const ls = document.getElementById("fnLastSynced");
+    if (ls) ls.textContent = "Last synced: " + new Date().toLocaleString("sv-SE");
   } catch (e) {
     showToast("Sync failed — " + e.message, "error");
   } finally {
@@ -139,7 +141,7 @@ function connectedHtml(status) {
   return `
     <div class="integration-card connected">
       <div class="integ-head"><span class="integ-dot"></span> Connected to Fortnox${status.tenant_name ? " · " + status.tenant_name : ""}</div>
-      <p class="integ-sub">Last synced: ${last}</p>
+      <p class="integ-sub" id="fnLastSynced">Last synced: ${last}</p>
       <div class="integ-actions">
         <button class="integ-btn" id="fnSyncBtn" type="button">Sync now</button>
         <button class="integ-link" id="fnMapToggle" type="button">Cost-centre mapping</button>
