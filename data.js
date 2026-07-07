@@ -10,9 +10,16 @@
 
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+// Fiscal-year anchor: app month 1 = FY_START_MONTH of FY_START_YEAR. Calendar
+// years keep the old Jan-2026 behaviour; broken years (May–Apr etc.) label
+// correctly. Set per org in loadData / loadPreviewData.
+let FY_START_MONTH = 1;
+let FY_START_YEAR = 2026;
+
 function monthLabel(m) {
-  const name = MONTH_NAMES[(m - 1) % 12];
-  const year = 26 + Math.floor((m - 1) / 12);
+  const abs = FY_START_MONTH - 1 + (m - 1);         // months since Jan of FY_START_YEAR
+  const name = MONTH_NAMES[abs % 12];
+  const year = (FY_START_YEAR % 100) + Math.floor(abs / 12);
   return `${name} ${year}`;
 }
 
@@ -135,6 +142,8 @@ async function loadData(orgId) {
   CURRENT_ORG_ID = org.id;
   CLOSE_MONTH = org.close_month;
   DISPLAY_UNIT = org.display_unit || "tkr"; // SME default; falls back gracefully if the column isn't set
+  FY_START_MONTH = org.fy_start_month || 1; // broken fiscal years — set by the Fortnox sync
+  FY_START_YEAR = org.fy_start_year || 2026;
   localStorage.setItem(ORG_STORAGE_KEY, CURRENT_ORG_ID);
 
   // Everything else is filtered to the active org (there may be several now).
@@ -207,6 +216,9 @@ function loadPreviewData() {
   CURRENT_ORG_ID = "preview-1";
   CLOSE_MONTH = 6;
   DISPLAY_UNIT = "mkr"; // demo figures are millions-scale — keep the portfolio clean
+  // Dev hook: ?preview&fystart=5 renders a broken fiscal year (May–Apr) to verify labels.
+  FY_START_MONTH = parseInt(new URLSearchParams(location.search).get("fystart"), 10) || 1;
+  FY_START_YEAR = 2026;
   Object.assign(ASSUMPTIONS, { employerContributionPct: 31.42, equipmentMonthly: 1200, otherOverheadPct: 4 });
 
   ROLE_CATALOG.length = 0;

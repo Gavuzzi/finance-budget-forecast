@@ -98,6 +98,8 @@ create table if not exists scenarios (
 
 -- Idempotent catch-up for databases created before newer columns existed.
 alter table cost_centers add column if not exists note text;
+alter table organizations add column if not exists fy_start_month smallint not null default 1;  -- broken fiscal years (May–Apr etc.)
+alter table organizations add column if not exists fy_start_year  smallint not null default 2026;
 
 -- ---------------------------------------------------------------------------
 -- Row-Level Security: a user can touch a row only if they're a member of its org.

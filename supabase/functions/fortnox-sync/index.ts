@@ -179,9 +179,12 @@ Deno.serve(async (req) => {
     });
     if (rows.length) await admin.from("monthly_actual").upsert(rows, { onConflict: "cost_center_id,month" });
 
-    // 5. Advance the actuals boundary to the latest synced month.
+    // 5. Advance the actuals boundary + persist the fiscal-year anchor so the
+    //    app labels months correctly (broken fiscal years: May–Apr etc.).
     const maxMonth = rows.reduce((m, r) => Math.max(m, r.month), 0);
-    if (maxMonth) await admin.from("organizations").update({ close_month: maxMonth }).eq("id", org_id);
+    const orgPatch: Record<string, unknown> = { fy_start_month: startMonth, fy_start_year: startYear };
+    if (maxMonth) orgPatch.close_month = maxMonth;
+    await admin.from("organizations").update(orgPatch).eq("id", org_id);
 
     // Cost-centre list (from SIE #OBJEKT defs + any codes seen in transactions),
     // with operating cost and mapped status — powers the one-click mapping UI.
