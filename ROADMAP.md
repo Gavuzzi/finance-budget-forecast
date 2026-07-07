@@ -245,7 +245,7 @@ Revenue is in scope (actuals from BAS 3xxx + simple typed plan + margin per line
 - [ ] `[B]` Noise filters (voucher series / account exclusions)
 - [ ] `[B]` "Spread annual costs" periodization toggle
 - [x] `[B]` Excel export — one-click CSV of the Monthly grid (sv-Excel format: BOM + sep=;), FY + rolling lenses *(blind spot #5 — done early, it was cheap)*
-- [ ] `[B]` Scheduled auto-sync (Supabase cron) — "always current" *(blind spot #5)*
+- [x] `[B]` Scheduled auto-sync — pg_cron fires the sync nightly (05:00 UTC) for every connected org, secret-authorized, per-org error isolation. Verified live: cron path synced 54,966 vouchers autonomously with exact tie-out. *(blind spot #5 — "always current" is real)*
 
 ### Phase 5 — Cash flow (major module · ✅ on the map, sequenced last)
 A second forecast lens: **bank-balance projection, not P&L.** Different data
