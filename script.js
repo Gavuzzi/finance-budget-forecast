@@ -378,7 +378,7 @@ function initScenarios() {
 }
 
 function renderAll() {
-  const sections = document.querySelectorAll(".lens-controls, .stats-row, .main-row, .table-panel, .role-breakdown-panel, .scenarios-panel");
+  const sections = document.querySelectorAll(".lens-controls, .stats-row, .main-row, .table-panel, .role-breakdown-panel, .scenarios-panel, .signals-panel, .fortnox-pnl-panel");
   let empty = document.getElementById("emptyState");
 
   if (COST_CENTERS.length === 0) {
@@ -400,6 +400,7 @@ function renderAll() {
   renderChart();
   renderRoleBreakdown();
   renderScenarios();
+  renderSignals();
 }
 
 function initLensControls() {
@@ -441,6 +442,34 @@ window.addEventListener("beforeprint", () => {
 window.addEventListener("afterprint", () => {
   if (_printPrevTheme && _printPrevTheme !== "light") applyTheme(_printPrevTheme);
 });
+
+// Signals — proactively surface what's off, so the controller doesn't have to
+// hunt through tables (the pattern every winning FP&A tool shares).
+function renderSignals() {
+  const panel = document.getElementById("signalsPanel");
+  const list = document.getElementById("signalsList");
+  if (!panel || !list) return;
+
+  const signals = [];
+  COST_CENTERS.forEach((cc) => {
+    const fy = fySummary(cc);
+    if (!fy.budget) return;
+    const pct = (fy.variance / fy.budget) * 100;
+    if (Math.abs(pct) < 3) return; // within tolerance — no noise
+    signals.push({
+      abs: Math.abs(fy.variance),
+      over: fy.variance > 0,
+      html: `<strong>${cc.name}</strong> is tracking <strong>${fmtMkrSigned(fy.variance)}</strong> ${fy.variance > 0 ? "over" : "under"} budget (${pct > 0 ? "+" : ""}${pct.toFixed(1)}%)${cc.note ? ` <span class="signal-note">— ${cc.note}</span>` : ""}`,
+    });
+  });
+
+  if (signals.length === 0) { panel.hidden = true; return; }
+  signals.sort((a, b) => b.abs - a.abs);
+  list.innerHTML = signals.slice(0, 5).map((s) =>
+    `<div class="signal-row"><span class="signal-dot ${s.over ? "over" : "under"}"></span><span>${s.html}</span></div>`
+  ).join("");
+  panel.hidden = false;
+}
 
 // The actuals P&L pulled from Fortnox (persisted from the last sync), shown on
 // the Overview so the headline view reflects the full picture, not just costs.

@@ -161,6 +161,17 @@ Swedish books are kept in **SEK by law**; foreign transactions are booked in SEK
 
 ---
 
+## Steal list — proven patterns from the winners (copy convention, innovate only on our edge)
+
+From teardown of Runway / Abacum / Causal / Planacy (2026-07-07):
+- **Proactive variance flags** *(Runway/Abacum — all winners have this)*: the system surfaces "what's off" in plain language instead of making you scan tables. → Build as "Signals" on Overview. **(building now)**
+- **Forecast suggestions from history** *(Planacy)* = our re-forecast item ✓ validated.
+- **Version control on budgets/forecasts** *(Abacum)* = our versioning item ✓ validated.
+- **Auto-retrieved actuals at process start** *(Planacy)* = our Fortnox sync ✓ already built.
+- **Investor/board-ready reporting** *(Runway)* = our board pack ✓; polish later.
+- **Anomaly scanning with severity + explanation** *(Abacum)* — later, after Signals proves out.
+- Anti-pattern to NOT copy: Planacy's module sprawl (needs consultants to configure) — that's the gap we live in.
+
 ## Risks & what can go wrong
 
 **Correctness & trust — highest stakes (in finance, one wrong number ends the relationship)**
