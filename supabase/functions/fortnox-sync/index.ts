@@ -47,13 +47,6 @@ async function refreshTokens(refreshToken: string) {
   return await res.json();
 }
 
-// "20260315" → absolute app month index (1..24), or null if outside the window.
-function monthIndexFromYmd(ymd: string): number | null {
-  const y = Number(ymd.slice(0, 4)), mo = Number(ymd.slice(4, 6));
-  const idx = (y - FY_BASE_YEAR) * 12 + mo;
-  return idx >= 1 && idx <= 24 ? idx : null;
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
@@ -101,6 +94,12 @@ Deno.serve(async (req) => {
     const fy = fys.find((f: any) => String(f.FromDate ?? "").startsWith(String(FY_BASE_YEAR))) ?? fys[fys.length - 1];
     const fyId = fy?.Id;
 
+    // Anchor month 1 to the fiscal year's REAL start, so broken fiscal years
+    // (e.g. May–Apr) land in the right months instead of assuming Jan–Dec.
+    const fyStart = String(fy?.FromDate ?? `${FY_BASE_YEAR}-01-01`);
+    const startYear = Number(fyStart.slice(0, 4)) || FY_BASE_YEAR;
+    const startMonth = Number(fyStart.slice(5, 7)) || 1;
+
     const sieRes = await fetch(`${API_BASE}/sie/4${fyId ? `?financialyear=${fyId}` : ""}`, { // VERIFY path/param
       headers: { Authorization: `Bearer ${accessToken}`, Accept: "*/*" },
     });
@@ -118,7 +117,11 @@ Deno.serve(async (req) => {
       if (line.startsWith("#VER")) {
         voucherCount++;
         const m = line.match(/#VER\s+\S+\s+\S+\s+(\d{8})/);
-        curMonth = m ? monthIndexFromYmd(m[1]) : null;
+        if (m) {
+          const ymd = m[1];
+          const idx = (Number(ymd.slice(0, 4)) - startYear) * 12 + (Number(ymd.slice(4, 6)) - startMonth) + 1;
+          curMonth = idx >= 1 && idx <= 24 ? idx : null;   // month relative to FY start
+        } else curMonth = null;
         return;
       }
       if (!line.startsWith("#TRANS") || curMonth === null) return;
