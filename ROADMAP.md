@@ -199,7 +199,7 @@ Goal: the sync's numbers match Fortnox's result report, at real scale, reliably.
 - [ ] `[B]` **Period refresh, not blind upsert** — delete + reload a period so corrections/deletions propagate. *(stale-actuals drift)*
 - [ ] `[B]` **Real "closed" month** — stop auto-advancing to "last month with a booking"; use Fortnox's locked-period info, or keep it user-confirmed. *(fake favourable variance)*
 
-- [ ] `[B]` **Support broken fiscal years** (brutet räkenskapsår) — read the org's real fiscal-year start from Fortnox (`/3/financialyears`) instead of hardcoding January (`FY_BASE_YEAR`); today's month mapping breaks for a May–Apr / Jul–Jun / Sep–Aug company.
+- [~] `[B]` **Support broken fiscal years** (brutet räkenskapsår) — sync now anchors each voucher's month to the fiscal year's real start (`/3/financialyears` FromDate), so May–Apr / Jul–Jun companies land in the right months. *(Follow-up: the app's month **labels** still say Jan–Dec; make those FY-relative too.)*
 
 **Gate:** foundation ties out → only now build features.
 
