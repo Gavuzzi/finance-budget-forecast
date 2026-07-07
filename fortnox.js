@@ -143,6 +143,7 @@ function connectedHtml(status) {
       <div class="integ-actions">
         <button class="integ-btn" id="fnSyncBtn" type="button">Sync now</button>
         <button class="integ-link" id="fnMapToggle" type="button">Cost-centre mapping</button>
+        <button class="integ-link" id="fnReconnectBtn" type="button">Switch company</button>
       </div>
       ${err}
       <div id="fnReconciliation"></div>
@@ -175,6 +176,9 @@ function wireIntegrationPanel(host, status) {
 
   const syncBtn = host.querySelector("#fnSyncBtn");
   if (syncBtn) syncBtn.addEventListener("click", () => runFortnoxSync(syncBtn));
+
+  const reconnectBtn = host.querySelector("#fnReconnectBtn");
+  if (reconnectBtn) reconnectBtn.addEventListener("click", startFortnoxConnect);
 
   const mapToggle = host.querySelector("#fnMapToggle");
   const mapping = host.querySelector("#fnMapping");
