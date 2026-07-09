@@ -636,6 +636,47 @@ async function dbUpdateAssumptions() {
   if (error) flagWriteError(error);
 }
 
+// ---- Full data export (GDPR portability / "your data is yours") ------------
+// Dumps every table this org owns, straight from the DB (RLS scopes each
+// query), as one JSON download. Deliberately excluded: `integrations` and
+// `oauth_states` — OAuth secrets/transient state, unreadable client-side by
+// design (RLS deny-all) and not the user's business data.
+const EXPORT_TABLES = [
+  "assumptions", "roles", "reporting_lines", "headcount_lines", "one_offs",
+  "recurring_costs", "monthly_actual", "forecast_overrides", "scenarios",
+  "budget_versions", "reporting_line_mappings", "sync_exclusions",
+  "cash_position", "open_invoices", "tax_liability_monthly", "actual_detail",
+];
+
+async function exportAllData() {
+  if (DEMO_MODE) { showToast("Sign in to export your own workspace."); return; }
+  const org = USER_ORGS.find((o) => o.id === CURRENT_ORG_ID) || {};
+  const out = {
+    exported_at: new Date().toISOString(),
+    app: "FP&A Planning",
+    organization: org,
+    note: "Every table stored for this organization. Excluded: OAuth tokens/state (secrets, not business data).",
+    tables: {},
+  };
+  for (const t of EXPORT_TABLES) {
+    const { data, error } = await sb.from(t).select("*").eq("org_id", CURRENT_ORG_ID);
+    // Tolerant per-table: a missing/newer table shouldn't sink the whole export.
+    out.tables[t] = error ? { export_error: error.message } : data;
+  }
+  const stRes = await sb.from("integration_status")
+    .select("connected, tenant_name, last_synced_at, last_sync_error, last_reconciliation, last_reporting_lines, last_projects")
+    .eq("org_id", CURRENT_ORG_ID).maybeSingle();
+  out.tables.integration_status = stRes.error ? { export_error: stRes.error.message } : stRes.data;
+
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `fpa-export-${(org.name || "org").replace(/[^\w-]+/g, "-").toLowerCase()}-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast("Export downloaded — everything this organization stores, as JSON.");
+}
+
 async function dbUpdateRevenuePlan() {
   const { error } = await sb.from("assumptions")
     .update({ revenue_plan: ASSUMPTIONS.revenuePlan })

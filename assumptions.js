@@ -147,8 +147,18 @@ function renderRateEngineBlock() {
   `;
 }
 
+function renderDataBlock() {
+  return `
+    <div class="cc-block rate-block data-block">
+      <h2>Your Data</h2>
+      <p class="rate-hint">Everything this organization stores — budget drivers, actuals, plans, scenarios, sync configuration — downloadable as one JSON file. Your data is yours: take it to Excel, another tool, or just keep a backup. (OAuth tokens are never included; they aren't readable from the browser at all.)</p>
+      <button class="add-headcount" id="exportAllBtn" type="button">⬇ Export everything (JSON)</button>
+    </div>
+  `;
+}
+
 function buildRateEngine() {
-  document.getElementById("rateEngine").innerHTML = renderRevenueBlock() + renderRateEngineBlock() + renderTaxBlock();
+  document.getElementById("rateEngine").innerHTML = renderRevenueBlock() + renderRateEngineBlock() + renderTaxBlock() + renderDataBlock();
   updateRateFormula();
 }
 
@@ -228,6 +238,10 @@ function initAssumptions() {
   });
 
   rateEngine.addEventListener("click", async (e) => {
+    if (e.target.id === "exportAllBtn") {
+      exportAllData();
+      return;
+    }
     if (e.target.id === "revSpreadBtn") {
       ASSUMPTIONS.revenuePlan = Array.from({ length: 12 }, () => Math.round((ASSUMPTIONS.revenueBudget || 0) / 12));
       dbUpdateRevenuePlan();
