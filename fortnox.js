@@ -245,8 +245,11 @@ async function renderMappingEditor(host) {
   const projSection = lastProjects.length
     ? `<p class="integ-map-hint fn-section-gap"><strong>Projects</strong> — matched before cost centres when a booking carries both.</p>` + codeRowsHtml(lastProjects, "project")
     : "";
-  host.innerHTML = ccSection + projSection + `<div id="fnAcctRanges" class="fn-acct-ranges"></div>`;
+  host.innerHTML = ccSection + projSection
+    + `<div id="fnAcctRanges" class="fn-acct-ranges"></div>`
+    + `<div id="fnExclusions" class="fn-acct-ranges"></div>`;
   renderAccountRanges(host);
+  renderExclusions(host);
   host.querySelectorAll(".fn-cc-row[data-code]").forEach((row) => {
     const dim = row.dataset.dim;
     const item = (dim === "project" ? lastProjects : lastCostCenters).find((c) => c.code === row.dataset.code);
@@ -304,6 +307,46 @@ async function renderAccountRanges(host) {
     if (error) { showToast("Couldn't add — " + error.message, "error"); return; }
     showToast("Range added — re-sync to apply.");
     renderAccountRanges(host);
+  });
+}
+
+// ---- Sync exclusions (noise filters: correction series, opening balances) --
+
+async function loadExclusions() {
+  const { data } = await sb.from("sync_exclusions").select("id, kind, value").eq("org_id", CURRENT_ORG_ID);
+  return data || [];
+}
+
+async function renderExclusions(host) {
+  const rows = await loadExclusions();
+  const el = host.querySelector("#fnExclusions");
+  if (!el) return;
+  el.innerHTML = `
+    <p class="integ-map-hint"><strong>Sync exclusions</strong> — filter out noise: a correction/adjustment voucher series, or an account used for opening balances. Excluded rows are ignored entirely, everywhere (not just left unmapped).</p>
+    ${rows.map((r) => `
+      <div class="fn-cc-row">
+        <span class="fn-cc-name">${r.kind === "series" ? "Voucher series" : "Account"} <span class="fn-cc-code">${r.value}</span></span>
+        <span></span>
+        <button class="integ-link" data-delexcl="${r.id}" type="button">Remove</button>
+      </div>`).join("")}
+    <div class="fn-acct-add">
+      <select id="fnExclKind"><option value="series">Voucher series</option><option value="account">Account</option></select>
+      <input type="text" id="fnExclValue" placeholder="e.g. B or 1930" style="width:110px">
+      <button class="fn-cc-import" id="fnExclAdd" type="button">Add</button>
+    </div>`;
+  el.querySelectorAll("[data-delexcl]").forEach((b) => b.addEventListener("click", async () => {
+    await sb.from("sync_exclusions").delete().eq("id", b.dataset.delexcl);
+    showToast("Exclusion removed — re-sync to apply.");
+    renderExclusions(host);
+  }));
+  el.querySelector("#fnExclAdd").addEventListener("click", async () => {
+    const kind = el.querySelector("#fnExclKind").value;
+    const value = el.querySelector("#fnExclValue").value.trim();
+    if (!value) { showToast("Enter a series letter or account number.", "error"); return; }
+    const { error } = await sb.from("sync_exclusions").insert({ org_id: CURRENT_ORG_ID, kind, value });
+    if (error) { showToast("Couldn't add — " + error.message, "error"); return; }
+    showToast("Exclusion added — re-sync to apply.");
+    renderExclusions(host);
   });
 }
 

@@ -242,7 +242,7 @@ Revenue is in scope (actuals from BAS 3xxx + simple typed plan + margin per line
 
 ### Phase 4 — Depth & polish
 - [ ] `[B]` Simple allocation (corporate unallocated) + before/after views
-- [ ] `[B]` Noise filters (voucher series / account exclusions)
+- [x] `[B]` Noise filters — a "Sync exclusions" panel lets you exclude a whole voucher series (e.g. a corrections series) or a specific account (e.g. opening balances); excluded rows are fully ignored everywhere, not just left unmapped. Verified live via fault injection on real data: excluding account 7010 (Löner) zeroed Personnel exactly and moved Result by precisely the excluded amount (+3,600,000); excluding series "A" (100% of the test company's vouchers) zeroed revenue and cost entirely while the scanned voucher count stayed correct. Fully restored after.
 - [ ] `[B]` "Spread annual costs" periodization toggle
 - [x] `[B]` Excel export — one-click CSV of the Monthly grid (sv-Excel format: BOM + sep=;), FY + rolling lenses *(blind spot #5 — done early, it was cheap)*
 - [x] `[B]` Scheduled auto-sync — pg_cron fires the sync nightly (05:00 UTC) for every connected org, secret-authorized, per-org error isolation. Verified live: cron path synced 54,966 vouchers autonomously with exact tie-out. *(blind spot #5 — "always current" is real)*

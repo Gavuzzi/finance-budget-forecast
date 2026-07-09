@@ -124,6 +124,17 @@ async function syncOrg(admin: any, org_id: string) {
     }
   });
 
+  // Noise filters: an excluded voucher series (e.g. a correction/adjustment
+  // series) or excluded account (e.g. opening-balance postings) is fully
+  // ignored — not counted anywhere, not just left unmapped.
+  const { data: exclRows } = await admin.from("sync_exclusions").select("kind, value").eq("org_id", org_id);
+  const excludedSeries = new Set<string>();
+  const excludedAccounts = new Set<number>();
+  (exclRows ?? []).forEach((r: any) => {
+    if (r.kind === "series") excludedSeries.add(String(r.value).toUpperCase());
+    else if (r.kind === "account") excludedAccounts.add(Number(r.value));
+  });
+
   // 3. Bulk read: ONE SIE export for the financial year, STREAM-parsed line by
   //    line so memory stays constant no matter how many vouchers (500 → millions).
   const fyRes = await fortnoxGet(`/financialyears`, accessToken);
@@ -160,9 +171,11 @@ async function syncOrg(admin: any, org_id: string) {
     const line = raw.trimStart();
     if (line.startsWith("#VER")) {
       voucherCount++;
-      const m = line.match(/#VER\s+\S+\s+\S+\s+(\d{8})/);
-      if (m) {
-        const ymd = m[1];
+      const vm = line.match(/#VER\s+"?([^"\s]+)"?\s+\S+\s+(\d{8})/);
+      if (vm) {
+        const series = vm[1].toUpperCase();
+        if (excludedSeries.has(series)) { curMonth = null; return; } // whole voucher is noise — ignore every row in it
+        const ymd = vm[2];
         const idx = (Number(ymd.slice(0, 4)) - startYear) * 12 + (Number(ymd.slice(4, 6)) - startMonth) + 1;
         curMonth = idx >= 1 && idx <= 24 ? idx : null;   // month relative to FY start
       } else curMonth = null;
@@ -185,6 +198,7 @@ async function syncOrg(admin: any, org_id: string) {
     const acct = Number(t[1]);
     const amount = Number(t[3]);
     if (!amount) return;
+    if (excludedAccounts.has(acct)) return; // noise (e.g. opening-balance postings) — fully ignored
     rowCount++;
     const cls = Math.floor(acct / 1000);
 

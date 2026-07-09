@@ -171,6 +171,22 @@ drop policy if exists forecast_overrides_write on forecast_overrides;
 create policy forecast_overrides_read on forecast_overrides for select using (is_org_member(org_id));
 create policy forecast_overrides_write on forecast_overrides for all using (can_edit_org(org_id)) with check (can_edit_org(org_id));
 
+-- Sync noise filters: excluded voucher series (e.g. a correction/adjustment
+-- series) or excluded accounts (e.g. opening-balance postings) — rows matching
+-- these are fully ignored by the sync, not just left unmapped.
+create table if not exists sync_exclusions (
+  id      uuid primary key default gen_random_uuid(),
+  org_id  uuid not null references organizations(id) on delete cascade,
+  kind    text not null check (kind in ('series','account')),
+  value   text not null,
+  unique (org_id, kind, value)
+);
+alter table sync_exclusions enable row level security;
+drop policy if exists sync_exclusions_read on sync_exclusions;
+drop policy if exists sync_exclusions_write on sync_exclusions;
+create policy sync_exclusions_read on sync_exclusions for select using (is_org_member(org_id));
+create policy sync_exclusions_write on sync_exclusions for all using (can_edit_org(org_id)) with check (can_edit_org(org_id));
+
 -- ---------------------------------------------------------------------------
 -- Row-Level Security: a user can touch a row only if they're a member of its org.
 -- Enabled on EVERY table. The anon key is safe in the browser only because of this.
