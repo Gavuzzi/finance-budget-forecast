@@ -375,9 +375,11 @@ async function syncOrg(admin: any, org_id: string) {
     prior_year: priorYear,   // null when the company has no previous FY
   };
 
-  // Persist the P&L on the status row so the app shows it on load, not just after a sync.
+  // Persist the P&L + cost-centre/project lists on the status row so the app
+  // shows them on load, not just immediately after a sync.
   await admin.from("integration_status").update({
     last_synced_at: new Date().toISOString(), last_sync_error: null, last_reconciliation: recon,
+    last_cost_centers: cost_centers, last_projects: projects,
   }).eq("org_id", org_id);
 
   return {

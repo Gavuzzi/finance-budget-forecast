@@ -32,8 +32,12 @@ create table if not exists integration_status (
   connected_at      timestamptz,
   last_synced_at    timestamptz,
   last_sync_error   text,
-  last_reconciliation jsonb           -- the P&L from the last sync, so the app shows it on load
+  last_reconciliation jsonb,          -- the P&L from the last sync, so the app shows it on load
+  last_cost_centers jsonb,            -- the cost-centre list from the last sync (mapping UI works without a fresh sync)
+  last_projects jsonb                 -- likewise for projects
 );
+alter table integration_status add column if not exists last_cost_centers jsonb;
+alter table integration_status add column if not exists last_projects jsonb;
 -- Idempotent catch-up for DBs created before the column existed:
 alter table integration_status add column if not exists last_reconciliation jsonb;
 alter table integration_status enable row level security;

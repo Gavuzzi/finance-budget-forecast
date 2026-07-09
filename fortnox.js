@@ -229,6 +229,16 @@ function codeRowsHtml(items, dimension) {
 // account range → Unassigned (a row rarely carries both, but if it does, the
 // project is more specific and wins).
 async function renderMappingEditor(host) {
+  // Fall back to what the LAST sync saw (persisted) if nothing's synced yet
+  // this page load — so the mapping editor works right after a reload, not
+  // just immediately after clicking Sync now.
+  if (lastCostCenters.length === 0 && lastProjects.length === 0 && !(typeof DEMO_MODE !== "undefined" && DEMO_MODE)) {
+    const status = await loadIntegrationStatus();
+    if (status) {
+      lastCostCenters = status.last_cost_centers || [];
+      lastProjects = status.last_projects || [];
+    }
+  }
   const ccSection = lastCostCenters.length
     ? `<p class="integ-map-hint">Your Fortnox <strong>cost centres</strong>. <strong>Import</strong> each as a reporting line, or <strong>link</strong> it to an existing one, then re-sync to pull its actuals in. Nothing is dropped.</p>` + codeRowsHtml(lastCostCenters, "costcenter")
     : `<p class="integ-map-hint">Hit <strong>Sync now</strong> first — then your Fortnox cost centres appear here to map in one click. (No cost centres in your books? Use account ranges below.)</p>`;
