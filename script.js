@@ -378,7 +378,7 @@ function initScenarios() {
 }
 
 function renderAll() {
-  const sections = document.querySelectorAll(".lens-controls, .stats-row, .main-row, .table-panel, .role-breakdown-panel, .scenarios-panel, .signals-panel, .fortnox-pnl-panel, .budget-version-panel");
+  const sections = document.querySelectorAll(".lens-controls, .stats-row, .main-row, .table-panel, .role-breakdown-panel, .scenarios-panel, .signals-panel, .fortnox-pnl-panel, .budget-version-panel, .reforecast-panel");
   let empty = document.getElementById("emptyState");
 
   if (COST_CENTERS.length === 0) {
@@ -402,6 +402,7 @@ function renderAll() {
   renderScenarios();
   renderSignals();
   renderBudgetVersion();
+  renderReforecast();
 }
 
 // Steal-list (Abacum): budgets are locked/versioned, not just a live editable
@@ -516,6 +517,74 @@ function renderSignals() {
   panel.hidden = false;
 }
 
+// Re-forecast: when a cost centre's recent actuals meaningfully diverge from
+// its driver-based plan, suggest applying the run-rate to the remaining
+// months — never automatically, always as an opt-in, reversible per-line
+// action (this is deliberate: an earlier design pass rejected any auto-apply
+// as trust-destroying — a controller may know a spike is a one-off).
+function renderReforecast() {
+  const panel = document.getElementById("reforecastPanel");
+  const list = document.getElementById("reforecastList");
+  if (!panel || !list) return;
+
+  const nextMonth = CLOSE_MONTH + 1;
+  const items = [];
+  COST_CENTERS.forEach((cc) => {
+    const hasOverride = cc.overrides && Object.keys(cc.overrides).length > 0;
+    if (hasOverride) {
+      items.push({ cc, hasOverride: true, runRate: cc.overrides[nextMonth] });
+      return;
+    }
+    if (nextMonth > TIMELINE_LENGTH) return;
+    const recent = [];
+    for (let m = CLOSE_MONTH; m >= 1 && recent.length < 3; m--) {
+      const v = cc.actualMonthly[m - 1];
+      if (v != null) recent.push(v);
+    }
+    if (recent.length === 0) return;
+    const runRate = recent.reduce((a, b) => a + b, 0) / recent.length;
+    const planForecast = forecastForMonth(cc, nextMonth);
+    if (!planForecast) return;
+    const pct = Math.abs(runRate - planForecast) / planForecast * 100;
+    if (pct < 10) return; // within normal drift — no noise
+    items.push({ cc, hasOverride: false, runRate, planForecast, pct });
+  });
+
+  if (items.length === 0) { panel.hidden = true; return; }
+  list.innerHTML = items.map((it) => `
+    <div class="rf-row" data-cc="${it.cc.id}">
+      <div>
+        <strong>${it.cc.name}</strong>
+        ${it.hasOverride
+          ? `<span class="rf-badge">using run-rate override (${fmtSek(it.runRate)}/mo) for its remaining months</span>`
+          : `<span class="rf-detail">recent actuals run ~${fmtSek(it.runRate)}/mo vs the plan's ${fmtSek(it.planForecast)}/mo (${it.pct.toFixed(0)}% off)</span>`}
+      </div>
+      ${it.hasOverride
+        ? `<button class="add-cc-btn" data-revert type="button">Revert to plan</button>`
+        : `<button class="add-cc-btn" data-apply type="button">Apply run-rate to remaining months</button>`}
+    </div>`).join("");
+  panel.hidden = false;
+}
+
+function initReforecast() {
+  const list = document.getElementById("reforecastList");
+  if (!list) return;
+  list.addEventListener("click", async (e) => {
+    const row = e.target.closest(".rf-row");
+    if (!row) return;
+    const cc = COST_CENTERS.find((c) => c.id === row.dataset.cc);
+    if (!cc) return;
+    if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast("Sign in to apply a real re-forecast."); return; }
+    if (e.target.dataset.apply !== undefined) {
+      const rr = await dbApplyRunRate(cc);
+      if (rr != null) { showToast(`Applied run-rate to ${cc.name}'s remaining months.`); renderAll(); }
+    } else if (e.target.dataset.revert !== undefined) {
+      const ok = await dbClearOverrides(cc);
+      if (ok) { showToast(`Reverted ${cc.name} to the driver-based plan.`); renderAll(); }
+    }
+  });
+}
+
 // The actuals P&L pulled from Fortnox (persisted from the last sync), shown on
 // the Overview so the headline view reflects the full picture, not just costs.
 async function renderFortnoxPnl() {
@@ -540,6 +609,7 @@ async function renderFortnoxPnl() {
 window.initPage = () => {
   initLensControls();
   initScenarios();
+  initReforecast();
   initPrint();
   renderOnboard();
   renderAll();

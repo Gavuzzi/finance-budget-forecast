@@ -151,6 +151,26 @@ alter table cost_centers add column if not exists source text not null default '
 alter table cost_centers add column if not exists state  text not null default 'linked';  -- planned|linked (plan-ahead lifecycle)
 alter table assumptions add column if not exists revenue_budget numeric not null default 0; -- simple annual revenue target — no driver engine, just a number to compare actuals against
 
+-- Re-forecast overrides: an EXPLICIT, per-line, user-applied replacement of the
+-- driver-computed forecast for a future month (e.g. "use recent run-rate
+-- instead"). Never written automatically by a sync — only by a user clicking
+-- Apply — and fully reversible (delete the rows, the driver forecast resumes
+-- unchanged since headcount/one-offs/recurring costs are never touched).
+create table if not exists forecast_overrides (
+  id              uuid primary key default gen_random_uuid(),
+  org_id          uuid not null references organizations(id) on delete cascade,
+  cost_center_id  uuid not null references cost_centers(id) on delete cascade,
+  month           smallint not null,
+  amount          numeric not null default 0,
+  created_at      timestamptz not null default now(),
+  unique (cost_center_id, month)
+);
+alter table forecast_overrides enable row level security;
+drop policy if exists forecast_overrides_read on forecast_overrides;
+drop policy if exists forecast_overrides_write on forecast_overrides;
+create policy forecast_overrides_read on forecast_overrides for select using (is_org_member(org_id));
+create policy forecast_overrides_write on forecast_overrides for all using (can_edit_org(org_id)) with check (can_edit_org(org_id));
+
 -- ---------------------------------------------------------------------------
 -- Row-Level Security: a user can touch a row only if they're a member of its org.
 -- Enabled on EVERY table. The anon key is safe in the browser only because of this.

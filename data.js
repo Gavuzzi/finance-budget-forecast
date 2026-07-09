@@ -89,10 +89,15 @@ function forecastForMonth(cc, month) {
 function monthAmount(cc, month) {
   // A closed month shows the ACTUAL — 0 if nothing was booked to this cost
   // centre. We never blend the forecast into a closed month; that would
-  // misrepresent reality and break variance. Future months show the forecast.
+  // misrepresent reality and break variance. Future months show the forecast —
+  // unless the user has EXPLICITLY applied a re-forecast override for this
+  // month (never written automatically), in which case that wins and is
+  // flagged (isOverridden) so it's visibly distinct from the driver plan.
   if (month <= CLOSE_MONTH) {
     return { value: cc.actualMonthly[month - 1] ?? 0, isActual: true };
   }
+  const override = cc.overrides && cc.overrides[month];
+  if (override != null) return { value: override, isActual: false, isOverridden: true };
   return { value: forecastForMonth(cc, month), isActual: false };
 }
 
@@ -235,6 +240,7 @@ async function loadData(orgId) {
           .filter((o) => o.cost_center_id === cc.id)
           .map((o) => ({ id: o.id, label: o.label, amount: Number(o.amount), month: o.month })),
         recurringCosts: [],
+        overrides: {},
         actualMonthly,
       });
     });
@@ -249,6 +255,16 @@ async function loadData(orgId) {
         id: r.id, label: r.label, amount: Number(r.amount),
         startMonth: r.start_month, endMonth: r.end_month, escalationPct: Number(r.escalation_pct || 0),
       });
+    });
+  }
+
+  // Re-forecast overrides — likewise tolerant. Never written by a sync; only
+  // ever present because a user explicitly clicked "Apply run-rate".
+  const foRes = await sb.from("forecast_overrides").select("*").eq("org_id", CURRENT_ORG_ID);
+  if (!foRes.error) {
+    foRes.data.forEach((o) => {
+      const cc = COST_CENTERS.find((c) => c.id === o.cost_center_id);
+      if (cc) cc.overrides[o.month] = Number(o.amount);
     });
   }
 
@@ -296,6 +312,7 @@ function loadPreviewData() {
   const mk = (id, name, budget, other, hc, oo, act) => ({
     id, name, annualBudget: budget, otherMonthly: other, note: "", headcount: hc, oneOffs: oo, actualMonthly: act,
     recurringCosts: other ? [{ id: id + "-rec1", label: "Other costs", amount: other, startMonth: 1, endMonth: 24, escalationPct: 0 }] : [],
+    overrides: {},
   });
 
   COST_CENTERS.push(
@@ -393,7 +410,7 @@ async function dbInsertCostCenter() {
     .insert({ org_id: CURRENT_ORG_ID, name: "New cost center", annual_budget: 0, other_monthly: 0 })
     .select().single();
   if (error) { flagWriteError(error); return null; }
-  return { id: data.id, name: data.name, annualBudget: Number(data.annual_budget), otherMonthly: Number(data.other_monthly), headcount: [], oneOffs: [], recurringCosts: [], actualMonthly: [] };
+  return { id: data.id, name: data.name, annualBudget: Number(data.annual_budget), otherMonthly: Number(data.other_monthly), headcount: [], oneOffs: [], recurringCosts: [], overrides: {}, actualMonthly: [] };
 }
 
 async function dbDeleteCostCenter(id) {
@@ -467,6 +484,37 @@ async function dbUpdateRecurringCost(r) {
 async function dbDeleteRecurringCost(id) {
   const { error } = await sb.from("recurring_costs").delete().eq("id", id);
   if (error) flagWriteError(error);
+}
+
+// Re-forecast: average the last up-to-3 CLOSED (actual) months for this cost
+// centre, and apply that run-rate as an explicit override for every remaining
+// month (CLOSE_MONTH+1 through the end of the timeline). Only ever called by
+// a user clicking "Apply" — never by a sync. Returns the run-rate, or null if
+// there's no actual data yet to base one on.
+async function dbApplyRunRate(cc) {
+  const recent = [];
+  for (let m = CLOSE_MONTH; m >= 1 && recent.length < 3; m--) {
+    const v = cc.actualMonthly[m - 1];
+    if (v != null) recent.push(v);
+  }
+  if (recent.length === 0) return null;
+  const runRate = Math.round(recent.reduce((a, b) => a + b, 0) / recent.length);
+
+  const rows = [];
+  for (let m = CLOSE_MONTH + 1; m <= TIMELINE_LENGTH; m++) rows.push({ org_id: CURRENT_ORG_ID, cost_center_id: cc.id, month: m, amount: runRate });
+  const { error } = await sb.from("forecast_overrides").upsert(rows, { onConflict: "cost_center_id,month" });
+  if (error) { flagWriteError(error); return null; }
+  rows.forEach((r) => (cc.overrides[r.month] = runRate));
+  return runRate;
+}
+
+// Reversible: delete the override rows and the driver-based forecast resumes
+// unchanged (headcount/one-offs/recurring costs were never touched).
+async function dbClearOverrides(cc) {
+  const { error } = await sb.from("forecast_overrides").delete().eq("cost_center_id", cc.id);
+  if (error) { flagWriteError(error); return false; }
+  cc.overrides = {};
+  return true;
 }
 
 async function dbUpdateCloseMonth() {

@@ -18,13 +18,15 @@ function lensMonths() {
   return a;
 }
 
-function monthCell(value, isActual, isDivider, ccId, month) {
+function monthCell(value, isActual, isDivider, ccId, month, isOverridden) {
   // Actual cells are drillable ("what's in this number?"); forecast cells aren't.
   const drill = isActual && ccId ? ` mt-drill" data-cc="${ccId}" data-m="${month}` : "";
-  const cls = (isActual ? "" : "mt-forecast") + (isDivider ? " mt-divider" : "");
+  // A run-rate override is visibly distinct from the driver-computed plan — never silent.
+  const cls = (isActual ? "" : "mt-forecast") + (isDivider ? " mt-divider" : "") + (isOverridden ? " mt-override" : "");
   // A booked-but-empty cell (actual = 0) reads as "nothing booked" — show a dash.
   const display = isActual && value === 0 ? "–" : fmtCell(value);
-  return `<td class="num ${cls}${drill}">${display}</td>`;
+  const title = isOverridden ? ` title="Using a re-forecast run-rate override, not the driver plan"` : "";
+  return `<td class="num ${cls}${drill}"${title}>${display}</td>`;
 }
 
 function renderMonthlyGrid() {
@@ -66,8 +68,8 @@ function renderMonthlyGrid() {
   COST_CENTERS.forEach((cc) => {
     html += `<tr><td class="mt-name">${cc.name}</td>`;
     months.forEach((m) => {
-      const { value, isActual } = monthAmount(cc, m);
-      html += monthCell(value, isActual, m === CLOSE_MONTH + 1, cc.id, m);
+      const { value, isActual, isOverridden } = monthAmount(cc, m);
+      html += monthCell(value, isActual, m === CLOSE_MONTH + 1, cc.id, m, isOverridden);
     });
     if (isFy) {
       const fy = fySummary(cc);

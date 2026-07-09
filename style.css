@@ -209,6 +209,13 @@
 
 .monthly-table .mt-divider { border-left: 2px solid var(--accent); }
 
+.monthly-table .mt-override {
+  color: var(--accent-soft);
+  background: rgba(77,124,199,0.10);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
 .monthly-table td.over { color: var(--red); }
 .monthly-table td.under { color: var(--green); }
 .monthly-table td.neutral { color: var(--amber); }
@@ -830,6 +837,16 @@ td.mt-drill:hover { background: rgba(77,124,199,0.12); border-radius: 4px; }
 .bv-drift { font-weight: 600; }
 .bv-drift.over { color: var(--red); }
 .bv-drift.under { color: var(--accent-soft); }
+
+/* Re-forecast suggestions */
+.rf-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 10px 0; border-bottom: 1px solid var(--panel-border); flex-wrap: wrap;
+}
+.rf-row:last-child { border-bottom: none; }
+.rf-row strong { color: var(--text); }
+.rf-detail, .rf-badge { display: block; font-size: 0.85rem; color: var(--text-dim); margin-top: 2px; }
+.rf-badge { color: var(--accent-soft); }
 
 /* Signals — proactive variance flags */
 .signal-row { display: flex; align-items: baseline; gap: 10px; padding: 7px 0; font-size: 0.92rem; color: var(--text); border-bottom: 1px solid var(--panel-border); }
