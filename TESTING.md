@@ -18,6 +18,9 @@ Collected while you're away — batch these whenever. (App: app.html, signed in,
 - [ ] **Projects mapping (new).** Monthly → Cost-centre mapping → after **Sync now**, if your books have any Fortnox **projects** tagged, a new **"Projects"** section should appear below the cost centres with the same Import/Link buttons.
   - If you don't use projects in Fortnox, this section just won't appear — nothing to check.
   - If you do: link/import one, re-sync, and its actuals should flow in (project tags take priority over cost-centre tags on the same booking).
+- [ ] **Re-forecast (new).** Overview → if any cost centre's recent actuals differ >10% from its plan for the next month, a **"Re-forecast"** panel appears with a suggestion + **"Apply run-rate to remaining months"** button.
+  - Click **Apply** on one → go to **Monthly** → its future months should show a **dotted-underline** styling (hover for a tooltip) — that's the override, visibly distinct from the plan.
+  - Back on Overview, that row should now say **"using run-rate override"** with a **Revert to plan** button — click it and confirm the Monthly grid goes back to normal (dotted underline gone, numbers match the driver plan again).
 
 ---
 Previously verified live (2026-07-07): ✅
