@@ -52,6 +52,11 @@ create table if not exists cost_center_mappings (
   cost_center_id  uuid references cost_centers(id) on delete cascade,
   unique (org_id, external_code)
 );
+-- Dimension-agnostic mapping (Phase 1): a rule can match a cost-centre code,
+-- a project code, or an ACCOUNT RANGE (fallback for untagged bookings).
+alter table cost_center_mappings add column if not exists dimension text not null default 'costcenter'; -- costcenter|project|account
+alter table cost_center_mappings add column if not exists account_from integer;
+alter table cost_center_mappings add column if not exists account_to integer;
 alter table cost_center_mappings enable row level security;
 drop policy if exists cost_center_mappings_read  on cost_center_mappings;
 drop policy if exists cost_center_mappings_write on cost_center_mappings;

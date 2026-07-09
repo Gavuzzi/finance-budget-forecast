@@ -66,11 +66,20 @@ async function syncOrg(admin: any, org_id: string) {
     }).eq("org_id", org_id);
   }
 
-  // 2. Cost-centre mappings: Fortnox code → our cost_center_id.
+  // 2. Mapping rules. Precedence per cost row: cost-centre tag → account-range
+  //    fallback → Unassigned. Account ranges make untagged companies syncable.
   const { data: maps } = await admin.from("cost_center_mappings")
-    .select("external_code, cost_center_id").eq("org_id", org_id);
+    .select("external_code, cost_center_id, dimension, account_from, account_to").eq("org_id", org_id);
   const codeToCc = new Map<string, string>();
-  (maps ?? []).forEach((m: any) => m.cost_center_id && codeToCc.set(m.external_code, m.cost_center_id));
+  const acctRanges: { from: number; to: number; ccId: string }[] = [];
+  (maps ?? []).forEach((m: any) => {
+    if (!m.cost_center_id) return;
+    if (m.dimension === "account" && m.account_from != null && m.account_to != null) {
+      acctRanges.push({ from: m.account_from, to: m.account_to, ccId: m.cost_center_id });
+    } else if (m.dimension !== "account") {
+      codeToCc.set(m.external_code, m.cost_center_id);
+    }
+  });
 
   // 3. Bulk read: ONE SIE export for the financial year, STREAM-parsed line by
   //    line so memory stays constant no matter how many vouchers (500 → millions).
@@ -94,10 +103,11 @@ async function syncOrg(admin: any, org_id: string) {
   const unmapped = new Set<string>();
   let voucherCount = 0, rowCount = 0;
   let revRaw = 0, cogs = 0, opex = 0, personnel = 0;   // raw P&L by BAS class
-  let capturedCost = 0, unmappedCost = 0;
+  let capturedCost = 0, unassignedCost = 0;
   let curMonth: number | null = null;
   const objektNames = new Map<string, string>();   // SIE dim-1 cost-centre code → name
   const codeCost = new Map<string, number>();       // cost-centre code → total operating cost
+  const uaMonths = new Map<number, number>();       // month → unassigned operating cost
 
   const processLine = (raw: string) => {
     const line = raw.trimStart();
@@ -132,14 +142,24 @@ async function syncOrg(admin: any, org_id: string) {
     else if (cls === 7) personnel += amount;
 
     // Cost capture into reporting lines: operating costs (BAS 4–7) only.
+    // Precedence: cost-centre tag → account-range fallback → Unassigned bucket.
     if (!(acct >= 4000 && acct < 8000)) return;
     const pairs = [...t[2].matchAll(/(\d+)\s+"([^"]*)"/g)];
     const ccPair = pairs.find((p) => p[1] === "1"); // SIE dimension 1 = kostnadsställe
     const code = ccPair ? ccPair[2].trim() : "";
-    if (!code) return;                              // untagged → can't place it
-    codeCost.set(code, (codeCost.get(code) ?? 0) + amount);
-    const ccId = codeToCc.get(code);
-    if (!ccId) { unmapped.add(code); unmappedCost += amount; return; }
+    if (code) codeCost.set(code, (codeCost.get(code) ?? 0) + amount);
+
+    let ccId = code ? codeToCc.get(code) : undefined;
+    if (!ccId) {
+      const r = acctRanges.find((r) => acct >= r.from && acct <= r.to);
+      if (r) ccId = r.ccId;
+    }
+    if (!ccId) {
+      if (code) unmapped.add(code);
+      unassignedCost += amount;   // never silently drop — lands in the Unassigned line
+      uaMonths.set(curMonth, (uaMonths.get(curMonth) ?? 0) + amount);
+      return;
+    }
     capturedCost += amount;
     const key = `${ccId}|${curMonth}`;
     totals.set(key, (totals.get(key) ?? 0) + amount);
@@ -164,6 +184,27 @@ async function syncOrg(admin: any, org_id: string) {
     const [cost_center_id, month] = key.split("|");
     return { org_id, cost_center_id, month: Number(month), amount: Math.round(amount) };
   });
+
+  // Unassigned bucket → a real reporting line, so unplaced money is VISIBLE in
+  // the grid (never silently dropped). Auto-created when needed, auto-removed
+  // when everything is assigned again.
+  const UA_NAME = "Unassigned (Fortnox)";
+  const { data: uaLine } = await admin.from("cost_centers")
+    .select("id").eq("org_id", org_id).eq("name", UA_NAME).maybeSingle();
+  let uaId = uaLine?.id ?? null;
+  if (uaMonths.size > 0) {
+    if (!uaId) {
+      const { data: created, error: uaErr } = await admin.from("cost_centers")
+        .insert({ org_id, name: UA_NAME, annual_budget: 0, other_monthly: 0, source: "fortnox" })
+        .select().single();
+      if (uaErr) throw new Error(`unassigned line: ${uaErr.message}`);
+      uaId = created.id;
+    }
+    for (const [m, amt] of uaMonths) rows.push({ org_id, cost_center_id: uaId, month: m, amount: Math.round(amt) });
+  } else if (uaId) {
+    await admin.from("cost_centers").delete().eq("id", uaId);
+  }
+
   await admin.from("monthly_actual").delete().eq("org_id", org_id);
   if (rows.length) await admin.from("monthly_actual").insert(rows);
 
@@ -203,7 +244,10 @@ async function syncOrg(admin: any, org_id: string) {
     total_cost: Math.round(totalCost),
     result: Math.round(revenue - totalCost),
     captured_cost: Math.round(capturedCost),
-    unmapped_cost: Math.round(unmappedCost),
+    unmapped_cost: Math.round(unassignedCost),
+    coverage_pct: capturedCost + unassignedCost > 0
+      ? Math.round((capturedCost / (capturedCost + unassignedCost)) * 100)
+      : 100,
     vouchers: voucherCount,
     rows: rowCount,
   };

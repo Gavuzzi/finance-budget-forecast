@@ -144,6 +144,7 @@ async function loadData(orgId) {
   CLOSE_MONTH = org.close_month;
   CLOSE_MONTH_MANUAL = !!org.close_month_manual;
   DISPLAY_UNIT = org.display_unit || "tkr"; // SME default; falls back gracefully if the column isn't set
+  CURRENCY = org.currency || "SEK";
   FY_START_MONTH = org.fy_start_month || 1; // broken fiscal years — set by the Fortnox sync
   FY_START_YEAR = org.fy_start_year || 2026;
   localStorage.setItem(ORG_STORAGE_KEY, CURRENT_ORG_ID);
@@ -465,13 +466,18 @@ async function createOrg() {
 
 // Display unit is per-org: real orgs default to thousands (tkr, the SME standard),
 // while the sample/demo uses millions (mkr) because its figures are much larger.
-// DISPLAY_UNIT is set in loadData / loadPreviewData before anything renders.
-const UNITS = {
-  kr:  { div: 1,         suffix: "kr",  dec: 0 },
-  tkr: { div: 1000,      suffix: "tkr", dec: 0 },
-  mkr: { div: 1_000_000, suffix: "mkr", dec: 1 },
-};
-function unitCfg() { return UNITS[DISPLAY_UNIT] || UNITS.mkr; }
+// Suffixes respect the org's accounting currency (SEK → kr/tkr/mkr; EUR → €/t€/M€).
+let CURRENCY = "SEK";
+function currencyBase() { return CURRENCY === "SEK" ? "kr" : CURRENCY === "EUR" ? "€" : CURRENCY; }
+function unitCfg() {
+  const base = currencyBase();
+  const units = {
+    kr:  { div: 1,         suffix: base,       dec: 0 },
+    tkr: { div: 1000,      suffix: "t" + base, dec: 0 },
+    mkr: { div: 1_000_000, suffix: "m" + base, dec: 1 },
+  };
+  return units[DISPLAY_UNIT] || units.mkr;
+}
 
 function fmtMkr(n) {
   const u = unitCfg();
@@ -485,7 +491,7 @@ function fmtMkrSigned(n) {
 
 function fmtSek(n) {
   const sign = n < 0 ? "−" : "";
-  return sign + Math.round(Math.abs(n)).toLocaleString("sv-SE") + " kr";
+  return sign + Math.round(Math.abs(n)).toLocaleString("sv-SE") + " " + currencyBase();
 }
 
 function varianceClass(variance, budget) {

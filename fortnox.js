@@ -94,7 +94,10 @@ async function runFortnoxSync(btn) {
   }
 }
 
-function fmtKr(n) { return (n || 0).toLocaleString("sv-SE") + " kr"; }
+function fmtKr(n) {
+  const base = typeof currencyBase === "function" ? currencyBase() : "kr";
+  return (n || 0).toLocaleString("sv-SE") + " " + base;
+}
 
 // Shared P&L table (used by the live sync panel and the demo showcase), with
 // a gross-margin line. `r` = { revenue, cogs, opex, personnel, total_cost, result }.
@@ -120,7 +123,7 @@ function renderReconciliation(out) {
     <div class="fn-recon">
       <h4>P&amp;L from Fortnox <span class="fn-recon-sub">— ties out to your Resultatrapport</span></h4>
       ${pnlTable(r)}
-      <p class="fn-recon-note">Read from ${r.vouchers} vouchers / ${r.rows} rows in one call. Into cost centres: ${fmtKr(r.captured_cost)}${r.unmapped_cost ? ` · <span class="fn-recon-warn">unmapped: ${fmtKr(r.unmapped_cost)}</span>` : " · nothing dropped ✓"}.</p>
+      <p class="fn-recon-note">Read from ${r.vouchers} vouchers / ${r.rows} rows in one call.${r.coverage_pct != null ? ` Coverage: <strong>${r.coverage_pct}%</strong> of operating costs assigned.` : ""}${r.unmapped_cost ? ` <span class="fn-recon-warn">Unassigned: ${fmtKr(r.unmapped_cost)} — shown as its own line in the grid.</span>` : " Every krona assigned ✓"}</p>
     </div>`;
 }
 
@@ -129,7 +132,7 @@ function renderReconciliation(out) {
 function demoIntegrationHtml() {
   const revenue = 52400000, cogs = 14200000, opex = 12600000, personnel = 15000000;
   const total_cost = cogs + opex + personnel;
-  const r = { revenue, cogs, opex, personnel, total_cost, result: revenue - total_cost };
+  const r = { revenue, cogs, opex, personnel, total_cost, result: revenue - total_cost, coverage_pct: 100 };
   return `
     <div class="integration-card connected">
       <div class="integ-head"><span class="integ-dot"></span> Connected to Fortnox · Meridian Manufacturing AB <span class="integ-demo-tag">demo</span></div>
@@ -182,32 +185,81 @@ function connectedHtml(status) {
 // Shows the REAL Fortnox cost centres (name + code + cost) from the last sync,
 // each with a one-click "Import as new reporting line" or "Link to existing".
 async function renderMappingEditor(host) {
-  if (!lastCostCenters.length) {
-    host.innerHTML = `<p class="integ-map-hint">Hit <strong>Sync now</strong> first — then your Fortnox cost centres appear here to map in one click.</p>`;
-    return;
-  }
   const options = COST_CENTERS.map((c) => `<option value="${c.id}">${c.name}</option>`).join("");
-  host.innerHTML = `
-    <p class="integ-map-hint">Your Fortnox cost centres. <strong>Import</strong> each as a reporting line, or <strong>link</strong> it to an existing one, then re-sync to pull its actuals in. Nothing is dropped.</p>
-    <div class="fn-cc-rows">
-      ${lastCostCenters.map((cc) => `
-        <div class="fn-cc-row" data-code="${cc.code}">
-          <span class="fn-cc-name">${cc.name} <span class="fn-cc-code">${cc.code}</span></span>
-          <span class="fn-cc-cost num">${fmtKr(cc.cost)}</span>
-          ${cc.mapped
-            ? `<span class="fn-cc-mapped">✓ mapped</span>`
-            : `<span class="fn-cc-actions">
-                 <button class="fn-cc-import" type="button">Import</button>
-                 <select class="fn-cc-link"><option value="">Link to…</option>${options}</select>
-               </span>`}
-        </div>`).join("")}
-    </div>`;
+  const ccSection = lastCostCenters.length
+    ? `<p class="integ-map-hint">Your Fortnox cost centres. <strong>Import</strong> each as a reporting line, or <strong>link</strong> it to an existing one, then re-sync to pull its actuals in. Nothing is dropped.</p>
+       <div class="fn-cc-rows">
+         ${lastCostCenters.map((cc) => `
+           <div class="fn-cc-row" data-code="${cc.code}">
+             <span class="fn-cc-name">${cc.name} <span class="fn-cc-code">${cc.code}</span></span>
+             <span class="fn-cc-cost num">${fmtKr(cc.cost)}</span>
+             ${cc.mapped
+               ? `<span class="fn-cc-mapped">✓ mapped</span>`
+               : `<span class="fn-cc-actions">
+                    <button class="fn-cc-import" type="button">Import</button>
+                    <select class="fn-cc-link"><option value="">Link to…</option>${options}</select>
+                  </span>`}
+           </div>`).join("")}
+       </div>`
+    : `<p class="integ-map-hint">Hit <strong>Sync now</strong> first — then your Fortnox cost centres appear here to map in one click. (No cost centres in your books? Use account ranges below.)</p>`;
+  host.innerHTML = ccSection + `<div id="fnAcctRanges" class="fn-acct-ranges"></div>`;
+  renderAccountRanges(host);
   host.querySelectorAll(".fn-cc-row").forEach((row) => {
     const cc = lastCostCenters.find((c) => c.code === row.dataset.code);
     const imp = row.querySelector(".fn-cc-import");
     if (imp) imp.addEventListener("click", () => importCostCenter(cc, host));
     const sel = row.querySelector(".fn-cc-link");
     if (sel) sel.addEventListener("change", () => { if (sel.value) linkCostCenter(cc, sel.value, host); });
+  });
+}
+
+// ---- Account-range mappings (fallback for untagged bookings) ----------------
+
+async function loadAccountRanges() {
+  const { data } = await sb.from("cost_center_mappings")
+    .select("id, account_from, account_to, cost_center_id")
+    .eq("org_id", CURRENT_ORG_ID).eq("dimension", "account");
+  return data || [];
+}
+
+async function renderAccountRanges(host) {
+  const ranges = await loadAccountRanges();
+  const el = host.querySelector("#fnAcctRanges");
+  if (!el) return;
+  const options = COST_CENTERS.map((c) => `<option value="${c.id}">${c.name}</option>`).join("");
+  el.innerHTML = `
+    <p class="integ-map-hint"><strong>Account ranges</strong> — fallback for bookings without a cost-centre tag: any BAS account in a range lands on the chosen line. (E.g. 4000–4999 → Production.)</p>
+    ${ranges.map((r) => `
+      <div class="fn-cc-row">
+        <span class="fn-cc-name">${r.account_from}–${r.account_to} → ${(COST_CENTERS.find((c) => c.id === r.cost_center_id) || {}).name || "?"}</span>
+        <span></span>
+        <button class="integ-link" data-del="${r.id}" type="button">Remove</button>
+      </div>`).join("")}
+    <div class="fn-acct-add">
+      <input type="number" id="fnAcctFrom" placeholder="4000" min="1000" max="9999">
+      <span>–</span>
+      <input type="number" id="fnAcctTo" placeholder="4999" min="1000" max="9999">
+      <span>→</span>
+      <select id="fnAcctCc">${options}</select>
+      <button class="fn-cc-import" id="fnAcctAdd" type="button">Add</button>
+    </div>`;
+  el.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", async () => {
+    await sb.from("cost_center_mappings").delete().eq("id", b.dataset.del);
+    showToast("Range removed — re-sync to apply.");
+    renderAccountRanges(host);
+  }));
+  el.querySelector("#fnAcctAdd").addEventListener("click", async () => {
+    const from = parseInt(el.querySelector("#fnAcctFrom").value, 10);
+    const to = parseInt(el.querySelector("#fnAcctTo").value, 10);
+    const ccId = el.querySelector("#fnAcctCc").value;
+    if (!from || !to || from > to || !ccId) { showToast("Enter a valid range (from ≤ to).", "error"); return; }
+    const { error } = await sb.from("cost_center_mappings").insert({
+      org_id: CURRENT_ORG_ID, dimension: "account", external_code: `${from}-${to}`,
+      account_from: from, account_to: to, cost_center_id: ccId,
+    });
+    if (error) { showToast("Couldn't add — " + error.message, "error"); return; }
+    showToast("Range added — re-sync to apply.");
+    renderAccountRanges(host);
   });
 }
 

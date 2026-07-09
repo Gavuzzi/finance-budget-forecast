@@ -101,6 +101,8 @@ alter table cost_centers add column if not exists note text;
 alter table organizations add column if not exists fy_start_month smallint not null default 1;  -- broken fiscal years (May–Apr etc.)
 alter table organizations add column if not exists fy_start_year  smallint not null default 2026;
 alter table organizations add column if not exists close_month_manual boolean not null default false; -- user override of "booked through"
+alter table cost_centers add column if not exists source text not null default 'manual';  -- fortnox|manual (fortnox-sourced lines refresh on sync)
+alter table cost_centers add column if not exists state  text not null default 'linked';  -- planned|linked (plan-ahead lifecycle)
 
 -- ---------------------------------------------------------------------------
 -- Row-Level Security: a user can touch a row only if they're a member of its org.
