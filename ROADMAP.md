@@ -261,3 +261,4 @@ and a running-balance view. Potentially *more* valuable to SMEs than the P&L —
 - [ ] `[F]` Confirm Fortnox **production** API access (partner agreement if needed)
 - [ ] `[F/B]` DPA + security review for holding real financial data (GDPR)
 - [ ] `[B]` Read-only posture (token has write scope; we never write) — documented + enforced
+- [ ] `[F]` **Live UI click-through pass** — every backend mechanism built this session was fault-injection-tested via direct DB/SQL access (coverage/Unassigned, account ranges, projects, drill-down, budget drift, revenue target, re-forecast apply/revert — all verified correct against real synced data). What's NOT yet done: clicking the real buttons as a logged-in user in a browser. Low risk (same render code already screenshot-verified in `?preview`; same write functions verified by hand) but not zero — do one full pass through Monthly/Overview/Planning/Assumptions before a real client's data is on the line.
