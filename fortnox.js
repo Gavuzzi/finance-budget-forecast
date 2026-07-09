@@ -110,9 +110,15 @@ function pnlTable(r) {
     const pct = ((cur - prev) / Math.abs(prev)) * 100;
     return ` <span class="pnl-py">${pct >= 0 ? "+" : "−"}${Math.abs(pct).toFixed(0)}% vs LY</span>`;
   };
+  // Revenue budget is a simple typed target (Assumptions page) — no driver
+  // engine. Only shown once a target is actually set (0 = hidden, not "0% of nothing").
+  const revBudget = (typeof ASSUMPTIONS !== "undefined" && ASSUMPTIONS.revenueBudget) || 0;
+  const revVsBudget = revBudget
+    ? ` <span class="pnl-py">${r.revenue >= revBudget ? "+" : "−"}${Math.abs(Math.round(((r.revenue - revBudget) / revBudget) * 100))}% vs budget</span>`
+    : "";
   return `
     <table class="fn-recon-table">
-      <tr><td>Revenue (class 3)</td><td class="num">${fmtKr(r.revenue)}${vsLy(r.revenue, py?.revenue)}</td></tr>
+      <tr><td>Revenue (class 3)</td><td class="num">${fmtKr(r.revenue)}${vsLy(r.revenue, py?.revenue)}${revVsBudget}</td></tr>
       <tr><td>COGS (class 4)</td><td class="num">${fmtKr(r.cogs)}</td></tr>
       <tr><td>Operating (class 5–6)</td><td class="num">${fmtKr(r.opex)}</td></tr>
       <tr><td>Personnel (class 7)</td><td class="num">${fmtKr(r.personnel)}</td></tr>

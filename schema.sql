@@ -120,6 +120,7 @@ alter table organizations add column if not exists fy_start_year  smallint not n
 alter table organizations add column if not exists close_month_manual boolean not null default false; -- user override of "booked through"
 alter table cost_centers add column if not exists source text not null default 'manual';  -- fortnox|manual (fortnox-sourced lines refresh on sync)
 alter table cost_centers add column if not exists state  text not null default 'linked';  -- planned|linked (plan-ahead lifecycle)
+alter table assumptions add column if not exists revenue_budget numeric not null default 0; -- simple annual revenue target — no driver engine, just a number to compare actuals against
 
 -- ---------------------------------------------------------------------------
 -- Row-Level Security: a user can touch a row only if they're a member of its org.

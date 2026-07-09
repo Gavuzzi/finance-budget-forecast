@@ -234,7 +234,7 @@ Revenue is in scope (actuals from BAS 3xxx + simple typed plan + margin per line
 ### Phase 3 — Breadth
 - [ ] `[B]` Project matcher + configurable dimension precedence
 - [ ] `[B]` Presets (consultancy / manufacturer / retail / service)
-- [ ] `[B]` Revenue (if chosen above) — actuals from class 3 + simple plan + margin view
+- [x] `[B]` Revenue plan v1 — a simple annual revenue target (`assumptions.revenue_budget`, deliberately no driver engine) set on the Assumptions page; the P&L panel shows "+X% vs budget" next to actual revenue whenever a target is set. Verified in preview (52.4M actual vs 50M target -> +5%).
 - [ ] `[B]` Cost forecast methods: recurring (start/end/escalation), % of driver, per-unit, manual profile
 - [ ] `[B]` **Re-forecast from actuals** (run-rate / trend) — **manual, opt-in, shown as a suggested delta, per-line, reversible; NEVER auto-overwrites a set forecast on sync** *(blind spot #4)*
 - [ ] `[B]` Variance "why" — bridge + commentary + drill-to-transaction UI *(blind spot #3/#5)*

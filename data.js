@@ -36,7 +36,7 @@ let BUDGET_VERSIONS = []; // locked budget snapshots, newest first
 let SCENARIOS = [];
 const ORG_STORAGE_KEY = "almgren-current-org";
 const ROLE_CATALOG = [];
-const ASSUMPTIONS = { employerContributionPct: 31.42, equipmentMonthly: 1200, otherOverheadPct: 4 };
+const ASSUMPTIONS = { employerContributionPct: 31.42, equipmentMonthly: 1200, otherOverheadPct: 4, revenueBudget: 0 };
 const COST_CENTERS = [];
 
 // ---- Rate engine -----------------------------------------------------------
@@ -190,6 +190,7 @@ async function loadData(orgId) {
     employerContributionPct: Number(assRes.data.employer_contribution_pct),
     equipmentMonthly: Number(assRes.data.equipment_monthly),
     otherOverheadPct: Number(assRes.data.other_overhead_pct),
+    revenueBudget: Number(assRes.data.revenue_budget || 0),
   });
 
   ROLE_CATALOG.length = 0;
@@ -251,7 +252,7 @@ function loadPreviewData() {
   // Dev hook: ?preview&fystart=5 renders a broken fiscal year (May–Apr) to verify labels.
   FY_START_MONTH = parseInt(new URLSearchParams(location.search).get("fystart"), 10) || 1;
   FY_START_YEAR = 2026;
-  Object.assign(ASSUMPTIONS, { employerContributionPct: 31.42, equipmentMonthly: 1200, otherOverheadPct: 4 });
+  Object.assign(ASSUMPTIONS, { employerContributionPct: 31.42, equipmentMonthly: 1200, otherOverheadPct: 4, revenueBudget: 50000000 });
 
   ROLE_CATALOG.length = 0;
   COST_CENTERS.length = 0;
@@ -325,6 +326,7 @@ async function dbUpdateAssumptions() {
     employer_contribution_pct: ASSUMPTIONS.employerContributionPct,
     equipment_monthly: ASSUMPTIONS.equipmentMonthly,
     other_overhead_pct: ASSUMPTIONS.otherOverheadPct,
+    revenue_budget: ASSUMPTIONS.revenueBudget,
   }).eq("org_id", CURRENT_ORG_ID);
   if (error) flagWriteError(error);
 }

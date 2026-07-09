@@ -33,6 +33,20 @@ function renderRoleTableBody() {
   return ROLE_CATALOG.map(renderRoleRow).join("");
 }
 
+function renderRevenueBlock() {
+  return `
+    <div class="cc-block rate-block revenue-block">
+      <h2>Revenue Target</h2>
+      <p class="rate-hint">A simple annual target — no driver engine, just a number to compare actual revenue (synced from Fortnox) against. Leave at 0 to hide revenue variance.</p>
+      <div class="assumption-fields">
+        <label>Annual revenue budget (SEK)
+          <input type="number" data-assumption="revenueBudget" value="${ASSUMPTIONS.revenueBudget}" step="10000">
+        </label>
+      </div>
+    </div>
+  `;
+}
+
 function renderRateEngineBlock() {
   return `
     <div class="cc-block rate-block">
@@ -70,7 +84,7 @@ function renderRateEngineBlock() {
 }
 
 function buildRateEngine() {
-  document.getElementById("rateEngine").innerHTML = renderRateEngineBlock();
+  document.getElementById("rateEngine").innerHTML = renderRevenueBlock() + renderRateEngineBlock();
   updateRateFormula();
 }
 
