@@ -280,9 +280,11 @@ function revenuePlanFyTotal() {
 // horizon — there's no data to project operating costs beyond it anyway.
 const RUNWAY_HORIZON_MONTHS = TIMELINE_LENGTH;
 
-function cashFlowProjection(monthsAhead = 6) {
+// fromIdx is injectable so tests can pin "now" to a fixed month; the app
+// always uses the default (today).
+function cashFlowProjection(monthsAhead = 6, fromIdx = null) {
   if (!CASH_POSITION) return null;
-  const nowIdx = cashFlowMonthIndex(new Date().toISOString().slice(0, 10));
+  const nowIdx = fromIdx ?? cashFlowMonthIndex(new Date().toISOString().slice(0, 10));
 
   const inflowByMonth = new Map();
   const outflowByMonth = new Map();

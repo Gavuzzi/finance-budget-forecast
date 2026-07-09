@@ -33,6 +33,9 @@ Live: https://gavuzzi.github.io/finance-budget-forecast/ · Supabase project ref
   `"/c/Program Files/Google/Chrome/Application/chrome.exe" --headless --disable-gpu --no-sandbox --screenshot=<scratchpad>\x.png --window-size=1500,1400 --virtual-time-budget=6000 "file:///C:/Users/felix/dev/finance-budget-forecast/<page>.html?preview"`
   Append `&theme=light` and re-check when styling changes. Some pages have hash dev-hooks for exact-value checks (`#csvtest`, `#smoothtest`, `#drilltest`, `#alloctest`).
 - **Numbers must tie out**: hand-compute the expected values from the preview fixtures (loadPreviewData in data.js) BEFORE looking at the screenshot, then confirm they match exactly.
+- **Run the engine tests after ANY change to data.js** (34 assertions over rates, forecasts, the cash walk, Skatteverket due-dates, allocation conservation, CSV parsing, escapeHtml):
+  `"/c/Program Files/Google/Chrome/Application/chrome.exe" --headless --disable-gpu --no-sandbox --dump-dom --virtual-time-budget=6000 "file:///C:/Users/felix/dev/finance-budget-forecast/tests.html" | grep -oE "(ALL PASS.*|FAIL.*|✗ [^<]*)"`
+  Expect `ALL PASS`. When you add engine features, add tests with hand-derived expected values — never values copied from the implementation's own output.
 - DB changes: apply live via the CLI **and** add them idempotently to schema.sql / integration-schema.sql in the same commit.
 
 ## Conventions

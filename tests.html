@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Engine tests — FP&A</title>
+<style>
+  body { font-family: monospace; background: #0e141f; color: #cdd6e4; padding: 24px; font-size: 13px; }
+  .pass { color: #5cb88a; } .fail { color: #d4716a; font-weight: bold; }
+  #summary { font-size: 16px; font-weight: bold; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+<!--
+  Engine test suite. No framework, no Node — open this file with ?preview-style
+  fixtures baked in via loadPreviewData(), or headless:
+
+    chrome --headless --dump-dom file:///.../tests.html | grep "ALL PASS"
+
+  Every expected number below was hand-derived from the preview fixtures
+  (role rates, headcount windows, one-offs, recurring costs, invoice and
+  Skatteverket due-dates) BEFORE being asserted — the suite locks in the
+  manually verified math so refactors can't silently bend it.
+-->
+<div id="summary">running…</div>
+<div id="results"></div>
+
+<script>
+// Minimal supabase stub so lib.js (escapeHtml + demo plumbing) and data.js
+// load without the CDN or a network connection. No test touches the network.
+window.supabase = { createClient: () => ({ auth: { onAuthStateChange() {} } }) };
+</script>
+<script src="lib.js"></script>
+<script src="data.js"></script>
+<script>
+const results = [];
+function eq(name, actual, expected) {
+  const ok = JSON.stringify(actual) === JSON.stringify(expected);
+  results.push({ name, ok, actual, expected });
+}
+function approx(name, actual, expected, tol = 0.5) {
+  const ok = typeof actual === "number" && Math.abs(actual - expected) <= tol;
+  results.push({ name, ok, actual, expected });
+}
+
+// Fixtures: the same in-memory model the ?preview demo uses.
+loadPreviewData();
+
+// ---- Rate engine (loaded monthly cost per role) -----------------------------
+eq("rate: Production Operator 33000 → 46351", monthlyCostForRole("r1"), 46351);
+eq("rate: Shift Supervisor 42000 → 58652", monthlyCostForRole("r2"), 58652);
+eq("rate: Engineer 47000 → 65486", monthlyCostForRole("r3"), 65486);
+eq("rate: IT Support 36000 → 50452", monthlyCostForRole("r4"), 50452);
+
+// ---- Driver forecast --------------------------------------------------------
+const prod = COST_CENTERS.find((c) => c.name === "Production");
+eq("forecast: Production m7 = 18×46351 + 1350000", forecastForMonth(prod, 7), 2184318);
+eq("forecast: Production m9 adds hire + one-off", forecastForMonth(prod, 9), 2892970);
+eq("company forecast m7", companyMonthAmount(7), 3127138);
+eq("company forecast m9", companyMonthAmount(9), 3835790);
+
+// ---- Actuals-only boundary (sacred rule #2) ---------------------------------
+eq("monthAmount: closed month returns the ACTUAL", monthAmount(prod, 6), { value: 2400000, isActual: true });
+eq("monthAmount: open month is forecast, not actual", monthAmount(prod, 7).isActual, false);
+prod.overrides[8] = 2500000;
+eq("monthAmount: explicit override wins and is flagged", monthAmount(prod, 8), { value: 2500000, isActual: false, isOverridden: true });
+delete prod.overrides[8];
+
+// ---- FY summary -------------------------------------------------------------
+approx("company FY total = booked 21.8M + forecast 19,967,436", companyFySummary().total, 41767436);
+
+// ---- Revenue plan -----------------------------------------------------------
+eq("revenue plan: July trough", revenuePlanForMonth(7), 3000000);
+eq("revenue plan: repeats into next FY (m13 = Jan)", revenuePlanForMonth(13), 4200000);
+eq("revenue plan: FY total = annual target", revenuePlanFyTotal(), 50000000);
+const savedPlan = ASSUMPTIONS.revenuePlan;
+ASSUMPTIONS.revenuePlan = null;
+approx("revenue plan: null falls back to flat target/12", revenuePlanForMonth(7), 50000000 / 12, 0.01);
+ASSUMPTIONS.revenuePlan = Array(12).fill(0);
+approx("revenue plan: all-zero plan treated as absent", revenuePlanForMonth(7), 50000000 / 12, 0.01);
+ASSUMPTIONS.revenuePlan = savedPlan;
+
+// ---- Skatteverket due-date rules ---------------------------------------------
+eq("tax: payroll m6 due 12th of month+1", taxDueDate("payroll", 6), "2026-07-12");
+eq("tax: payroll m12 rolls year AND hits the Jan-17 rule", taxDueDate("payroll", 12), "2027-01-17");
+ASSUMPTIONS.vatFrequency = "quarterly";
+eq("tax: quarterly VAT m6 due Aug 17 (August rule)", taxDueDate("vat", 6), "2026-08-17");
+eq("tax: quarterly VAT m5 is not a period end", taxDueDate("vat", 5), null);
+ASSUMPTIONS.vatFrequency = "monthly";
+eq("tax: monthly VAT m1 due Mar 12", taxDueDate("vat", 1), "2026-03-12");
+ASSUMPTIONS.vatFrequency = "annual";
+eq("tax: annual VAT only at m12", taxDueDate("vat", 7), null);
+eq("tax: annual VAT m12 → Feb 12 next year", taxDueDate("vat", 12), "2027-02-12");
+ASSUMPTIONS.vatFrequency = "quarterly";
+
+// ---- Cash flow projection (pinned to July = month 7) ------------------------
+const proj = cashFlowProjection(6, 7);
+eq("cash: 6 rows", proj.rows.length, 6);
+eq("cash: Jul row (invoices, tax, operating, net, balance)",
+  proj.rows[0],
+  { month: 7, inflow: 1450000, outflow: 850000, taxDue: 960000, operating: -127138, net: -487138, balance: 5712862 });
+eq("cash: Aug balance", proj.rows[1].balance, 6645724);
+eq("cash: Dec balance", proj.rows[5].balance, 10852564);
+eq("cash: runway null (never crosses zero)", proj.runway, null);
+
+// Runway crossing: kill revenue → burn only. Hand-walked: Jul 2,712,862;
+// Aug 45,724; Sep −3,790,066 → crosses in month 3.
+const savedBudget = ASSUMPTIONS.revenueBudget;
+ASSUMPTIONS.revenuePlan = null;
+ASSUMPTIONS.revenueBudget = 0;
+eq("cash: zero revenue → runway 3 months", cashFlowProjection(6, 7).runway, 3);
+ASSUMPTIONS.revenueBudget = savedBudget;
+ASSUMPTIONS.revenuePlan = savedPlan;
+
+// ---- Allocation conservation --------------------------------------------------
+// Marking a line shared and switching to fully-loaded view must never create
+// or destroy money: sum(fully-loaded receivers) == sum(all lines direct).
+const it = COST_CENTERS.find((c) => c.name === "IT");
+const before = COST_CENTERS.reduce((s, cc) => s + fySummary(cc).total, 0);
+it.isShared = true;
+const after = COST_CENTERS.filter((c) => !c.isShared).reduce((s, cc) => s + fullyLoadedTotal(cc), 0);
+approx("allocation conserves the company total", after, before, 1);
+it.isShared = false;
+
+// ---- CSV import parsing -------------------------------------------------------
+const parsed = parseActualsCsv("Reporting Line;Month;Amount\nProduction; 7; 2500000\nNope; 7; 1\nR&D; 7; not-a-number\nR&D; 8; 900 000");
+eq("csv: header + bad rows skipped, unmatched reported", {
+  rows: parsed.rows.length, unmatched: parsed.unmatched, skipped: parsed.skipped,
+}, { rows: 2, unmatched: ["Nope"], skipped: 2 });
+eq("csv: matched by name onto the right line", parsed.rows[0].reporting_line_id, prod.id);
+
+// ---- escapeHtml (XSS guard) ----------------------------------------------------
+eq("escapeHtml neutralizes tags and quotes",
+  escapeHtml(`<img src=x onerror="x('y')">&`),
+  "&lt;img src=x onerror=&quot;x(&#39;y&#39;)&quot;&gt;&amp;");
+
+// ---- Report ---------------------------------------------------------------------
+const failed = results.filter((r) => !r.ok);
+document.getElementById("results").innerHTML = results.map((r) =>
+  `<div class="${r.ok ? "pass" : "fail"}">${r.ok ? "✓" : "✗"} ${escapeHtml(r.name)}${r.ok ? "" :
+    ` — expected ${escapeHtml(JSON.stringify(r.expected))}, got ${escapeHtml(JSON.stringify(r.actual))}`}</div>`).join("");
+document.getElementById("summary").textContent = failed.length === 0
+  ? `ALL PASS (${results.length} tests)`
+  : `FAIL: ${failed.length} of ${results.length}`;
+document.getElementById("summary").className = failed.length === 0 ? "pass" : "fail";
+</script>
+</body>
+</html>
