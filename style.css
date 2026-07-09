@@ -817,6 +817,8 @@ a.sync-badge:hover { text-decoration: underline; }
   font-size: 0.8rem; padding: 5px 12px; border-radius: 7px; cursor: pointer; font-family: inherit;
 }
 .fn-cc-import:hover { background: var(--accent-soft); }
+.fn-import-all { margin-bottom: 10px; padding: 7px 14px; }
+.fn-import-all[disabled] { opacity: 0.5; cursor: default; }
 .fn-cc-link {
   background: var(--bg); border: 1px solid var(--panel-border); color: var(--text);
   border-radius: 7px; padding: 5px 8px; font-family: inherit; font-size: 0.8rem; cursor: pointer;

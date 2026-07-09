@@ -239,17 +239,27 @@ async function renderMappingEditor(host) {
       lastProjects = status.last_projects || [];
     }
   }
+  const importAllBtn = (items, dim) => {
+    const unmapped = items.filter((c) => !c.mapped);
+    return unmapped.length >= 2
+      ? `<button class="fn-cc-import fn-import-all" data-importall="${dim}" type="button">Import all ${unmapped.length} as reporting lines</button>`
+      : "";
+  };
   const ccSection = lastCostCenters.length
-    ? `<p class="integ-map-hint">Your Fortnox <strong>cost centres</strong>. <strong>Import</strong> each as a reporting line, or <strong>link</strong> it to an existing one, then re-sync to pull its actuals in. Nothing is dropped.</p>` + codeRowsHtml(lastCostCenters, "costcenter")
+    ? `<p class="integ-map-hint">Your Fortnox <strong>cost centres</strong>. <strong>Import</strong> each as a reporting line, or <strong>link</strong> it to an existing one, then re-sync to pull its actuals in. Nothing is dropped.</p>`
+      + importAllBtn(lastCostCenters, "costcenter") + codeRowsHtml(lastCostCenters, "costcenter")
     : `<p class="integ-map-hint">Hit <strong>Sync now</strong> first — then your Fortnox cost centres appear here to map in one click. (No cost centres in your books? Use account ranges below.)</p>`;
   const projSection = lastProjects.length
-    ? `<p class="integ-map-hint fn-section-gap"><strong>Projects</strong> — matched before cost centres when a booking carries both.</p>` + codeRowsHtml(lastProjects, "project")
+    ? `<p class="integ-map-hint fn-section-gap"><strong>Projects</strong> — matched before cost centres when a booking carries both.</p>`
+      + importAllBtn(lastProjects, "project") + codeRowsHtml(lastProjects, "project")
     : "";
   host.innerHTML = ccSection + projSection
     + `<div id="fnAcctRanges" class="fn-acct-ranges"></div>`
     + `<div id="fnExclusions" class="fn-acct-ranges"></div>`;
   renderAccountRanges(host);
   renderExclusions(host);
+  host.querySelectorAll("[data-importall]").forEach((btn) =>
+    btn.addEventListener("click", () => importAllUnmapped(btn.dataset.importall, host, btn)));
   host.querySelectorAll(".fn-cc-row[data-code]").forEach((row) => {
     const dim = row.dataset.dim;
     const item = (dim === "project" ? lastProjects : lastCostCenters).find((c) => c.code === row.dataset.code);
@@ -350,15 +360,36 @@ async function renderExclusions(host) {
   });
 }
 
-async function importCostCenter(item, host, dimension = "costcenter") {
+// Core import (no toast/re-render) shared by the single Import button and
+// the batch "Import all" — one proven write path, not two.
+async function importOneQuiet(item, dimension) {
   const { data, error } = await sb.from("reporting_lines")
     .insert({ org_id: CURRENT_ORG_ID, name: item.name, annual_budget: 0, other_monthly: 0 })
     .select().single();
-  if (error) { showToast("Couldn't create — " + error.message, "error"); return; }
+  if (error) { showToast(`Couldn't create "${item.name}" — ` + error.message, "error"); return false; }
   COST_CENTERS.push({ id: data.id, name: data.name, annualBudget: 0, otherMonthly: 0, isShared: false, note: "", headcount: [], oneOffs: [], recurringCosts: [], overrides: {}, actualMonthly: [] });
   await saveMapping(data.id, item.code, dimension);
   item.mapped = true;
-  showToast(`Imported "${item.name}" and mapped it.`);
+  return true;
+}
+
+async function importCostCenter(item, host, dimension = "costcenter") {
+  if (await importOneQuiet(item, dimension)) showToast(`Imported "${item.name}" and mapped it.`);
+  renderMappingEditor(host);
+}
+
+// One-click onboarding: import every still-unmapped Fortnox code as a new
+// reporting line in one go, instead of one click per code.
+async function importAllUnmapped(dimension, host, btn) {
+  const list = (dimension === "project" ? lastProjects : lastCostCenters).filter((c) => !c.mapped);
+  if (btn) { btn.disabled = true; btn.textContent = "Importing…"; }
+  let n = 0;
+  for (const item of list) {
+    if (await importOneQuiet(item, dimension)) n++;
+  }
+  showToast(n === list.length
+    ? `Imported all ${n} — hit Sync now to pull their actuals in.`
+    : `Imported ${n} of ${list.length} — see errors above, then Sync now.`, n === list.length ? "info" : "error");
   renderMappingEditor(host);
 }
 
