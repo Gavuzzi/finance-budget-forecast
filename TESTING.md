@@ -2,6 +2,8 @@
 
 Collected while you're away — batch these whenever. (App: app.html, signed in, hard-refresh first.)
 
+- [ ] **Presets (new, needs a fresh org — can't fault-inject this one via SQL since it only shows on a genuinely empty org).** Sidebar → **+ New organization** → give it any name → you'll land on an empty org showing **4 preset cards** (Manufacturer / Consultancy / Retail / Small service) instead of the old single "load example data" link. Click one → confirm it seeds realistic cost centres + headcount + budget for that shape. (Delete the test org after, or keep it — up to you.)
+
 - [ ] **Drill-down.** Monthly → **Sync now** once (populates the new drill table) → click any **solid (actual) cell** in the grid.
   - Expect: a popup "Cost centre — Month" listing the **BAS accounts behind that number** (account, name, tx count, amount, total). Forecast cells are not clickable.
 - [ ] **Coverage line.** After that sync, the P&L panel note should read "Coverage: **100%** of operating costs assigned … Every krona assigned ✓" (your org is fully mapped).
