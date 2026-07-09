@@ -6,7 +6,7 @@ multiple tasks into one commit.
 
 ---
 
-## TASK 1 — Security pass (do first)
+## TASK 1 — Security pass (do first) ✅ DONE 2026-07-09 (commit 1d011fa)
 
 ### 1a. XSS: escape user/external strings in HTML
 **Problem:** UI is built with `innerHTML` and interpolates strings we don't control:
