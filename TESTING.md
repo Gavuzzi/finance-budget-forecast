@@ -6,6 +6,10 @@ Collected while you're away — batch these whenever. (App: app.html, signed in,
   - Expect: a popup "Cost centre — Month" listing the **BAS accounts behind that number** (account, name, tx count, amount, total). Forecast cells are not clickable.
 - [ ] **Coverage line.** After that sync, the P&L panel note should read "Coverage: **100%** of operating costs assigned … Every krona assigned ✓" (your org is fully mapped).
 - [ ] **Account ranges UI (glance).** Cost-centre mapping → below the centres there's now an **Account ranges** section (add e.g. `8000–8999 → IT` and remove it again — just to see it works).
+- [ ] **Budget versioning.** Overview → new **"Budget version"** panel above Signals.
+  - Click **Lock current budget** → name it → it should show "Locked [today] · [name]: [total] approved · ✓ matches the live budget".
+  - Go to **Planning**, change a cost centre's annual budget, back to **Overview** → the panel should now show a **drift amount** (over/under) instead of the ✓.
+  - Click **Lock current as new version** again → drift should clear back to ✓ against the new snapshot.
 
 ---
 Previously verified live (2026-07-07): ✅
