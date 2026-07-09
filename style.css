@@ -716,6 +716,24 @@ html, body {
   border-top: 1px solid var(--panel-border);
 }
 
+/* Data-freshness badge: green = synced recently, amber = stale (>48h),
+   red = the last sync errored. Trust signal, so it lives on every page. */
+.sync-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  text-decoration: none;
+}
+.sync-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.sync-badge.fresh .sync-dot { background: var(--green); box-shadow: 0 0 0 3px rgba(92, 184, 138, 0.15); }
+.sync-badge.stale { color: var(--amber); }
+.sync-badge.stale .sync-dot { background: var(--amber); box-shadow: 0 0 0 3px rgba(217, 166, 71, 0.15); }
+.sync-badge.error { color: var(--red); }
+.sync-badge.error .sync-dot { background: var(--red); box-shadow: 0 0 0 3px rgba(212, 113, 106, 0.15); }
+a.sync-badge:hover { text-decoration: underline; }
+
 .period-box {
   display: flex;
   flex-direction: column;

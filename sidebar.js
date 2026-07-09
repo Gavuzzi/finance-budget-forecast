@@ -36,6 +36,24 @@ function applyTheme(theme) {
   if (typeof window.onThemeChanged === "function") window.onThemeChanged();
 }
 
+// Data-freshness badge (steal: Fathom). Finance people don't trust a number
+// until they know how current it is — and a silently-failed sync is worse
+// than none. Green under 48h, amber when stale, red on a sync error. Only
+// shown for Fortnox-connected orgs; links to Monthly where the sync lives.
+function syncBadgeHtml() {
+  if (!SYNC_STATUS || !SYNC_STATUS.last_synced_at) return "";
+  const when = new Date(SYNC_STATUS.last_synced_at).toLocaleString("sv-SE");
+  if (SYNC_STATUS.last_sync_error) {
+    return `<a class="sync-badge error" href="monthly.html" title="Last sync FAILED (${when}): ${escapeHtml(SYNC_STATUS.last_sync_error)} — numbers may be out of date"><span class="sync-dot"></span>Sync failing — check Monthly</a>`;
+  }
+  const ageH = (Date.now() - new Date(SYNC_STATUS.last_synced_at).getTime()) / 3600000;
+  if (ageH >= 48) {
+    return `<a class="sync-badge stale" href="monthly.html" title="Last synced ${when} — the nightly sync hasn't run since; numbers may be out of date"><span class="sync-dot"></span>Data ${Math.floor(ageH / 24)} days old</a>`;
+  }
+  const label = ageH < 1 ? "just now" : ageH < 24 ? `${Math.round(ageH)}h ago` : "yesterday";
+  return `<span class="sync-badge fresh" title="Fortnox data last synced ${when}"><span class="sync-dot"></span>Synced ${label}</span>`;
+}
+
 function sidebarHtml() {
   const active = currentPageId();
   const nav = NAV.map(
@@ -65,6 +83,7 @@ function sidebarHtml() {
     <button class="new-org-btn" id="newOrgBtn" type="button">+ New organization</button>
     <nav class="sidebar-nav">${nav}</nav>
     <div class="sidebar-footer">
+      ${syncBadgeHtml()}
       <div class="period-box">
         <label class="period-label" for="closeMonthSelect">Actuals booked through</label>
         <select class="period-select" id="closeMonthSelect">${monthOptions}</select>

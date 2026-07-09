@@ -40,6 +40,9 @@ let OPEN_INVOICES = [];   // [{ kind: 'customer'|'supplier', amount, dueDate, de
 // owed, kept separate from OPEN_INVOICES (a hard Fortnox figure).
 let TAX_LIABILITY = { vat: new Map(), payroll: new Map() };
 let SCENARIOS = [];
+// Freshness of the Fortnox connection, for the sidebar badge — null for orgs
+// that aren't connected (manual/CSV orgs get no badge, no nagging).
+let SYNC_STATUS = null; // { connected, last_synced_at, last_sync_error }
 const ORG_STORAGE_KEY = "almgren-current-org";
 const ROLE_CATALOG = [];
 const ASSUMPTIONS = {
@@ -486,6 +489,12 @@ async function loadData(orgId) {
   const bvRes = await sb.from("budget_versions").select("*").eq("org_id", CURRENT_ORG_ID).order("locked_at", { ascending: false });
   if (!bvRes.error) bvRes.data.forEach((v) => BUDGET_VERSIONS.push({ id: v.id, name: v.name, lockedAt: v.locked_at, snapshot: v.snapshot, total: Number(v.total) }));
 
+  // Sync freshness for the sidebar badge — tolerant, absent for unconnected orgs.
+  SYNC_STATUS = null;
+  const stRes = await sb.from("integration_status")
+    .select("connected, last_synced_at, last_sync_error").eq("org_id", CURRENT_ORG_ID).maybeSingle();
+  if (!stRes.error && stRes.data && stRes.data.connected) SYNC_STATUS = stRes.data;
+
   // Cash flow (Phase 5) — tolerant load; only populated once Fortnox is connected and synced.
   CASH_POSITION = null;
   const cpRes = await sb.from("cash_position").select("*").eq("org_id", CURRENT_ORG_ID).maybeSingle();
@@ -568,6 +577,9 @@ function loadPreviewData() {
   // July dips (industrisemester), Q4 pushes. Gives the demo a non-flat cash
   // curve and exercises the plan → forecast-P&L → cash-flow chain.
   ASSUMPTIONS.revenuePlan = [4200000, 4200000, 4600000, 4400000, 4300000, 4100000, 3000000, 3600000, 4400000, 4600000, 4600000, 4000000];
+
+  // Badge demo: synced a few hours ago, healthy.
+  SYNC_STATUS = { connected: true, last_synced_at: new Date(Date.now() - 3 * 3600000).toISOString(), last_sync_error: null };
 
   CASH_POSITION = { bankBalance: 6200000, asOf: "2026-07-07T05:00:00Z" };
   OPEN_INVOICES.length = 0;
