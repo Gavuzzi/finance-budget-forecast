@@ -35,10 +35,17 @@ let USER_ORGS = [];
 let BUDGET_VERSIONS = []; // locked budget snapshots, newest first
 let CASH_POSITION = null; // { bankBalance, asOf } — from the last sync's SIE #UB lines
 let OPEN_INVOICES = [];   // [{ kind: 'customer'|'supplier', amount, dueDate, description, counterparty }]
+// VAT/payroll-tax closing balances by FY-relative month, from the sync's #IB +
+// #TRANS tracking of the configured account ranges — an ESTIMATE of what's
+// owed, kept separate from OPEN_INVOICES (a hard Fortnox figure).
+let TAX_LIABILITY = { vat: new Map(), payroll: new Map() };
 let SCENARIOS = [];
 const ORG_STORAGE_KEY = "almgren-current-org";
 const ROLE_CATALOG = [];
-const ASSUMPTIONS = { employerContributionPct: 31.42, equipmentMonthly: 1200, otherOverheadPct: 4, revenueBudget: 0 };
+const ASSUMPTIONS = {
+  employerContributionPct: 31.42, equipmentMonthly: 1200, otherOverheadPct: 4, revenueBudget: 0,
+  vatFrequency: "quarterly", vatAccountFrom: 2610, vatAccountTo: 2659, payrollAccountFrom: 2710, payrollAccountTo: 2739,
+};
 const COST_CENTERS = [];
 
 // ---- Rate engine -----------------------------------------------------------
@@ -208,6 +215,41 @@ function cashFlowMonthIndex(dateStr) {
   return (d.getUTCFullYear() - FY_START_YEAR) * 12 + (d.getUTCMonth() + 1 - FY_START_MONTH) + 1;
 }
 
+// FY-relative month → real calendar {year, month(1-12)}. VAT/payroll deadlines
+// follow the calendar, not the org's (possibly broken) fiscal year.
+function fyMonthToCalendar(m) {
+  const abs = FY_START_MONTH - 1 + (m - 1);
+  return { year: FY_START_YEAR + Math.floor(abs / 12), month: (abs % 12) + 1 };
+}
+
+// Skatteverket's standard deadline shape for turnover ≤40M SEK (our SME
+// target segment): the 12th of the Nth month after the period, EXCEPT the
+// 17th whenever that resolves to January or August. Verified against
+// Skatteverket's published 2026 dates for monthly/quarterly VAT and the
+// (aligned) arbetsgivardeklaration payment deadline.
+function skatteverketDueDate(calYear, calMonth, monthsAfter) {
+  let y = calYear, m = calMonth + monthsAfter;
+  while (m > 12) { m -= 12; y++; }
+  const day = (m === 1 || m === 8) ? 17 : 12;
+  return `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+// When a given FY-relative month's tracked liability balance actually falls
+// due — or null if that month isn't a reporting-period boundary for the kind
+// (e.g. a non-quarter-end month under quarterly VAT).
+function taxDueDate(kind, fyMonth) {
+  const { year, month } = fyMonthToCalendar(fyMonth);
+  if (kind === "payroll") return skatteverketDueDate(year, month, 1);
+  if (ASSUMPTIONS.vatFrequency === "monthly") return skatteverketDueDate(year, month, 2);
+  if (ASSUMPTIONS.vatFrequency === "annual") {
+    if (month !== 12) return null;
+    return `${year + 1}-02-12`; // approximate — Skatteverket doesn't publish an exact day for annual filers
+  }
+  // quarterly (default): only calendar quarter-end months carry a liability event.
+  if (![3, 6, 9, 12].includes(month)) return null;
+  return skatteverketDueDate(year, month, 2);
+}
+
 function cashFlowProjection(monthsAhead = 6) {
   if (!CASH_POSITION) return null;
   const nowIdx = cashFlowMonthIndex(new Date().toISOString().slice(0, 10));
@@ -220,14 +262,29 @@ function cashFlowProjection(monthsAhead = 6) {
     map.set(m, (map.get(m) ?? 0) + inv.amount);
   });
 
+  // Tax/VAT: an ESTIMATE from tracked account balances, kept as its own signed
+  // bucket (positive = owed/outflow, negative = refund) rather than blended
+  // into the hard invoice inflow/outflow above.
+  const taxDueByMonth = new Map();
+  for (const kind of ["vat", "payroll"]) {
+    for (const [fyMonth, balance] of TAX_LIABILITY[kind]) {
+      const due = taxDueDate(kind, fyMonth);
+      if (!due) continue;
+      const m = cashFlowMonthIndex(due);
+      const owed = -balance; // liability balances are negative (credit-normal); owed = -balance
+      taxDueByMonth.set(m, (taxDueByMonth.get(m) ?? 0) + owed);
+    }
+  }
+
   let running = CASH_POSITION.bankBalance;
   const rows = [];
   for (let i = 0; i < monthsAhead; i++) {
     const m = nowIdx + i;
     const inflow = inflowByMonth.get(m) ?? 0;
     const outflow = outflowByMonth.get(m) ?? 0;
-    running += inflow - outflow;
-    rows.push({ month: m, inflow, outflow, net: inflow - outflow, balance: running });
+    const taxDue = taxDueByMonth.get(m) ?? 0;
+    running += inflow - outflow - taxDue;
+    rows.push({ month: m, inflow, outflow, taxDue, net: inflow - outflow - taxDue, balance: running });
   }
   return rows;
 }
@@ -308,6 +365,11 @@ async function loadData(orgId) {
     equipmentMonthly: Number(assRes.data.equipment_monthly),
     otherOverheadPct: Number(assRes.data.other_overhead_pct),
     revenueBudget: Number(assRes.data.revenue_budget || 0),
+    vatFrequency: assRes.data.vat_frequency || "quarterly",
+    vatAccountFrom: Number(assRes.data.vat_account_from ?? 2610),
+    vatAccountTo: Number(assRes.data.vat_account_to ?? 2659),
+    payrollAccountFrom: Number(assRes.data.payroll_account_from ?? 2710),
+    payrollAccountTo: Number(assRes.data.payroll_account_to ?? 2739),
   });
 
   ROLE_CATALOG.length = 0;
@@ -387,6 +449,10 @@ async function loadData(orgId) {
   OPEN_INVOICES.length = 0;
   const oiRes = await sb.from("open_invoices").select("*").eq("org_id", CURRENT_ORG_ID).order("due_date");
   if (!oiRes.error) oiRes.data.forEach((o) => OPEN_INVOICES.push({ kind: o.kind, amount: Number(o.amount), dueDate: o.due_date, description: o.description, counterparty: o.counterparty }));
+
+  TAX_LIABILITY = { vat: new Map(), payroll: new Map() };
+  const taxRes = await sb.from("tax_liability_monthly").select("*").eq("org_id", CURRENT_ORG_ID);
+  if (!taxRes.error) taxRes.data.forEach((r) => TAX_LIABILITY[r.kind === "vat" ? "vat" : "payroll"].set(r.month, Number(r.balance)));
 }
 
 // ---- Preview mode ----------------------------------------------------------
@@ -404,7 +470,10 @@ function loadPreviewData() {
   // Dev hook: ?preview&fystart=5 renders a broken fiscal year (May–Apr) to verify labels.
   FY_START_MONTH = parseInt(new URLSearchParams(location.search).get("fystart"), 10) || 1;
   FY_START_YEAR = 2026;
-  Object.assign(ASSUMPTIONS, { employerContributionPct: 31.42, equipmentMonthly: 1200, otherOverheadPct: 4, revenueBudget: 50000000 });
+  Object.assign(ASSUMPTIONS, {
+    employerContributionPct: 31.42, equipmentMonthly: 1200, otherOverheadPct: 4, revenueBudget: 50000000,
+    vatFrequency: "quarterly", vatAccountFrom: 2610, vatAccountTo: 2659, payrollAccountFrom: 2710, payrollAccountTo: 2739,
+  });
 
   ROLE_CATALOG.length = 0;
   COST_CENTERS.length = 0;
@@ -460,6 +529,14 @@ function loadPreviewData() {
     { kind: "supplier", amount: 310000, dueDate: "2026-07-31", description: "#SI-8834", counterparty: "Fastighets AB" },
     { kind: "supplier", amount: 275000, dueDate: "2026-08-12", description: "#SI-8850", counterparty: "IT-Partner AB" },
   );
+
+  // Liability balances are negative in this convention (credit-normal accounts,
+  // same sign convention as CASH_POSITION's bank balance) — a negative number
+  // here means money owed, matching what the real sync would store.
+  TAX_LIABILITY = { vat: new Map(), payroll: new Map() };
+  [-920000, -935000, -905000, -940000, -915000, -960000].forEach((bal, i) => TAX_LIABILITY.payroll.set(i + 1, bal));
+  TAX_LIABILITY.vat.set(3, -410000);
+  TAX_LIABILITY.vat.set(6, -395000);
 }
 
 // ---- Writes (granular Supabase updates, scoped by org via RLS) -------------
@@ -493,6 +570,17 @@ async function dbUpdateAssumptions() {
     equipment_monthly: ASSUMPTIONS.equipmentMonthly,
     other_overhead_pct: ASSUMPTIONS.otherOverheadPct,
     revenue_budget: ASSUMPTIONS.revenueBudget,
+  }).eq("org_id", CURRENT_ORG_ID);
+  if (error) flagWriteError(error);
+}
+
+async function dbUpdateTaxSettings() {
+  const { error } = await sb.from("assumptions").update({
+    vat_frequency: ASSUMPTIONS.vatFrequency,
+    vat_account_from: ASSUMPTIONS.vatAccountFrom,
+    vat_account_to: ASSUMPTIONS.vatAccountTo,
+    payroll_account_from: ASSUMPTIONS.payrollAccountFrom,
+    payroll_account_to: ASSUMPTIONS.payrollAccountTo,
   }).eq("org_id", CURRENT_ORG_ID);
   if (error) flagWriteError(error);
 }

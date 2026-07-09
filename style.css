@@ -1527,7 +1527,8 @@ html[data-theme="light"] .panel {
   min-width: 200px;
 }
 
-.assumption-fields input {
+.assumption-fields input,
+.assumption-fields select {
   background: var(--bg);
   border: 1px solid var(--panel-border);
   color: var(--text);
@@ -1536,6 +1537,16 @@ html[data-theme="light"] .panel {
   font-size: 0.95rem;
   font-family: inherit;
   font-variant-numeric: tabular-nums;
+}
+
+.range-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.range-inputs input {
+  width: 80px;
 }
 
 .line-hint {

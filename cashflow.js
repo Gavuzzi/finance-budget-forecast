@@ -1,7 +1,11 @@
-// cashflow.js — Phase 5 v1: "will there be money in the bank." Current bank
+// cashflow.js — Phase 5: "will there be money in the bank." Current bank
 // balance (from the sync's SIE #UB lines) walked forward by open invoices due
-// each month (from Fortnox's /invoices and /supplierinvoices). No VAT or
-// payroll/tax timing yet — that's documented v2 scope, not silently assumed.
+// each month (from Fortnox's /invoices and /supplierinvoices) — a hard figure
+// straight from Fortnox's own AR/AP module — PLUS an estimated VAT/payroll-tax
+// due-date projection (v2) derived from tracked account balances + Skatteverket's
+// published deadline rules. The two are never blended silently: the table keeps
+// them in separate columns so the estimate is always visually distinct from the
+// hard invoice data.
 
 let cashChart;
 const CASHFLOW_MONTHS_AHEAD = 6;
@@ -45,7 +49,7 @@ function renderCashStats() {
     <div class="stat-card highlight">
       <span class="stat-label">Projected Balance</span>
       <span class="stat-value ${cls}">${fmtMkr(endBalance)}</span>
-      <span class="stat-sub ${cls}">in ${CASHFLOW_MONTHS_AHEAD} months</span>
+      <span class="stat-sub ${cls}">in ${CASHFLOW_MONTHS_AHEAD} months, incl. est. tax/VAT</span>
     </div>
   `;
 }
@@ -93,16 +97,19 @@ function renderCashTable() {
     <th class="mt-name">Month</th>
     <th class="num">Inflow</th>
     <th class="num">Outflow</th>
+    <th class="num" title="Estimated from tracked VAT/payroll-tax account balances + Skatteverket deadline rules — not a hard Fortnox figure">Tax/VAT (est.)</th>
     <th class="num">Net</th>
     <th class="num mt-summary">Running Balance</th>
   </tr></thead><tbody>`;
   projection.forEach((r) => {
     const netCls = r.net > 0 ? "under" : r.net < 0 ? "over" : "";
     const balCls = r.balance < 0 ? "over" : "";
+    const taxCls = r.taxDue > 0 ? "over" : r.taxDue < 0 ? "under" : "";
     html += `<tr>
       <td class="mt-name">${monthLabel(r.month)}</td>
       <td class="num">${r.inflow ? fmtMkr(r.inflow) : "–"}</td>
       <td class="num">${r.outflow ? fmtMkr(r.outflow) : "–"}</td>
+      <td class="num ${taxCls} mt-forecast">${r.taxDue ? fmtMkrSigned(-r.taxDue) : "–"}</td>
       <td class="num ${netCls}">${fmtMkrSigned(r.net)}</td>
       <td class="num mt-summary ${balCls}">${fmtMkr(r.balance)}</td>
     </tr>`;

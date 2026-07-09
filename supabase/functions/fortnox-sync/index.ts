@@ -135,6 +135,15 @@ async function syncOrg(admin: any, org_id: string) {
     else if (r.kind === "account") excludedAccounts.add(Number(r.value));
   });
 
+  // VAT/payroll-tax account ranges (Phase 5 v2 cash flow) — configurable per
+  // org since exact chart-of-accounts usage varies. Defaults land on BAS
+  // standard: 2610-2659 (moms sub-accounts + 2650 settlement), 2710-2739
+  // (personalskatt + arbetsgivaravgifter settlement).
+  const { data: asmp } = await admin.from("assumptions")
+    .select("vat_account_from, vat_account_to, payroll_account_from, payroll_account_to").eq("org_id", org_id).maybeSingle();
+  const vatFrom = asmp?.vat_account_from ?? 2610, vatTo = asmp?.vat_account_to ?? 2659;
+  const paFrom = asmp?.payroll_account_from ?? 2710, paTo = asmp?.payroll_account_to ?? 2739;
+
   // 3. Bulk read: ONE SIE export for the financial year, STREAM-parsed line by
   //    line so memory stays constant no matter how many vouchers (500 → millions).
   const fyRes = await fortnoxGet(`/financialyears`, accessToken);
@@ -167,6 +176,9 @@ async function syncOrg(admin: any, org_id: string) {
   const kontoNames = new Map<number, string>();     // SIE #KONTO — account number → name
   const detail = new Map<string, { amt: number; n: number }>(); // `${ccKey}|${month}|${acct}` (ccKey = ccId or "UA")
   let bankBalance = 0; // sum of #UB (closing balance) for bank accounts (BAS 1900–1999), current year (index 0)
+  let vatOpening = 0, paOpening = 0;               // #IB (opening balance), current year, summed over the configured range
+  const vatMonthly = new Map<number, number>();    // month → net #TRANS movement within the VAT range
+  const paMonthly = new Map<number, number>();     // month → net #TRANS movement within the payroll-tax range
 
   const processLine = (raw: string) => {
     const line = raw.trimStart();
@@ -175,6 +187,15 @@ async function syncOrg(admin: any, org_id: string) {
       if (u && u[1] === "0") {
         const acct = Number(u[2]);
         if (acct >= 1900 && acct < 2000) bankBalance += Number(u[3]);
+      }
+      return;
+    }
+    if (line.startsWith("#IB")) {       // #IB <yearindex> <account> <amount> — opening balance
+      const i = line.match(/^#IB\s+(-?\d+)\s+(\d+)\s+(-?\d+(?:\.\d+)?)/);
+      if (i && i[1] === "0") {
+        const acct = Number(i[2]);
+        if (acct >= vatFrom && acct <= vatTo) vatOpening += Number(i[3]);
+        else if (acct >= paFrom && acct <= paTo) paOpening += Number(i[3]);
       }
       return;
     }
@@ -208,6 +229,12 @@ async function syncOrg(admin: any, org_id: string) {
     const amount = Number(t[3]);
     if (!amount) return;
     if (excludedAccounts.has(acct)) return; // noise (e.g. opening-balance postings) — fully ignored
+
+    // VAT/payroll-tax balance-sheet tracking (Phase 5 v2) — independent of the
+    // cost-centre capture below (these are 2xxx accounts, never dimension-tagged).
+    if (acct >= vatFrom && acct <= vatTo) vatMonthly.set(curMonth, (vatMonthly.get(curMonth) ?? 0) + amount);
+    else if (acct >= paFrom && acct <= paTo) paMonthly.set(curMonth, (paMonthly.get(curMonth) ?? 0) + amount);
+
     rowCount++;
     const cls = Math.floor(acct / 1000);
 
@@ -365,6 +392,25 @@ async function syncOrg(admin: any, org_id: string) {
     await admin.from("open_invoices").delete().eq("org_id", org_id);
     if (invoiceRows.length) await admin.from("open_invoices").insert(invoiceRows);
   } catch (e) { console.error("cash-flow step (non-fatal):", e); }
+
+  // 5C. VAT/payroll-tax timing (Phase 5 v2): closing balance = opening balance
+  // + cumulative #TRANS movement through each month, for the configured
+  // account ranges. That closing balance IS the amount due on Skatteverket's
+  // deadline the following month/quarter (client computes the exact date).
+  // An estimate from account balances, not a hard Fortnox figure — best-effort.
+  try {
+    const taxRows: Record<string, unknown>[] = [];
+    let vatRunning = vatOpening, paRunning = paOpening;
+    const lastMonth = Math.max(0, ...[...vatMonthly.keys(), ...paMonthly.keys()]);
+    for (let m = 1; m <= lastMonth; m++) {
+      vatRunning += vatMonthly.get(m) ?? 0;
+      paRunning += paMonthly.get(m) ?? 0;
+      taxRows.push({ org_id, kind: "vat", month: m, balance: Math.round(vatRunning) });
+      taxRows.push({ org_id, kind: "payroll", month: m, balance: Math.round(paRunning) });
+    }
+    await admin.from("tax_liability_monthly").delete().eq("org_id", org_id);
+    if (taxRows.length) await admin.from("tax_liability_monthly").insert(taxRows);
+  } catch (e) { console.error("VAT/payroll-tax step (non-fatal):", e); }
 
   // Master-data load: fetch Fortnox's FULL cost-centre + project lists (not
   // just codes seen in the ledger), so one created but never yet booked to —

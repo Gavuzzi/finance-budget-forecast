@@ -47,6 +47,38 @@ function renderRevenueBlock() {
   `;
 }
 
+function renderTaxBlock() {
+  return `
+    <div class="cc-block rate-block tax-block">
+      <h2>Tax &amp; VAT Settings <span class="pnl-src">— feeds the Cash Flow page's estimate</span></h2>
+      <p class="rate-hint">Which BAS accounts hold your VAT and payroll-tax liabilities, and how often you report VAT — used to estimate when those amounts fall due. Defaults match the standard BAS chart of accounts; adjust if your books use different ones. Ranges are wide on purpose: reclassification entries within a range net to zero either way.</p>
+      <div class="assumption-fields">
+        <label>VAT reporting frequency
+          <select data-taxfield="vatFrequency">
+            <option value="monthly"${ASSUMPTIONS.vatFrequency === "monthly" ? " selected" : ""}>Monthly</option>
+            <option value="quarterly"${ASSUMPTIONS.vatFrequency === "quarterly" ? " selected" : ""}>Quarterly</option>
+            <option value="annual"${ASSUMPTIONS.vatFrequency === "annual" ? " selected" : ""}>Annual</option>
+          </select>
+        </label>
+        <label>VAT account range
+          <span class="range-inputs">
+            <input type="number" data-taxfield="vatAccountFrom" value="${ASSUMPTIONS.vatAccountFrom}">
+            &ndash;
+            <input type="number" data-taxfield="vatAccountTo" value="${ASSUMPTIONS.vatAccountTo}">
+          </span>
+        </label>
+        <label>Payroll-tax account range
+          <span class="range-inputs">
+            <input type="number" data-taxfield="payrollAccountFrom" value="${ASSUMPTIONS.payrollAccountFrom}">
+            &ndash;
+            <input type="number" data-taxfield="payrollAccountTo" value="${ASSUMPTIONS.payrollAccountTo}">
+          </span>
+        </label>
+      </div>
+    </div>
+  `;
+}
+
 function renderRateEngineBlock() {
   return `
     <div class="cc-block rate-block">
@@ -84,7 +116,7 @@ function renderRateEngineBlock() {
 }
 
 function buildRateEngine() {
-  document.getElementById("rateEngine").innerHTML = renderRevenueBlock() + renderRateEngineBlock();
+  document.getElementById("rateEngine").innerHTML = renderRevenueBlock() + renderRateEngineBlock() + renderTaxBlock();
   updateRateFormula();
 }
 
@@ -125,6 +157,12 @@ function initAssumptions() {
       refreshRoleRatesDisplay();
       updateRateFormula();
       dbUpdateAssumptions();
+      return;
+    }
+
+    if (target.dataset.taxfield) {
+      ASSUMPTIONS[target.dataset.taxfield] = target.dataset.taxfield === "vatFrequency" ? target.value : (Number(target.value) || 0);
+      dbUpdateTaxSettings();
       return;
     }
 

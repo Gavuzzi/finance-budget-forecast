@@ -151,6 +151,16 @@ alter table cost_centers add column if not exists source text not null default '
 alter table cost_centers add column if not exists state  text not null default 'linked';  -- planned|linked (plan-ahead lifecycle)
 alter table cost_centers add column if not exists is_shared boolean not null default false; -- corporate/overhead cost centre — optionally allocated to the others, never on by default
 alter table assumptions add column if not exists revenue_budget numeric not null default 0; -- simple annual revenue target — no driver engine, just a number to compare actuals against
+-- VAT/payroll-tax cash-flow timing (Phase 5 v2). Account ranges default wide
+-- enough to be robust to either bookkeeping style (whether or not sub-accounts
+-- get formally closed into the settlement account mid-year) — reclassification
+-- entries within a range net to zero either way. Configurable per org because
+-- exact chart-of-accounts usage varies by company/accountant.
+alter table assumptions add column if not exists vat_frequency text not null default 'quarterly';  -- monthly|quarterly|annual — Skatteverket reporting cadence
+alter table assumptions add column if not exists vat_account_from smallint not null default 2610;  -- moms: raw sub-accounts + 2650 settlement
+alter table assumptions add column if not exists vat_account_to   smallint not null default 2659;
+alter table assumptions add column if not exists payroll_account_from smallint not null default 2710; -- personalskatt (2710) + arbetsgivaravgifter (2730-2739)
+alter table assumptions add column if not exists payroll_account_to   smallint not null default 2739;
 
 -- Re-forecast overrides: an EXPLICIT, per-line, user-applied replacement of the
 -- driver-computed forecast for a future month (e.g. "use recent run-rate
@@ -214,6 +224,24 @@ alter table open_invoices enable row level security;
 drop policy if exists open_invoices_read on open_invoices;
 create policy open_invoices_read on open_invoices for select using (is_org_member(org_id));
 create index if not exists open_invoices_org on open_invoices (org_id, due_date);
+
+-- Phase 5 v2: VAT + payroll-tax cash-flow timing. The sync tracks each
+-- month's CLOSING balance (opening balance + cumulative postings) for the
+-- configured VAT and payroll-tax account ranges — this closing balance IS
+-- the amount that becomes due on the statutory Skatteverket deadline the
+-- following month/quarter. An ESTIMATE derived from account balances (not a
+-- hard figure from a Fortnox module like open_invoices), so the client keeps
+-- it visually distinct. Client-read only; written by the sync.
+create table if not exists tax_liability_monthly (
+  org_id   uuid not null references organizations(id) on delete cascade,
+  kind     text not null check (kind in ('vat','payroll')),
+  month    smallint not null,
+  balance  numeric not null default 0,
+  primary key (org_id, kind, month)
+);
+alter table tax_liability_monthly enable row level security;
+drop policy if exists tax_liability_monthly_read on tax_liability_monthly;
+create policy tax_liability_monthly_read on tax_liability_monthly for select using (is_org_member(org_id));
 
 -- ---------------------------------------------------------------------------
 -- Row-Level Security: a user can touch a row only if they're a member of its org.

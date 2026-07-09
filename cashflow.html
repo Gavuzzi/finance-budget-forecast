@@ -16,7 +16,7 @@
       <header class="page-head">
         <div class="page-head-text">
           <h1>Cash Flow</h1>
-          <p class="page-sub">Will there be money in the bank — projected from your bank balance and open invoices</p>
+          <p class="page-sub">Will there be money in the bank — projected from your bank balance, open invoices, and estimated tax/VAT</p>
         </div>
       </header>
 
@@ -33,7 +33,7 @@
 
       <section class="panel table-panel">
         <h2>Monthly Projection</h2>
-        <p class="table-hint">Running balance = today's bank balance, walked forward by open invoices due each month. Doesn't yet include VAT or payroll/tax timing (v2).</p>
+        <p class="table-hint">Running balance = today's bank balance, walked forward by open invoices (hard Fortnox figures) and an <strong>estimated</strong> Tax/VAT column projected from tracked account balances onto Skatteverket's standard deadlines (12th of the month, 17th in January/August, for turnover ≤40M SEK). Tax/VAT only appears once the relevant month's actuals have synced. Adjust the account ranges or VAT frequency on <a href="assumptions.html">Assumptions</a> if it looks off for your chart of accounts.</p>
         <div id="cashTable"></div>
       </section>
 
