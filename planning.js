@@ -125,8 +125,29 @@ function renderCcBlock(i) {
       <div class="cc-summary">
         <span>FY2026 total: <strong>${fmtMkr(fy.total)}</strong></span>
         <span class="variance ${cls}">vs budget: <strong>${fmtMkrSigned(fy.variance)} (${pct > 0 ? "+" : ""}${pct.toFixed(1)}%)</strong></span>
+        <button class="bridge-toggle" data-bridge="${i}" type="button">Why? ▾</button>
       </div>
+      <div class="cc-bridge" data-bridgepanel="${i}" hidden>${bridgeHtml(cc)}</div>
     </div>
+  `;
+}
+
+// The composition breakdown behind a cost centre's FY total — "what's this
+// number actually made of" (booked actuals + each driver category's forecast
+// for the remaining months), not a budget-to-actual waterfall (see fyComposition).
+function bridgeHtml(cc) {
+  const b = fyComposition(cc);
+  const rows = [
+    ["Booked actuals", b.actual],
+    ["Re-forecast override (remaining months)", b.overridden],
+    ["Headcount (remaining months)", b.headcount],
+    ["One-off costs (remaining months)", b.oneOff],
+    ["Recurring costs (remaining months)", b.recurring],
+  ].filter(([, v]) => v !== 0); // skip zero rows (e.g. no override applied) — no noise
+  return `
+    <p class="bridge-hint">What this cost centre's FY total is actually made of.</p>
+    ${rows.map(([label, v]) => `<div class="bridge-row"><span>${label}</span><span class="num">${fmtMkr(v)}</span></div>`).join("")}
+    <div class="bridge-row bridge-total"><span>= FY2026 total</span><span class="num">${fmtMkr(b.total)}</span></div>
   `;
 }
 
@@ -164,12 +185,24 @@ function refreshCcComputed(ccIndex) {
   block.querySelector(".cc-summary").innerHTML = `
     <span>FY2026 total: <strong>${fmtMkr(fy.total)}</strong></span>
     <span class="variance ${cls}">vs budget: <strong>${fmtMkrSigned(fy.variance)} (${pct > 0 ? "+" : ""}${pct.toFixed(1)}%)</strong></span>
+    <button class="bridge-toggle" data-bridge="${ccIndex}" type="button">Why? ▾</button>
   `;
+
+  // If the bridge breakdown is currently open, keep it live too — it changes
+  // with the same edits that change the FY total.
+  const bridgePanel = block.querySelector(`.cc-bridge[data-bridgepanel="${ccIndex}"]`);
+  if (bridgePanel && !bridgePanel.hidden) bridgePanel.innerHTML = bridgeHtml(cc);
 }
 
 function initPlanningGrid() {
   buildPlanningGrid();
   const ccBlocks = document.getElementById("ccBlocks");
+
+  // Dev hook: #bridgetest auto-opens the first cost centre's bridge panel, for headless verification.
+  if (location.hash === "#bridgetest") {
+    const panel = document.querySelector('.cc-bridge[data-bridgepanel="0"]');
+    if (panel) { panel.hidden = false; panel.innerHTML = bridgeHtml(COST_CENTERS[0]); }
+  }
 
   document.getElementById("addCostCenter").addEventListener("click", async () => {
     const cc = await dbInsertCostCenter();
@@ -233,6 +266,17 @@ function initPlanningGrid() {
   });
 
   ccBlocks.addEventListener("click", async (e) => {
+    const bridgeBtn = e.target.closest("[data-bridge]");
+    if (bridgeBtn) {
+      const ccIndex = Number(bridgeBtn.dataset.bridge);
+      const panel = document.querySelector(`.cc-bridge[data-bridgepanel="${ccIndex}"]`);
+      if (panel) {
+        panel.hidden = !panel.hidden;
+        if (!panel.hidden) panel.innerHTML = bridgeHtml(COST_CENTERS[ccIndex]); // fresh on open
+      }
+      return;
+    }
+
     const deleteCcBtn = e.target.closest("[data-deletecc]");
     if (deleteCcBtn) {
       const ccIndex = Number(deleteCcBtn.dataset.deletecc);

@@ -133,6 +133,26 @@ function companyFySummary() {
   };
 }
 
+// The "why" behind a cost centre's FY total: what it's actually MADE OF, split
+// into booked actuals (closed months), any re-forecast override, and each
+// driver category's forecast for the remaining open months. Sums to exactly
+// fySummary(cc).total — this is a composition breakdown, not a classic
+// budget-to-actual waterfall, because the budget is a flat target independent
+// of the drivers (there's nothing to "walk" from budget in named steps; what
+// a controller actually wants first is "what's IN this number").
+function fyComposition(cc) {
+  let actual = 0, overridden = 0, headcount = 0, oneOff = 0, recurring = 0;
+  for (let m = 1; m <= FY_MONTHS; m++) {
+    const a = monthAmount(cc, m);
+    if (a.isActual) { actual += a.value; continue; }
+    if (a.isOverridden) { overridden += a.value; continue; }
+    headcount += headcountCostForMonth(cc, m);
+    oneOff += oneOffCostForMonth(cc, m);
+    recurring += recurringCostForMonth(cc, m);
+  }
+  return { actual, overridden, headcount, oneOff, recurring, total: actual + overridden + headcount + oneOff + recurring };
+}
+
 // ---- Budget versioning (locked baseline vs the live, editable budget) ------
 // "Variance vs budget" above always compares to the CURRENT annualBudget,
 // which keeps moving as people edit it. A locked version freezes a snapshot so

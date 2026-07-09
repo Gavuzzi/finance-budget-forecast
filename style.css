@@ -1427,6 +1427,19 @@ html[data-theme="light"] .panel {
 .cc-summary .variance.under strong { color: var(--green); }
 .cc-summary .variance.neutral strong { color: var(--amber); }
 
+.bridge-toggle {
+  background: none; border: 1px solid var(--panel-border); color: var(--accent-soft);
+  font-size: 0.8rem; font-weight: 600; padding: 4px 10px; border-radius: 999px;
+  cursor: pointer; font-family: inherit; margin-left: auto;
+}
+.bridge-toggle:hover { border-color: var(--accent); }
+.cc-bridge { margin-top: 12px; padding: 14px 16px; background: var(--bg); border: 1px solid var(--panel-border); border-radius: 10px; }
+.bridge-hint { font-size: 0.8rem; color: var(--text-dim); margin: 0 0 10px; }
+.bridge-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 0.88rem; color: var(--text); border-bottom: 1px solid var(--panel-border); }
+.bridge-row .num { font-variant-numeric: tabular-nums; }
+.bridge-row:last-child { border-bottom: none; }
+.bridge-total { font-weight: 700; padding-top: 9px; }
+
 .rate-block {
   border-color: var(--accent);
   background: linear-gradient(135deg, rgba(77, 124, 199, 0.08), var(--panel));
