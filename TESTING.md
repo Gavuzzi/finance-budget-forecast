@@ -3,6 +3,9 @@
 Collected while you're away — batch these whenever. (App: app.html, signed in, hard-refresh first.)
 
 - [ ] **Presets (new, needs a fresh org — can't fault-inject this one via SQL since it only shows on a genuinely empty org).** Sidebar → **+ New organization** → give it any name → you'll land on an empty org showing **4 preset cards** (Manufacturer / Consultancy / Retail / Small service) instead of the old single "load example data" link. Click one → confirm it seeds realistic cost centres + headcount + budget for that shape. (Delete the test org after, or keep it — up to you.)
+- [ ] **Noise filters (new).** Monthly → Cost-centre mapping → new **"Sync exclusions"** section at the bottom. Add an exclusion (e.g. a voucher series or account you know is a correction/opening-balance) → re-sync → confirm the P&L moved as expected. Already fault-injection-verified on real data by me; this is just a glance.
+- [ ] **Periodization (new).** Monthly → **"Spread lumpy actuals"** checkbox next to the FY/Rolling toggle. Turn it on → booked-actual columns for each cost centre should flatten to their period average (italic styling) → FY Total at the far right should NOT change. Turn it back off → raw figures return.
+- [ ] **Simple allocation (new).** Planning → tick **"Shared / corporate"** on one cost centre (e.g. Administration) → tick the **"Fully-loaded view"** checkbox near "+ Add cost center" → the shared centre's summary should say "allocated to the other cost centres"; every other centre should show "Direct + allocated = Fully-loaded". Untick both to return to normal.
 
 - [ ] **Drill-down.** Monthly → **Sync now** once (populates the new drill table) → click any **solid (actual) cell** in the grid.
   - Expect: a popup "Cost centre — Month" listing the **BAS accounts behind that number** (account, name, tx count, amount, total). Forecast cells are not clickable.
