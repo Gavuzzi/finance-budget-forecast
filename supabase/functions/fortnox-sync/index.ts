@@ -46,6 +46,43 @@ async function refreshTokens(refreshToken: string) {
   return await res.json();
 }
 
+// Lightweight P&L-only parse of a SIE export (used for the PRIOR fiscal year —
+// baseline for "vs last year" deltas). Same stream approach, classes only.
+async function fetchPnlTotals(accessToken: string, fyId: number | string) {
+  const res = await fetch(`${API_BASE}/sie/4?financialyear=${fyId}`, {
+    headers: { Authorization: `Bearer ${accessToken}`, Accept: "*/*" },
+  });
+  if (!res.ok || !res.body) return null;
+  let revRaw = 0, cogs = 0, opex = 0, personnel = 0;
+  const reader = res.body.pipeThrough(new TextDecoderStream("latin1")).getReader();
+  let buf = "";
+  const line = (l: string) => {
+    const t = l.trimStart().match(/^#TRANS\s+(\d+)\s+\{[^}]*\}\s+(-?\d+(?:\.\d+)?)/);
+    if (!t) return;
+    const cls = Math.floor(Number(t[1]) / 1000);
+    const amt = Number(t[2]);
+    if (cls === 3) revRaw += amt;
+    else if (cls === 4) cogs += amt;
+    else if (cls === 5 || cls === 6) opex += amt;
+    else if (cls === 7) personnel += amt;
+  };
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += value;
+    const lines = buf.split("\n");
+    buf = lines.pop() ?? "";
+    for (const l of lines) line(l);
+  }
+  if (buf) line(buf);
+  const revenue = -revRaw, totalCost = cogs + opex + personnel;
+  return {
+    revenue: Math.round(revenue), cogs: Math.round(cogs), opex: Math.round(opex),
+    personnel: Math.round(personnel), total_cost: Math.round(totalCost),
+    result: Math.round(revenue - totalCost),
+  };
+}
+
 // The whole sync for one org: refresh tokens → SIE export → stream-parse →
 // replace actuals → persist FY anchor + P&L. Returns the response payload.
 async function syncOrg(admin: any, org_id: string) {
@@ -267,6 +304,16 @@ async function syncOrg(admin: any, org_id: string) {
     mapped: codeToCc.has(code),
   })).sort((a, b) => b.cost - a.cost);
 
+  // Prior fiscal year (if the company has one) → "vs last year" baseline.
+  let priorYear: Record<string, number> | null = null;
+  const prior = fys
+    .filter((f: any) => String(f.ToDate ?? "") < String(fy?.FromDate ?? ""))
+    .sort((a: any, b: any) => String(b.ToDate).localeCompare(String(a.ToDate)))[0];
+  if (prior?.Id) {
+    try { priorYear = await fetchPnlTotals(accessToken, prior.Id); }
+    catch (_) { /* baseline is best-effort — never fail the sync over it */ }
+  }
+
   const revenue = -revRaw;
   const totalCost = cogs + opex + personnel;
   const recon = {
@@ -283,6 +330,7 @@ async function syncOrg(admin: any, org_id: string) {
       : 100,
     vouchers: voucherCount,
     rows: rowCount,
+    prior_year: priorYear,   // null when the company has no previous FY
   };
 
   // Persist the P&L on the status row so the app shows it on load, not just after a sync.

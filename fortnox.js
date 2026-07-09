@@ -103,14 +103,21 @@ function fmtKr(n) {
 // a gross-margin line. `r` = { revenue, cogs, opex, personnel, total_cost, result }.
 function pnlTable(r) {
   const margin = r.revenue ? Math.round((r.result / r.revenue) * 100) : 0;
+  const py = r.prior_year;
+  // "vs LY" delta — only when a prior fiscal year exists in the company's books.
+  const vsLy = (cur, prev) => {
+    if (!py || !prev) return "";
+    const pct = ((cur - prev) / Math.abs(prev)) * 100;
+    return ` <span class="pnl-py">${pct >= 0 ? "+" : "−"}${Math.abs(pct).toFixed(0)}% vs LY</span>`;
+  };
   return `
     <table class="fn-recon-table">
-      <tr><td>Revenue (class 3)</td><td class="num">${fmtKr(r.revenue)}</td></tr>
+      <tr><td>Revenue (class 3)</td><td class="num">${fmtKr(r.revenue)}${vsLy(r.revenue, py?.revenue)}</td></tr>
       <tr><td>COGS (class 4)</td><td class="num">${fmtKr(r.cogs)}</td></tr>
       <tr><td>Operating (class 5–6)</td><td class="num">${fmtKr(r.opex)}</td></tr>
       <tr><td>Personnel (class 7)</td><td class="num">${fmtKr(r.personnel)}</td></tr>
-      <tr class="fn-recon-total"><td>Total cost</td><td class="num">${fmtKr(r.total_cost)}</td></tr>
-      <tr class="fn-recon-total"><td>Result <span class="fn-margin">${margin}% margin</span></td><td class="num">${fmtKr(r.result)}</td></tr>
+      <tr class="fn-recon-total"><td>Total cost</td><td class="num">${fmtKr(r.total_cost)}${vsLy(r.total_cost, py?.total_cost)}</td></tr>
+      <tr class="fn-recon-total"><td>Result <span class="fn-margin">${margin}% margin</span></td><td class="num">${fmtKr(r.result)}${vsLy(r.result, py?.result)}</td></tr>
     </table>`;
 }
 
@@ -132,7 +139,10 @@ function renderReconciliation(out) {
 function demoIntegrationHtml() {
   const revenue = 52400000, cogs = 14200000, opex = 12600000, personnel = 15000000;
   const total_cost = cogs + opex + personnel;
-  const r = { revenue, cogs, opex, personnel, total_cost, result: revenue - total_cost, coverage_pct: 100 };
+  const r = {
+    revenue, cogs, opex, personnel, total_cost, result: revenue - total_cost, coverage_pct: 100,
+    prior_year: { revenue: 46800000, cogs: 13100000, opex: 11900000, personnel: 13600000, total_cost: 38600000, result: 8200000 },
+  };
   return `
     <div class="integration-card connected">
       <div class="integ-head"><span class="integ-dot"></span> Connected to Fortnox · Meridian Manufacturing AB <span class="integ-demo-tag">demo</span></div>

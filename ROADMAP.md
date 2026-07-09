@@ -224,7 +224,7 @@ Revenue is in scope (actuals from BAS 3xxx + simple typed plan + margin per line
 - [x] `[B]` Coverage % + **Unassigned** line — unplaced money lands in a real "Unassigned (Fortnox)" line (auto-created/auto-removed); panel shows coverage. Verified live by fault injection (67% → 100%).
 - [x] `[B]` Currency suffix respects `organizations.currency` (SEK → kr/tkr/mkr, EUR → €/t€/m€)
 - [x] `[B]` Drill-down v1 — sync stores per (line × month × account) detail with names from SIE #KONTO; clicking an actual cell shows "what's in this number" (accounts, tx counts, amounts). *(blind spot #3 — account-level; voucher-level later)*
-- [ ] `[B]` Load prior-year actuals as a baseline *(blind spot #5)*
+- [x] `[B]` Prior-year baseline v1 — sync also reads the PREVIOUS fiscal year's SIE (still O(1) calls, best-effort) and the P&L panels show "vs LY" deltas on revenue/cost/result. Graceful when no prior FY exists. *(per-line monthly PY = later, with trend views)*
 
 ### Phase 2 — Onboarding superpower
 - [ ] `[B]` Master-data load (`/3/costcenters`, `/3/projects`) → auto-create + auto-map
