@@ -227,8 +227,8 @@ Revenue is in scope (actuals from BAS 3xxx + simple typed plan + margin per line
 - [x] `[B]` Prior-year baseline v1 — sync also reads the PREVIOUS fiscal year's SIE (still O(1) calls, best-effort) and the P&L panels show "vs LY" deltas on revenue/cost/result. Graceful when no prior FY exists. *(per-line monthly PY = later, with trend views)*
 
 ### Phase 2 — Onboarding superpower
-- [ ] `[B]` Master-data load (`/3/costcenters`, `/3/projects`) → auto-create + auto-map
-- [ ] `[B]` **Link-or-create** reconciliation review for unmapped codes
+- [x] `[B]` Master-data load (cost centres) — sync also fetches Fortnox's full `/3/costcenters` list (best-effort), so a cost centre defined but never yet booked to (plan-ahead) still appears in the mapping UI to link-or-create against. Verified live: full sync ran clean, coverage unaffected. *(Projects deferred to Phase 3, alongside the project matcher — no UI would consume it yet)*
+- [x] `[B]` **Link-or-create** reconciliation review — already delivered by the one-click mapping UI (Phase 1): every unmapped Fortnox code lists with **Import** (create a new line) or **Link to…** (an existing one).
 - [x] `[B]` **Budget vs forecast as versioned series v1** — a `budget_versions` table snapshots every cost centre's live annual_budget under a name + lock timestamp; the Overview shows the locked baseline, flags drift from the live (still-editable) budget, and lets you lock a new version. *(blind spot #1 v1 — forecast-side versioning/drift-over-time trend is a later iteration)*
 
 ### Phase 3 — Breadth

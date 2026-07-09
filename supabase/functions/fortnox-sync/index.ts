@@ -294,8 +294,20 @@ async function syncOrg(admin: any, org_id: string) {
   await admin.from("organizations").update(orgPatch).eq("id", org_id);
   const closeMonthOut = org?.close_month_manual ? org.close_month : autoClose;
 
-  // Cost-centre list (from SIE #OBJEKT defs + any codes seen in transactions),
-  // with operating cost and mapped status — powers the one-click mapping UI.
+  // Master-data load: fetch Fortnox's FULL cost-centre list (not just codes seen
+  // in the ledger), so a cost-centre created but never yet booked to — the
+  // plan-ahead scenario — still shows up to link-or-create against. Best-effort;
+  // the SIE-derived list alone is still enough if this call fails.
+  try {
+    const cc = await fortnoxGet(`/costcenters`, accessToken);
+    for (const c of cc?.CostCenters ?? []) {
+      const code = String(c.Code ?? c.code ?? "").trim();
+      if (code && !objektNames.has(code)) objektNames.set(code, c.Description ?? c.Name ?? code);
+    }
+  } catch (_) { /* non-fatal — SIE-derived list still works */ }
+
+  // Cost-centre list (master data + any codes seen in transactions), with
+  // operating cost and mapped status — powers the one-click mapping UI.
   const seenCodes = new Set<string>([...objektNames.keys(), ...codeCost.keys()]);
   const cost_centers = [...seenCodes].map((code) => ({
     code,
