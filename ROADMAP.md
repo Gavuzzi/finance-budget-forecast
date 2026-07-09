@@ -219,10 +219,10 @@ Goal: the sync's numbers match Fortnox's result report, at real scale, reliably.
 Revenue is in scope (actuals from BAS 3xxx + simple typed plan + margin per line/project). Design reporting lines to hold revenue *and* cost from now; build the P&L/margin view in Phase 3. No revenue-driver engine — keep the plan simple.
 
 ### Phase 1 — Universal ingestion
-- [ ] `[B]` `dimension` (`costcenter|project|account`) + `source` (`fortnox|manual`) + `state` (`planned|linked`) on the model
-- [ ] `[B]` Account-range matcher (works even untagged)
-- [ ] `[B]` Coverage % + **Unassigned** line — never silently drop
-- [ ] `[B]` Currency suffix respects `organizations.currency`
+- [x] `[B]` `dimension` (`costcenter|project|account`) + `source` (`fortnox|manual`) + `state` (`planned|linked`) on the model — migrations applied, sync + UI use them
+- [x] `[B]` Account-range matcher — sync falls back to account ranges for untagged/unmapped rows; add/remove ranges in the mapping UI. Untagged companies are now syncable.
+- [x] `[B]` Coverage % + **Unassigned** line — unplaced money lands in a real "Unassigned (Fortnox)" line (auto-created/auto-removed); panel shows coverage. Verified live by fault injection (67% → 100%).
+- [x] `[B]` Currency suffix respects `organizations.currency` (SEK → kr/tkr/mkr, EUR → €/t€/m€)
 - [ ] `[B]` Store transaction-level detail at sync → enables **drill-to-transaction** *(blind spot #3)*
 - [ ] `[B]` Load prior-year actuals as a baseline *(blind spot #5)*
 
