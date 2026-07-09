@@ -69,8 +69,21 @@ function oneOffCostForMonth(cc, month) {
   return cc.oneOffs.filter((o) => o.month === month).reduce((s, o) => s + o.amount, 0);
 }
 
+// Recurring costs (rent, subscriptions, leases): a named line active over a
+// start–end range, with an optional annual escalation compounding every 12
+// months from its own start (so a line starting mid-year escalates on its own
+// anniversary, not the calendar year).
+function recurringCostForMonth(cc, month) {
+  return (cc.recurringCosts || []).reduce((sum, r) => {
+    if (month < r.startMonth || month > r.endMonth) return sum;
+    const yearsIn = Math.floor((month - r.startMonth) / 12);
+    const amt = r.amount * Math.pow(1 + (r.escalationPct || 0) / 100, yearsIn);
+    return sum + amt;
+  }, 0);
+}
+
 function forecastForMonth(cc, month) {
-  return headcountCostForMonth(cc, month) + oneOffCostForMonth(cc, month) + cc.otherMonthly;
+  return headcountCostForMonth(cc, month) + oneOffCostForMonth(cc, month) + recurringCostForMonth(cc, month);
 }
 
 function monthAmount(cc, month) {
@@ -213,7 +226,7 @@ async function loadData(orgId) {
         id: cc.id,
         name: cc.name,
         annualBudget: Number(cc.annual_budget),
-        otherMonthly: Number(cc.other_monthly),
+        otherMonthly: Number(cc.other_monthly), // legacy — superseded by recurringCosts, kept only so old writes don't error
         note: cc.note || "",
         headcount: hcRes.data
           .filter((h) => h.cost_center_id === cc.id)
@@ -221,9 +234,23 @@ async function loadData(orgId) {
         oneOffs: ooRes.data
           .filter((o) => o.cost_center_id === cc.id)
           .map((o) => ({ id: o.id, label: o.label, amount: Number(o.amount), month: o.month })),
+        recurringCosts: [],
         actualMonthly,
       });
     });
+
+  // Recurring costs — loaded tolerantly (like scenarios) in case an older DB
+  // hasn't run the migration yet; the app still works, just with no recurring lines.
+  const rcRes = await sb.from("recurring_costs").select("*").eq("org_id", CURRENT_ORG_ID);
+  if (!rcRes.error) {
+    rcRes.data.forEach((r) => {
+      const cc = COST_CENTERS.find((c) => c.id === r.cost_center_id);
+      if (cc) cc.recurringCosts.push({
+        id: r.id, label: r.label, amount: Number(r.amount),
+        startMonth: r.start_month, endMonth: r.end_month, escalationPct: Number(r.escalation_pct || 0),
+      });
+    });
+  }
 
   // Scenarios are optional — the table may not exist until migration-scenarios.sql
   // is run — so load them tolerantly; the app works either way.
@@ -266,8 +293,10 @@ function loadPreviewData() {
     { id: "r4", label: "IT Support Specialist", baseSalary: 36000 },
   );
 
-  const mk = (id, name, budget, other, hc, oo, act) =>
-    ({ id, name, annualBudget: budget, otherMonthly: other, note: "", headcount: hc, oneOffs: oo, actualMonthly: act });
+  const mk = (id, name, budget, other, hc, oo, act) => ({
+    id, name, annualBudget: budget, otherMonthly: other, note: "", headcount: hc, oneOffs: oo, actualMonthly: act,
+    recurringCosts: other ? [{ id: id + "-rec1", label: "Other costs", amount: other, startMonth: 1, endMonth: 24, escalationPct: 0 }] : [],
+  });
 
   COST_CENTERS.push(
     mk("c1", "Production", 28000000, 1350000,
@@ -364,7 +393,7 @@ async function dbInsertCostCenter() {
     .insert({ org_id: CURRENT_ORG_ID, name: "New cost center", annual_budget: 0, other_monthly: 0 })
     .select().single();
   if (error) { flagWriteError(error); return null; }
-  return { id: data.id, name: data.name, annualBudget: Number(data.annual_budget), otherMonthly: Number(data.other_monthly), headcount: [], oneOffs: [], actualMonthly: [] };
+  return { id: data.id, name: data.name, annualBudget: Number(data.annual_budget), otherMonthly: Number(data.other_monthly), headcount: [], oneOffs: [], recurringCosts: [], actualMonthly: [] };
 }
 
 async function dbDeleteCostCenter(id) {
@@ -417,6 +446,26 @@ async function dbUpdateOneOff(o) {
 
 async function dbDeleteOneOff(id) {
   const { error } = await sb.from("one_offs").delete().eq("id", id);
+  if (error) flagWriteError(error);
+}
+
+async function dbInsertRecurringCost(ccId, r) {
+  const { data, error } = await sb.from("recurring_costs")
+    .insert({ org_id: CURRENT_ORG_ID, cost_center_id: ccId, label: r.label, amount: r.amount, start_month: r.startMonth, end_month: r.endMonth, escalation_pct: r.escalationPct })
+    .select().single();
+  if (error) { flagWriteError(error); return null; }
+  return data.id;
+}
+
+async function dbUpdateRecurringCost(r) {
+  const { error } = await sb.from("recurring_costs")
+    .update({ label: r.label, amount: r.amount, start_month: r.startMonth, end_month: r.endMonth, escalation_pct: r.escalationPct })
+    .eq("id", r.id);
+  if (error) flagWriteError(error);
+}
+
+async function dbDeleteRecurringCost(id) {
+  const { error } = await sb.from("recurring_costs").delete().eq("id", id);
   if (error) flagWriteError(error);
 }
 
@@ -592,6 +641,12 @@ async function seedExampleData() {
     const hcRows = cc.hc.map(([label, count]) => ({ org_id: CURRENT_ORG_ID, cost_center_id: ccId, role_id: roleIds[label], count, start_month: 1, end_month: 24 }));
     const hcRes = await sb.from("headcount_lines").insert(hcRows);
     if (hcRes.error) { flagWriteError(hcRes.error); return false; }
+
+    // The forecast engine reads recurringCosts, not the legacy other_monthly
+    // column — without this row the seeded "other" cost would silently vanish.
+    const rcRes = await sb.from("recurring_costs")
+      .insert({ org_id: CURRENT_ORG_ID, cost_center_id: ccId, label: "Other costs", amount: cc.other, start_month: 1, end_month: 24, escalation_pct: 0 });
+    if (rcRes.error) { flagWriteError(rcRes.error); return false; }
 
     const actRows = cc.actuals.map((amount, i) => ({ org_id: CURRENT_ORG_ID, cost_center_id: ccId, month: i + 1, amount }));
     const actRes = await sb.from("monthly_actual").insert(actRows);

@@ -284,7 +284,7 @@ async function importCostCenter(cc, host) {
     .insert({ org_id: CURRENT_ORG_ID, name: cc.name, annual_budget: 0, other_monthly: 0 })
     .select().single();
   if (error) { showToast("Couldn't create — " + error.message, "error"); return; }
-  COST_CENTERS.push({ id: data.id, name: data.name, annualBudget: 0, otherMonthly: 0, note: "", headcount: [], oneOffs: [], actualMonthly: [] });
+  COST_CENTERS.push({ id: data.id, name: data.name, annualBudget: 0, otherMonthly: 0, note: "", headcount: [], oneOffs: [], recurringCosts: [], actualMonthly: [] });
   await saveMapping(data.id, cc.code);
   cc.mapped = true;
   showToast(`Imported "${cc.name}" and mapped it.`);

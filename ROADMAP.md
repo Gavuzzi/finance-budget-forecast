@@ -235,7 +235,7 @@ Revenue is in scope (actuals from BAS 3xxx + simple typed plan + margin per line
 - [ ] `[B]` Project matcher + configurable dimension precedence
 - [ ] `[B]` Presets (consultancy / manufacturer / retail / service)
 - [x] `[B]` Revenue plan v1 — a simple annual revenue target (`assumptions.revenue_budget`, deliberately no driver engine) set on the Assumptions page; the P&L panel shows "+X% vs budget" next to actual revenue whenever a target is set. Verified in preview (52.4M actual vs 50M target -> +5%).
-- [ ] `[B]` Cost forecast methods: recurring (start/end/escalation), % of driver, per-unit, manual profile
+- [x] `[B]` **Recurring cost lines** — replaced the flat "other_monthly" blob with named lines (label, amount, start/end month, annual escalation %). Migration auto-preserved every existing value as an equivalent line (verified: identical FY totals before/after, to the mkr). Planning UI mirrors the one-offs table. *(% of driver / per-unit / manual-profile methods are a later iteration — this closes the recurring-with-escalation gap, the one explicitly flagged in the design)*
 - [ ] `[B]` **Re-forecast from actuals** (run-rate / trend) — **manual, opt-in, shown as a suggested delta, per-line, reversible; NEVER auto-overwrites a set forecast on sync** *(blind spot #4)*
 - [ ] `[B]` Variance "why" — bridge + commentary + drill-to-transaction UI *(blind spot #3/#5)*
 - [ ] `[B]` Rename `cost_centers` → reporting lines (cosmetic, once)

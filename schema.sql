@@ -113,6 +113,35 @@ drop policy if exists budget_versions_write on budget_versions;
 create policy budget_versions_read on budget_versions for select using (is_org_member(org_id));
 create policy budget_versions_write on budget_versions for all using (can_edit_org(org_id)) with check (can_edit_org(org_id));
 
+-- Recurring costs: named lines with a start/end month + optional annual
+-- escalation — replaces the old flat "other_monthly" blob (kept as a legacy
+-- column, no longer read by the engine) so run-rate costs (rent, subs, leases)
+-- can start/stop and grow over time instead of being one flat number forever.
+create table if not exists recurring_costs (
+  id             uuid primary key default gen_random_uuid(),
+  org_id         uuid not null references organizations(id) on delete cascade,
+  cost_center_id uuid not null references cost_centers(id) on delete cascade,
+  label          text not null default 'Other costs',
+  amount         numeric not null default 0,
+  start_month    smallint not null default 1,
+  end_month      smallint not null default 24,
+  escalation_pct numeric not null default 0
+);
+alter table recurring_costs enable row level security;
+drop policy if exists recurring_costs_read on recurring_costs;
+drop policy if exists recurring_costs_write on recurring_costs;
+create policy recurring_costs_read on recurring_costs for select using (is_org_member(org_id));
+create policy recurring_costs_write on recurring_costs for all using (can_edit_org(org_id)) with check (can_edit_org(org_id));
+
+-- One-time backward-compat migration: preserve every cost centre's existing
+-- other_monthly as an equivalent recurring-cost row (idempotent — only inserts
+-- where one doesn't already exist for that cost centre).
+insert into recurring_costs (org_id, cost_center_id, label, amount, start_month, end_month, escalation_pct)
+select cc.org_id, cc.id, 'Other costs (migrated)', cc.other_monthly, 1, 24, 0
+from cost_centers cc
+where cc.other_monthly > 0
+and not exists (select 1 from recurring_costs rc where rc.cost_center_id = cc.id);
+
 -- Idempotent catch-up for databases created before newer columns existed.
 alter table cost_centers add column if not exists note text;
 alter table organizations add column if not exists fy_start_month smallint not null default 1;  -- broken fiscal years (May–Apr etc.)

@@ -35,6 +35,19 @@ function renderOneOffRow(o, oi) {
   `;
 }
 
+function renderRecurringRow(r, ri) {
+  return `
+    <tr data-recurring="${ri}">
+      <td><input type="text" data-rfield="label" value="${r.label}"></td>
+      <td><input type="number" data-rfield="amount" value="${r.amount}" step="1000"></td>
+      <td><select data-rfield="startMonth">${monthOptionsHtml(r.startMonth)}</select></td>
+      <td><select data-rfield="endMonth">${monthOptionsHtml(r.endMonth)}</select></td>
+      <td><input type="number" data-rfield="escalationPct" value="${r.escalationPct}" step="0.5"></td>
+      <td><button class="row-remove" data-removerecurring="${ri}" title="Remove">✕</button></td>
+    </tr>
+  `;
+}
+
 function renderCcBlock(i) {
   const cc = COST_CENTERS[i];
   const fy = fySummary(cc);
@@ -43,6 +56,7 @@ function renderCcBlock(i) {
 
   const headcountRows = cc.headcount.map(renderHeadcountRow).join("");
   const oneOffRows = cc.oneOffs.map(renderOneOffRow).join("");
+  const recurringRows = (cc.recurringCosts || []).map(renderRecurringRow).join("");
 
   return `
     <div class="cc-block" data-cc="${i}">
@@ -88,10 +102,18 @@ function renderCcBlock(i) {
         <button class="add-headcount" data-addoneoff="${i}">+ Add one-off cost</button>
       </div>
 
-      <div class="cc-other-rows">
-        <label>Other costs — materials, utilities, etc. (SEK/month)
-          <input type="number" data-ccfield="otherMonthly" value="${cc.otherMonthly}" step="10000">
-        </label>
+      <div class="recurring-section">
+        <h3>Recurring costs</h3>
+        <p class="line-hint">Rent, subscriptions, leases, materials — a named cost active over a start–end range, with an optional annual increase (e.g. 3%/yr rent escalation).</p>
+        <div class="driver-table-wrap">
+          <table class="driver-table recurring-table">
+            <thead>
+              <tr><th>Description</th><th>Amount (SEK/mo)</th><th>Active from</th><th>Active until</th><th>Escalation (%/yr)</th><th></th></tr>
+            </thead>
+            <tbody>${recurringRows}</tbody>
+          </table>
+        </div>
+        <button class="add-headcount" data-addrecurring="${i}">+ Add recurring cost</button>
       </div>
 
       <div class="cc-note-row">
@@ -183,6 +205,13 @@ function initPlanningGrid() {
       o[field] = field === "label" ? target.value : Number(target.value) || 0;
       refreshCcComputed(ccIndex);
       dbUpdateOneOff(o);
+    } else if (target.dataset.rfield) {
+      const row = target.closest("tr[data-recurring]");
+      const r = cc.recurringCosts[Number(row.dataset.recurring)];
+      const field = target.dataset.rfield;
+      r[field] = field === "label" ? target.value : Number(target.value) || 0;
+      refreshCcComputed(ccIndex);
+      dbUpdateRecurringCost(r);
     } else if (target.dataset.ccfield) {
       const field = target.dataset.ccfield;
       if (field === "note") {
@@ -243,6 +272,18 @@ function initPlanningGrid() {
       return;
     }
 
+    if (removeBtn && removeBtn.dataset.removerecurring !== undefined) {
+      const block = removeBtn.closest(".cc-block");
+      const ccIndex = Number(block.dataset.cc);
+      const rIndex = Number(removeBtn.dataset.removerecurring);
+      const r = COST_CENTERS[ccIndex].recurringCosts[rIndex];
+      if (!confirm(`Remove the recurring cost "${r.label}"? This can't be undone.`)) return;
+      COST_CENTERS[ccIndex].recurringCosts.splice(rIndex, 1);
+      rebuildCcBlock(ccIndex);
+      dbDeleteRecurringCost(r.id);
+      return;
+    }
+
     const addBtn = e.target.closest(".add-headcount[data-add]");
     if (addBtn) {
       if (ROLE_CATALOG.length === 0) {
@@ -278,6 +319,21 @@ function initPlanningGrid() {
       rebuildCcBlock(ccIndex);
       const block = document.querySelector(`.cc-block[data-cc="${ccIndex}"]`);
       const lastInput = block.querySelector(".oneoffs-table tbody tr:last-child input");
+      if (lastInput) lastInput.focus();
+      return;
+    }
+
+    const addRecurringBtn = e.target.closest("[data-addrecurring]");
+    if (addRecurringBtn) {
+      const ccIndex = Number(addRecurringBtn.dataset.addrecurring);
+      const r = { label: "New recurring cost", amount: 10000, startMonth: Math.min(CLOSE_MONTH + 1, TIMELINE_LENGTH), endMonth: TIMELINE_LENGTH, escalationPct: 0 };
+      const id = await dbInsertRecurringCost(COST_CENTERS[ccIndex].id, r);
+      if (!id) return;
+      r.id = id;
+      COST_CENTERS[ccIndex].recurringCosts.push(r);
+      rebuildCcBlock(ccIndex);
+      const block = document.querySelector(`.cc-block[data-cc="${ccIndex}"]`);
+      const lastInput = block.querySelector(".recurring-table tbody tr:last-child input");
       if (lastInput) lastInput.focus();
     }
   });
