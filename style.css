@@ -989,6 +989,10 @@ td.mt-drill:hover { background: rgba(77,124,199,0.12); border-radius: 4px; }
   gap: 18px;
 }
 
+/* Cash Flow has a 5th stat card (Runway) — scoped by id so other pages'
+   4-card rows are untouched. */
+#cashStatsRow { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+
 .stat-card {
   background: var(--panel);
   border: 1px solid var(--panel-border);
@@ -1653,7 +1657,7 @@ html[data-theme="light"] .panel {
 
   .page-head h1 { font-size: 1.6rem; }
 
-  .stats-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .stats-row, #cashStatsRow { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .stat-card { padding: 12px 14px; }
   .stat-label { font-size: 0.7rem; }
   .stat-value { font-size: 1.4rem; }
@@ -1690,5 +1694,5 @@ html[data-theme="light"] .panel {
 }
 
 @media (max-width: 480px) {
-  .stats-row { grid-template-columns: minmax(0, 1fr); }
+  .stats-row, #cashStatsRow { grid-template-columns: minmax(0, 1fr); }
 }

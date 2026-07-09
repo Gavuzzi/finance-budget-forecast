@@ -250,6 +250,11 @@ function taxDueDate(kind, fyMonth) {
   return skatteverketDueDate(year, month, 2);
 }
 
+// Runway cap: how far ahead we'll walk looking for a zero-crossing before
+// giving up and calling it cash-positive. Matches the driver forecast's own
+// horizon — there's no data to project operating costs beyond it anyway.
+const RUNWAY_HORIZON_MONTHS = TIMELINE_LENGTH;
+
 function cashFlowProjection(monthsAhead = 6) {
   if (!CASH_POSITION) return null;
   const nowIdx = cashFlowMonthIndex(new Date().toISOString().slice(0, 10));
@@ -276,17 +281,33 @@ function cashFlowProjection(monthsAhead = 6) {
     }
   }
 
+  // Estimated operating cash flow: the SAME driver forecast that powers
+  // Overview/Monthly (salaries, recurring costs, one-offs — the biggest,
+  // most predictable outflow, and previously missing here entirely) netted
+  // against a flat monthly revenue estimate from the annual target. Kept as
+  // its own signed bucket, exactly like tax, so a hard invoice figure is
+  // never silently blended with a model estimate. The revenue side is
+  // deliberately crude (annual target / 12) — a real monthly revenue plan
+  // is a separate, later pass.
+  const estMonthlyRevenue = (ASSUMPTIONS.revenueBudget || 0) / 12;
+  const estOperating = (m) => estMonthlyRevenue - (m >= 1 && m <= TIMELINE_LENGTH ? companyMonthAmount(m) : 0);
+
   let running = CASH_POSITION.bankBalance;
   const rows = [];
-  for (let i = 0; i < monthsAhead; i++) {
+  let runway = running < 0 ? 0 : null;
+  const horizon = Math.max(monthsAhead, RUNWAY_HORIZON_MONTHS - nowIdx + 1, 0);
+  for (let i = 0; i < horizon; i++) {
     const m = nowIdx + i;
     const inflow = inflowByMonth.get(m) ?? 0;
     const outflow = outflowByMonth.get(m) ?? 0;
     const taxDue = taxDueByMonth.get(m) ?? 0;
-    running += inflow - outflow - taxDue;
-    rows.push({ month: m, inflow, outflow, taxDue, net: inflow - outflow - taxDue, balance: running });
+    const operating = estOperating(m);
+    const net = inflow - outflow - taxDue + operating;
+    running += net;
+    if (i < monthsAhead) rows.push({ month: m, inflow, outflow, taxDue, operating, net, balance: running });
+    if (runway == null && running < 0) runway = i + 1;
   }
-  return rows;
+  return { rows, runway };
 }
 
 // ---- Budget versioning (locked baseline vs the live, editable budget) ------

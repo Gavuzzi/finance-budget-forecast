@@ -62,7 +62,7 @@ TESTING.md under a "Security review" heading.
 
 ---
 
-## TASK 2 — Cash flow honesty + runway
+## TASK 2 — Cash flow honesty + runway ✅ DONE 2026-07-10
 
 **Problem:** `cashFlowProjection()` in `data.js` walks the balance using only open invoices + tax.
 It omits salaries/recurring/one-offs (the biggest outflows) and revenue, so the projected line is

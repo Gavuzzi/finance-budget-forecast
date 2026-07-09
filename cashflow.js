@@ -27,8 +27,15 @@ function renderCashStats() {
   const totalAr = OPEN_INVOICES.filter((i) => i.kind === "customer").reduce((s, i) => s + i.amount, 0);
   const totalAp = OPEN_INVOICES.filter((i) => i.kind === "supplier").reduce((s, i) => s + i.amount, 0);
   const projection = cashFlowProjection(CASHFLOW_MONTHS_AHEAD);
-  const endBalance = projection[projection.length - 1].balance;
+  const rows = projection.rows;
+  const endBalance = rows[rows.length - 1].balance;
   const cls = endBalance < 0 ? "over" : "";
+  const runway = projection.runway;
+  const runwayLabel = runway == null ? "Cash-positive" : `${runway} mo${runway === 1 ? "" : "s"}`;
+  const runwayCls = runway != null && runway <= 3 ? "over" : "";
+  const runwaySub = runway == null
+    ? `holds beyond ${RUNWAY_HORIZON_MONTHS - cashFlowMonthIndex(new Date().toISOString().slice(0, 10)) + 1} months at current plan`
+    : "until balance would cross zero, at current plan";
 
   row.innerHTML = `
     <div class="stat-card">
@@ -49,16 +56,21 @@ function renderCashStats() {
     <div class="stat-card highlight">
       <span class="stat-label">Projected Balance</span>
       <span class="stat-value ${cls}">${fmtMkr(endBalance)}</span>
-      <span class="stat-sub ${cls}">in ${CASHFLOW_MONTHS_AHEAD} months, incl. est. tax/VAT</span>
+      <span class="stat-sub ${cls}">in ${CASHFLOW_MONTHS_AHEAD} months, incl. estimates</span>
+    </div>
+    <div class="stat-card highlight">
+      <span class="stat-label" title="Estimated from the driver forecast (salaries, recurring, one-offs) and a flat monthly revenue estimate — not a hard figure">Runway</span>
+      <span class="stat-value ${runwayCls}">${runwayLabel}</span>
+      <span class="stat-sub ${runwayCls}">${runwaySub}</span>
     </div>
   `;
 }
 
 function renderCashChart() {
   const colors = THEME_COLORS[getTheme()];
-  const projection = cashFlowProjection(CASHFLOW_MONTHS_AHEAD);
-  const labels = projection.map((r) => monthLabel(r.month));
-  const balanceSeries = projection.map((r) => r.balance);
+  const rows = cashFlowProjection(CASHFLOW_MONTHS_AHEAD).rows;
+  const labels = rows.map((r) => monthLabel(r.month));
+  const balanceSeries = rows.map((r) => r.balance);
 
   const ctx = document.getElementById("cashChart");
   if (cashChart) cashChart.destroy();
@@ -92,23 +104,26 @@ function renderCashChart() {
 }
 
 function renderCashTable() {
-  const projection = cashFlowProjection(CASHFLOW_MONTHS_AHEAD);
+  const rows = cashFlowProjection(CASHFLOW_MONTHS_AHEAD).rows;
   let html = `<table class="monthly-table"><thead><tr>
     <th class="mt-name">Month</th>
-    <th class="num">Inflow</th>
-    <th class="num">Outflow</th>
+    <th class="num" title="Hard figures from unpaid Fortnox invoices">Inflow</th>
+    <th class="num" title="Hard figures from unpaid Fortnox invoices">Outflow</th>
+    <th class="num" title="Estimated from the driver forecast (salaries, recurring costs, one-offs) netted against a flat monthly revenue estimate — not a hard Fortnox figure">Operating (est.)</th>
     <th class="num" title="Estimated from tracked VAT/payroll-tax account balances + Skatteverket deadline rules — not a hard Fortnox figure">Tax/VAT (est.)</th>
     <th class="num">Net</th>
     <th class="num mt-summary">Running Balance</th>
   </tr></thead><tbody>`;
-  projection.forEach((r) => {
+  rows.forEach((r) => {
     const netCls = r.net > 0 ? "under" : r.net < 0 ? "over" : "";
     const balCls = r.balance < 0 ? "over" : "";
     const taxCls = r.taxDue > 0 ? "over" : r.taxDue < 0 ? "under" : "";
+    const opCls = r.operating > 0 ? "under" : r.operating < 0 ? "over" : "";
     html += `<tr>
       <td class="mt-name">${monthLabel(r.month)}</td>
       <td class="num">${r.inflow ? fmtMkr(r.inflow) : "–"}</td>
       <td class="num">${r.outflow ? fmtMkr(r.outflow) : "–"}</td>
+      <td class="num ${opCls} mt-forecast">${r.operating ? fmtMkrSigned(r.operating) : "–"}</td>
       <td class="num ${taxCls} mt-forecast">${r.taxDue ? fmtMkrSigned(-r.taxDue) : "–"}</td>
       <td class="num ${netCls}">${fmtMkrSigned(r.net)}</td>
       <td class="num mt-summary ${balCls}">${fmtMkr(r.balance)}</td>
