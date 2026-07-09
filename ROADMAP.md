@@ -229,7 +229,7 @@ Revenue is in scope (actuals from BAS 3xxx + simple typed plan + margin per line
 ### Phase 2 — Onboarding superpower
 - [ ] `[B]` Master-data load (`/3/costcenters`, `/3/projects`) → auto-create + auto-map
 - [ ] `[B]` **Link-or-create** reconciliation review for unmapped codes
-- [ ] `[B]` **Budget vs forecast as versioned series** — locked/approved budget baseline + living forecast *(blind spot #1)*
+- [x] `[B]` **Budget vs forecast as versioned series v1** — a `budget_versions` table snapshots every cost centre's live annual_budget under a name + lock timestamp; the Overview shows the locked baseline, flags drift from the live (still-editable) budget, and lets you lock a new version. *(blind spot #1 v1 — forecast-side versioning/drift-over-time trend is a later iteration)*
 
 ### Phase 3 — Breadth
 - [ ] `[B]` Project matcher + configurable dimension precedence

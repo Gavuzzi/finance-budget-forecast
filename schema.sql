@@ -96,6 +96,23 @@ create table if not exists scenarios (
   created_at        timestamptz not null default now()
 );
 
+-- A locked, approved budget baseline: a snapshot of every cost centre's
+-- annual_budget at lock time, so "variance vs budget" can mean "vs what was
+-- approved" even after the live budget keeps getting edited.
+create table if not exists budget_versions (
+  id                uuid primary key default gen_random_uuid(),
+  org_id            uuid not null references organizations(id) on delete cascade,
+  name              text not null,
+  locked_at         timestamptz not null default now(),
+  snapshot          jsonb not null,   -- { cost_center_id: annual_budget }
+  total             numeric not null default 0
+);
+alter table budget_versions enable row level security;
+drop policy if exists budget_versions_read on budget_versions;
+drop policy if exists budget_versions_write on budget_versions;
+create policy budget_versions_read on budget_versions for select using (is_org_member(org_id));
+create policy budget_versions_write on budget_versions for all using (can_edit_org(org_id)) with check (can_edit_org(org_id));
+
 -- Idempotent catch-up for databases created before newer columns existed.
 alter table cost_centers add column if not exists note text;
 alter table organizations add column if not exists fy_start_month smallint not null default 1;  -- broken fiscal years (May–Apr etc.)

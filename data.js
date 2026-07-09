@@ -32,6 +32,7 @@ let CLOSE_MONTH_MANUAL = false; // true = user picked the month; syncs won't tou
 let DISPLAY_UNIT = "mkr"; // "kr" | "tkr" | "mkr" — set per org in loadData/loadPreviewData
 let CURRENT_ORG_ID = null;
 let USER_ORGS = [];
+let BUDGET_VERSIONS = []; // locked budget snapshots, newest first
 let SCENARIOS = [];
 const ORG_STORAGE_KEY = "almgren-current-org";
 const ROLE_CATALOG = [];
@@ -112,6 +113,29 @@ function companyFySummary() {
     budget: totals.reduce((s, t) => s + t.budget, 0),
     variance: totals.reduce((s, t) => s + t.variance, 0),
   };
+}
+
+// ---- Budget versioning (locked baseline vs the live, editable budget) ------
+// "Variance vs budget" above always compares to the CURRENT annualBudget,
+// which keeps moving as people edit it. A locked version freezes a snapshot so
+// you can also see "vs what was approved" — and whether the live plan has
+// since drifted from it.
+
+function latestBudgetVersion() {
+  return BUDGET_VERSIONS[0] || null;
+}
+
+function currentBudgetTotal() {
+  return COST_CENTERS.reduce((s, cc) => s + cc.annualBudget, 0);
+}
+
+// null when there's no locked version yet, or once one exists but nothing has
+// drifted (nothing to flag).
+function budgetDrift() {
+  const v = latestBudgetVersion();
+  if (!v) return null;
+  const diff = currentBudgetTotal() - v.total;
+  return Math.abs(diff) < 1 ? null : diff;
 }
 
 function companyRollingSummary() {
@@ -205,6 +229,11 @@ async function loadData(orgId) {
   SCENARIOS.length = 0;
   const scenRes = await sb.from("scenarios").select("*").eq("org_id", CURRENT_ORG_ID).order("created_at");
   if (!scenRes.error) scenRes.data.forEach((s) => SCENARIOS.push({ id: s.id, name: s.name, fyTotal: Number(s.fy_total), breakdown: (s.snapshot && s.snapshot.breakdown) || [] }));
+
+  // Budget versions — likewise optional/tolerant (table may not exist yet on an older DB).
+  BUDGET_VERSIONS.length = 0;
+  const bvRes = await sb.from("budget_versions").select("*").eq("org_id", CURRENT_ORG_ID).order("locked_at", { ascending: false });
+  if (!bvRes.error) bvRes.data.forEach((v) => BUDGET_VERSIONS.push({ id: v.id, name: v.name, lockedAt: v.locked_at, snapshot: v.snapshot, total: Number(v.total) }));
 }
 
 // ---- Preview mode ----------------------------------------------------------
@@ -261,6 +290,9 @@ function loadPreviewData() {
     { id: "s1", name: "Base", fyTotal: 41800000, breakdown: [{ name: "Production", total: 28600000 }, { name: "R&D", total: 9300000 }, { name: "IT", total: 3900000 }] },
     { id: "s2", name: "Hiring freeze", fyTotal: 39500000, breakdown: [{ name: "Production", total: 27000000 }, { name: "R&D", total: 8600000 }, { name: "IT", total: 3900000 }] },
   );
+
+  BUDGET_VERSIONS.length = 0;
+  BUDGET_VERSIONS.push({ id: "bv1", name: "FY2026 Budget", lockedAt: "2026-01-15T09:00:00Z", snapshot: { c1: 28000000, c2: 9000000, c3: 5000000 }, total: 42000000 });
 }
 
 // ---- Writes (granular Supabase updates, scoped by org via RLS) -------------
@@ -445,6 +477,21 @@ async function dbDeleteScenario(id) {
   const { error } = await sb.from("scenarios").delete().eq("id", id);
   if (error) { flagWriteError(error); return false; }
   return true;
+}
+
+// Lock the CURRENT annualBudget of every cost centre into a named, permanent
+// snapshot. Doesn't touch the live budget — that stays editable — so future
+// edits can be measured against "what was approved" via budgetDrift().
+async function dbLockBudgetVersion(name) {
+  const snapshot = Object.fromEntries(COST_CENTERS.map((cc) => [cc.id, cc.annualBudget]));
+  const total = currentBudgetTotal();
+  const { data, error } = await sb.from("budget_versions")
+    .insert({ org_id: CURRENT_ORG_ID, name, snapshot, total })
+    .select().single();
+  if (error) { flagWriteError(error); return null; }
+  const version = { id: data.id, name: data.name, lockedAt: data.locked_at, snapshot: data.snapshot, total: Number(data.total) };
+  BUDGET_VERSIONS.unshift(version);
+  return version;
 }
 
 // Stand up a brand-new tenant via the locked-down server-side function — one

@@ -378,7 +378,7 @@ function initScenarios() {
 }
 
 function renderAll() {
-  const sections = document.querySelectorAll(".lens-controls, .stats-row, .main-row, .table-panel, .role-breakdown-panel, .scenarios-panel, .signals-panel, .fortnox-pnl-panel");
+  const sections = document.querySelectorAll(".lens-controls, .stats-row, .main-row, .table-panel, .role-breakdown-panel, .scenarios-panel, .signals-panel, .fortnox-pnl-panel, .budget-version-panel");
   let empty = document.getElementById("emptyState");
 
   if (COST_CENTERS.length === 0) {
@@ -401,6 +401,51 @@ function renderAll() {
   renderRoleBreakdown();
   renderScenarios();
   renderSignals();
+  renderBudgetVersion();
+}
+
+// Steal-list (Abacum): budgets are locked/versioned, not just a live editable
+// number. Shows the locked baseline, flags drift from the live budget, and
+// lets you lock the current numbers as a new approved version.
+function renderBudgetVersion() {
+  const panel = document.getElementById("budgetVersionPanel");
+  if (!panel) return;
+  const v = latestBudgetVersion();
+  const drift = budgetDrift();
+  const lockBtn = `<button class="add-cc-btn" id="lockBudgetBtn" type="button">${v ? "Lock current as new version" : "Lock current budget"}</button>`;
+
+  if (!v) {
+    panel.innerHTML = `
+      <div class="bv-row">
+        <div>
+          <h2 class="bv-title">Budget version</h2>
+          <p class="table-hint">No approved budget locked yet — "variance vs budget" is measured against the live, editable number. Lock it to freeze a baseline.</p>
+        </div>
+        ${lockBtn}
+      </div>`;
+  } else {
+    const dateStr = new Date(v.lockedAt).toLocaleDateString("sv-SE");
+    const driftHtml = drift == null
+      ? `<span class="bv-clean">✓ matches the live budget</span>`
+      : `<span class="bv-drift ${drift > 0 ? "over" : "under"}">${fmtMkrSigned(drift)} drift from live budget</span>`;
+    panel.innerHTML = `
+      <div class="bv-row">
+        <div>
+          <h2 class="bv-title">Budget version <span class="pnl-src">— locked ${dateStr}</span></h2>
+          <p class="table-hint"><strong>${v.name}</strong>: ${fmtMkr(v.total)} approved. ${driftHtml}</p>
+        </div>
+        ${lockBtn}
+      </div>`;
+  }
+
+  document.getElementById("lockBudgetBtn").addEventListener("click", async () => {
+    const suggested = `FY2026 Budget${BUDGET_VERSIONS.length ? " v" + (BUDGET_VERSIONS.length + 1) : ""}`;
+    const name = prompt("Name this locked budget version:", suggested);
+    if (!name || !name.trim()) return;
+    if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast("Sign in to lock a real budget version."); return; }
+    const version = await dbLockBudgetVersion(name.trim());
+    if (version) { showToast(`Locked "${version.name}".`); renderBudgetVersion(); }
+  });
 }
 
 function initLensControls() {
