@@ -667,8 +667,58 @@ function varianceClass(variance, budget) {
   return "neutral";
 }
 
+// Researched starter shapes for common SME setups (steal-list: "arrive
+// prepared" — a controller shouldn't hear "never seen that before" from us).
+// Each maps to how that business type TYPICALLY tags its Fortnox bookings, so
+// picking one also sets expectations for the Fortnox mapping step later.
+const BUSINESS_PRESETS = {
+  manufacturer: {
+    label: "Manufacturer",
+    hint: "Departments as cost centres — typically maps by Fortnox kostnadsställe.",
+    roles: [["Manager", 55000], ["Specialist", 42000], ["Associate", 33000], ["Support", 30000]],
+    costCenters: [
+      { name: "Production", budget: 12000000, other: 300000, hc: [["Manager", 1], ["Specialist", 4], ["Associate", 6]] },
+      { name: "Sales & Marketing", budget: 6000000, other: 150000, hc: [["Manager", 1], ["Associate", 4]] },
+      { name: "Administration", budget: 3000000, other: 120000, hc: [["Support", 2]] },
+    ],
+  },
+  consultancy: {
+    label: "Consultancy / agency",
+    hint: "People-heavy, engagement-based — typically maps by Fortnox PROJECT, not cost centre.",
+    roles: [["Partner", 75000], ["Senior Consultant", 55000], ["Consultant", 42000], ["Ops & Admin", 33000]],
+    costCenters: [
+      { name: "Client Delivery", budget: 14000000, other: 100000, hc: [["Senior Consultant", 3], ["Consultant", 5]] },
+      { name: "Business Development", budget: 2500000, other: 80000, hc: [["Partner", 1]] },
+      { name: "Operations", budget: 2000000, other: 90000, hc: [["Ops & Admin", 2]] },
+    ],
+  },
+  retail: {
+    label: "Retail / e-commerce",
+    hint: "COGS-heavy, thin cost-centre use — typically maps by BAS account groups instead.",
+    roles: [["Store/Ops Manager", 45000], ["Warehouse Staff", 32000], ["E-com & Marketing", 38000], ["Support", 29000]],
+    costCenters: [
+      { name: "COGS & Merchandising", budget: 18000000, other: 400000, hc: [["Store/Ops Manager", 1]] },
+      { name: "Logistics & Fulfilment", budget: 4000000, other: 250000, hc: [["Warehouse Staff", 4]] },
+      { name: "Marketing", budget: 3000000, other: 120000, hc: [["E-com & Marketing", 2]] },
+    ],
+  },
+  service: {
+    label: "Small service business",
+    hint: "Often books with no cost-centre or project tags at all — map by BAS account ranges instead.",
+    roles: [["Owner/Manager", 45000], ["Staff", 32000]],
+    costCenters: [
+      { name: "Operations", budget: 4000000, other: 150000, hc: [["Owner/Manager", 1], ["Staff", 3]] },
+    ],
+  },
+};
+
 // Shown on Overview/Monthly when an organization has no cost centers yet.
 function emptyOrgHtml() {
+  const presetButtons = Object.entries(BUSINESS_PRESETS).map(([key, p]) =>
+    `<button class="preset-card" data-loadpreset="${key}" type="button">
+       <strong>${p.label}</strong>
+       <span>${p.hint}</span>
+     </button>`).join("");
   return `
     <div class="empty-state">
       <h2>Let's set up this organization</h2>
@@ -678,30 +728,30 @@ function emptyOrgHtml() {
         <li>Add <strong>cost centers</strong> and their headcount on the <a href="planning.html">Planning</a> page.</li>
       </ol>
       <a class="empty-cta" href="assumptions.html">Start on Assumptions →</a>
-      <button class="empty-cta secondary" data-loadexample type="button">Or load example data to explore</button>
+      <p class="preset-lead">Or start from what's closest to your business — a working example you edit from there:</p>
+      <div class="preset-grid">${presetButtons}</div>
     </div>`;
 }
 
-// One-click onboarding: fill the current (empty) org with a small working sample
-// company so a new user starts from something real instead of a blank app.
-async function seedExampleData() {
+// One-click onboarding: fill the current (empty) org with a small working
+// sample company shaped like the chosen business type, so a new user starts
+// from something real (and already-labelled the way their Fortnox books
+// probably look) instead of a blank app or a one-size-fits-all example.
+async function seedPreset(presetKey) {
   if (DEMO_MODE) { showToast("Sign in to save your own data."); return false; }
-  const roleDefs = [["Manager", 55000], ["Specialist", 42000], ["Associate", 33000], ["Support", 30000]];
+  const preset = BUSINESS_PRESETS[presetKey];
+  if (!preset) return false;
+
   const roleIds = {};
-  for (const [label, base] of roleDefs) {
+  for (const [label, base] of preset.roles) {
     const { data, error } = await sb.from("roles").insert({ org_id: CURRENT_ORG_ID, label, base_salary: base }).select().single();
     if (error) { flagWriteError(error); return false; }
     roleIds[label] = data.id;
   }
 
-  const ccDefs = [
-    { name: "Operations", budget: 12000000, other: 300000, hc: [["Manager", 1], ["Specialist", 4], ["Associate", 6]], actuals: [900000, 920000, 950000, 930000, 940000, 930000] },
-    { name: "Sales", budget: 6000000, other: 150000, hc: [["Manager", 1], ["Associate", 4]], actuals: [480000, 500000, 510000, 490000, 505000, 500000] },
-    { name: "Admin", budget: 3000000, other: 120000, hc: [["Support", 2]], actuals: [230000, 240000, 235000, 245000, 238000, 242000] },
-  ];
-  for (const cc of ccDefs) {
+  for (const cc of preset.costCenters) {
     const { data: ccRow, error } = await sb.from("cost_centers")
-      .insert({ org_id: CURRENT_ORG_ID, name: cc.name, annual_budget: cc.budget, other_monthly: cc.other })
+      .insert({ org_id: CURRENT_ORG_ID, name: cc.name, annual_budget: cc.budget, other_monthly: 0 })
       .select().single();
     if (error) { flagWriteError(error); return false; }
     const ccId = ccRow.id;
@@ -710,13 +760,18 @@ async function seedExampleData() {
     const hcRes = await sb.from("headcount_lines").insert(hcRows);
     if (hcRes.error) { flagWriteError(hcRes.error); return false; }
 
-    // The forecast engine reads recurringCosts, not the legacy other_monthly
-    // column — without this row the seeded "other" cost would silently vanish.
     const rcRes = await sb.from("recurring_costs")
       .insert({ org_id: CURRENT_ORG_ID, cost_center_id: ccId, label: "Other costs", amount: cc.other, start_month: 1, end_month: 24, escalation_pct: 0 });
     if (rcRes.error) { flagWriteError(rcRes.error); return false; }
 
-    const actRows = cc.actuals.map((amount, i) => ({ org_id: CURRENT_ORG_ID, cost_center_id: ccId, month: i + 1, amount }));
+    // Believable 6 months of actuals derived from the monthly budget run-rate
+    // (small variation), so the example shows a real actual/forecast split.
+    const monthlyBudget = (cc.budget + cc.other * 12) / 12;
+    const factors = [0.93, 0.97, 1.02, 0.99, 1.01, 0.98];
+    const actRows = factors.map((f, i) => ({
+      org_id: CURRENT_ORG_ID, cost_center_id: ccId, month: i + 1,
+      amount: Math.round((monthlyBudget * f) / 1000) * 1000,
+    }));
     const actRes = await sb.from("monthly_actual").insert(actRows);
     if (actRes.error) { flagWriteError(actRes.error); return false; }
   }
@@ -726,15 +781,15 @@ async function seedExampleData() {
   return true;
 }
 
-// Delegated handler for the empty-state "Load example data" button (works on any
-// page that renders emptyOrgHtml).
+// Delegated handler for the empty-state preset buttons (works on any page
+// that renders emptyOrgHtml).
 document.addEventListener("click", async (e) => {
-  const btn = e.target.closest("[data-loadexample]");
+  const btn = e.target.closest("[data-loadpreset]");
   if (!btn) return;
   btn.disabled = true;
-  const orig = btn.textContent;
-  btn.textContent = "Loading example…";
-  const ok = await seedExampleData();
+  const orig = btn.innerHTML;
+  btn.innerHTML = "<strong>Loading…</strong>";
+  const ok = await seedPreset(btn.dataset.loadpreset);
   if (ok) location.reload();
-  else { btn.disabled = false; btn.textContent = orig; }
+  else { btn.disabled = false; btn.innerHTML = orig; }
 });

@@ -425,6 +425,18 @@
 
 .empty-cta.secondary:hover { border-color: var(--accent); background: none; }
 
+.preset-lead { color: var(--text-dim); font-size: 0.88rem; margin: 22px 0 12px; padding-top: 18px; border-top: 1px solid var(--panel-border); }
+.preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.preset-card {
+  display: flex; flex-direction: column; gap: 4px; text-align: left;
+  background: var(--bg); border: 1px solid var(--panel-border); border-radius: 10px;
+  padding: 12px 14px; cursor: pointer; font-family: inherit;
+}
+.preset-card:hover { border-color: var(--accent); }
+.preset-card strong { color: var(--text); font-size: 0.92rem; }
+.preset-card span { color: var(--text-dim); font-size: 0.78rem; line-height: 1.4; }
+@media (max-width: 520px) { .preset-grid { grid-template-columns: 1fr; } }
+
 .empty-hint {
   color: var(--text-dim);
   font-size: 0.9rem;
