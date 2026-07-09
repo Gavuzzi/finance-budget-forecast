@@ -12,6 +12,9 @@ Collected while you're away — batch these whenever. (App: app.html, signed in,
   - Click **Lock current as new version** again → drift should clear back to ✓ against the new snapshot.
 - [ ] **Revenue target.** Assumptions page → new **"Revenue Target"** panel at the top → set an annual number (e.g. your real rough target) → go to Monthly, **Sync now**.
   - Expect: the P&L panel's Revenue row shows an extra **"±X% vs budget"** next to the actual figure. Set it back to 0 → the "vs budget" text should disappear.
+- [ ] **Recurring costs (important — replaces "Other costs").** Planning → each cost centre now has a **"Recurring costs"** table instead of the old single "Other costs" field.
+  - Your existing values should already be there as one row named **"Other costs (migrated)"** with the same amount — **check your FY totals didn't change** (they shouldn't have).
+  - Try **+ Add recurring cost**: e.g. a new lease starting mid-year (active from month X) or set a 3% escalation on one — confirm the FY total moves as expected.
 
 ---
 Previously verified live (2026-07-07): ✅
