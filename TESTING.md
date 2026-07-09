@@ -1,6 +1,14 @@
 # Pending manual tests (live app)
 
-**Nothing pending — all clear as of 2026-07-07.** ✅
+Collected while you're away — batch these whenever. (App: app.html, signed in, hard-refresh first.)
+
+- [ ] **Drill-down.** Monthly → **Sync now** once (populates the new drill table) → click any **solid (actual) cell** in the grid.
+  - Expect: a popup "Cost centre — Month" listing the **BAS accounts behind that number** (account, name, tx count, amount, total). Forecast cells are not clickable.
+- [ ] **Coverage line.** After that sync, the P&L panel note should read "Coverage: **100%** of operating costs assigned … Every krona assigned ✓" (your org is fully mapped).
+- [ ] **Account ranges UI (glance).** Cost-centre mapping → below the centres there's now an **Account ranges** section (add e.g. `8000–8999 → IT` and remove it again — just to see it works).
+
+---
+Previously verified live (2026-07-07): ✅
 
 Everything below verified live against real Fortnox data:
 

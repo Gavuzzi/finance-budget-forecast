@@ -223,7 +223,7 @@ Revenue is in scope (actuals from BAS 3xxx + simple typed plan + margin per line
 - [x] `[B]` Account-range matcher — sync falls back to account ranges for untagged/unmapped rows; add/remove ranges in the mapping UI. Untagged companies are now syncable.
 - [x] `[B]` Coverage % + **Unassigned** line — unplaced money lands in a real "Unassigned (Fortnox)" line (auto-created/auto-removed); panel shows coverage. Verified live by fault injection (67% → 100%).
 - [x] `[B]` Currency suffix respects `organizations.currency` (SEK → kr/tkr/mkr, EUR → €/t€/m€)
-- [ ] `[B]` Store transaction-level detail at sync → enables **drill-to-transaction** *(blind spot #3)*
+- [x] `[B]` Drill-down v1 — sync stores per (line × month × account) detail with names from SIE #KONTO; clicking an actual cell shows "what's in this number" (accounts, tx counts, amounts). *(blind spot #3 — account-level; voucher-level later)*
 - [ ] `[B]` Load prior-year actuals as a baseline *(blind spot #5)*
 
 ### Phase 2 — Onboarding superpower

@@ -65,6 +65,24 @@ create policy cost_center_mappings_read  on cost_center_mappings
 create policy cost_center_mappings_write on cost_center_mappings
   for all using (can_edit_org(org_id)) with check (can_edit_org(org_id));
 
+-- --- Account-level drill detail (client-readable) ----------------------------
+-- "What's in this number?" — per (reporting line × month × BAS account),
+-- written by the sync (service role), read by members. Powers cell drill-down.
+create table if not exists actual_detail (
+  id              uuid primary key default gen_random_uuid(),
+  org_id          uuid not null references organizations(id) on delete cascade,
+  cost_center_id  uuid not null references cost_centers(id) on delete cascade,
+  month           smallint not null,
+  account         integer not null,
+  account_name    text,
+  amount          numeric not null default 0,
+  tx_count        integer not null default 0
+);
+alter table actual_detail enable row level security;
+drop policy if exists actual_detail_read on actual_detail;
+create policy actual_detail_read on actual_detail for select using (is_org_member(org_id));
+create index if not exists actual_detail_cell on actual_detail (cost_center_id, month);
+
 -- --- OAuth handshake state (CSRF binding) -----------------------------------
 -- The client inserts a random `state` bound to its org before redirecting to
 -- Fortnox; the callback (service role) looks it up to know which org to attach,

@@ -18,11 +18,13 @@ function lensMonths() {
   return a;
 }
 
-function monthCell(value, isActual, isDivider) {
+function monthCell(value, isActual, isDivider, ccId, month) {
+  // Actual cells are drillable ("what's in this number?"); forecast cells aren't.
+  const drill = isActual && ccId ? ` mt-drill" data-cc="${ccId}" data-m="${month}` : "";
   const cls = (isActual ? "" : "mt-forecast") + (isDivider ? " mt-divider" : "");
   // A booked-but-empty cell (actual = 0) reads as "nothing booked" — show a dash.
   const display = isActual && value === 0 ? "–" : fmtCell(value);
-  return `<td class="num ${cls}">${display}</td>`;
+  return `<td class="num ${cls}${drill}">${display}</td>`;
 }
 
 function renderMonthlyGrid() {
@@ -65,7 +67,7 @@ function renderMonthlyGrid() {
     html += `<tr><td class="mt-name">${cc.name}</td>`;
     months.forEach((m) => {
       const { value, isActual } = monthAmount(cc, m);
-      html += monthCell(value, isActual, m === CLOSE_MONTH + 1);
+      html += monthCell(value, isActual, m === CLOSE_MONTH + 1, cc.id, m);
     });
     if (isFy) {
       const fy = fySummary(cc);
@@ -146,6 +148,62 @@ function downloadExport() {
   URL.revokeObjectURL(a.href);
 }
 
+// ---- Drill-down: what's inside an actual cell -------------------------------
+
+async function loadDrill(ccId, month) {
+  if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) {
+    return [
+      { account: 7010, account_name: "Löner", amount: 1650000, tx_count: 1 },
+      { account: 4010, account_name: "Inköp material", amount: 520000, tx_count: 14 },
+      { account: 5010, account_name: "Lokalhyra", amount: 118000, tx_count: 1 },
+      { account: 6540, account_name: "IT-tjänster", amount: 62000, tx_count: 3 },
+    ];
+  }
+  const { data } = await sb.from("actual_detail")
+    .select("account, account_name, amount, tx_count")
+    .eq("org_id", CURRENT_ORG_ID).eq("cost_center_id", ccId).eq("month", month)
+    .order("amount", { ascending: false });
+  return data || [];
+}
+
+async function showDrill(ccId, month) {
+  const cc = COST_CENTERS.find((c) => c.id === ccId);
+  const rows = await loadDrill(ccId, month);
+  const total = rows.reduce((s, r) => s + Number(r.amount), 0);
+  const old = document.getElementById("drillOverlay");
+  if (old) old.remove();
+  const el = document.createElement("div");
+  el.id = "drillOverlay";
+  el.className = "drill-overlay";
+  el.innerHTML = `
+    <div class="drill-card">
+      <div class="drill-head">
+        <h3>${cc ? cc.name : ""} — ${monthLabel(month)}</h3>
+        <button class="drill-close" type="button">✕</button>
+      </div>
+      <p class="drill-sub">Booked actuals by account — straight from your ledger.</p>
+      ${rows.length === 0 ? `<p class="drill-empty">No transactions behind this cell${cc ? "" : ""} — run a sync to populate drill data.</p>` : `
+      <div class="drill-rows">
+        ${rows.map((r) => `
+          <div class="drill-row">
+            <span><span class="fn-cc-code">${r.account}</span> ${r.account_name || ""}</span>
+            <span class="drill-n">${r.tx_count} tx</span>
+            <span class="num">${fmtSek(Number(r.amount))}</span>
+          </div>`).join("")}
+        <div class="drill-row drill-total"><span>Total</span><span></span><span class="num">${fmtSek(total)}</span></div>
+      </div>`}
+    </div>`;
+  document.body.appendChild(el);
+  el.addEventListener("click", (e) => { if (e.target === el || e.target.classList.contains("drill-close")) el.remove(); });
+}
+
+function initDrill() {
+  document.getElementById("monthlyGrid").addEventListener("click", (e) => {
+    const td = e.target.closest("td.mt-drill");
+    if (td) showDrill(td.dataset.cc, Number(td.dataset.m));
+  });
+}
+
 function initImport() {
   const panel = document.getElementById("importPanel");
   const textArea = document.getElementById("csvText");
@@ -198,11 +256,13 @@ function initMonthly() {
     });
   });
   document.getElementById("exportBtn").addEventListener("click", downloadExport);
+  initDrill();
   initImport();
   handleFortnoxRedirect();
   renderIntegrationPanel(document.getElementById("integrationPanel"));
   renderMonthlyGrid();
-  // Dev hook: #csvtest renders the export inline so it can be verified headless.
+  // Dev hooks for headless verification.
+  if (location.hash === "#drilltest" && COST_CENTERS.length) showDrill(COST_CENTERS[0].id, 3);
   if (location.hash === "#csvtest") {
     document.getElementById("monthlyGrid").innerHTML = `<pre style="font-size:11px">${buildExportCsv().replace(/</g, "&lt;")}</pre>`;
   }

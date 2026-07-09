@@ -782,6 +782,35 @@ html, body {
 }
 .fn-acct-add span { color: var(--text-dim); }
 
+/* Drill-down: what's inside an actual cell */
+td.mt-drill { cursor: pointer; }
+td.mt-drill:hover { background: rgba(77,124,199,0.12); border-radius: 4px; }
+.drill-overlay {
+  position: fixed; inset: 0; z-index: 1600;
+  background: rgba(8,12,20,0.6);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.drill-card {
+  width: 480px; max-width: 100%; max-height: 80vh; overflow-y: auto;
+  background: var(--panel); border: 1px solid var(--panel-border);
+  border-radius: 14px; padding: 22px 24px;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.45);
+}
+.drill-head { display: flex; align-items: center; justify-content: space-between; }
+.drill-head h3 { font-size: 1.05rem; color: var(--text); margin: 0; }
+.drill-close { background: none; border: none; color: var(--text-dim); font-size: 1rem; cursor: pointer; }
+.drill-close:hover { color: var(--text); }
+.drill-sub { color: var(--text-dim); font-size: 0.82rem; margin: 6px 0 12px; }
+.drill-empty { color: var(--text-dim); font-size: 0.88rem; }
+.drill-rows { display: flex; flex-direction: column; }
+.drill-row {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: baseline;
+  padding: 7px 0; border-bottom: 1px solid var(--panel-border); font-size: 0.9rem; color: var(--text);
+}
+.drill-row .num { font-variant-numeric: tabular-nums; }
+.drill-n { color: var(--text-dim); font-size: 0.78rem; }
+.drill-total { border-bottom: none; font-weight: 700; padding-top: 10px; }
+
 .fn-recon { margin-top: 14px; border-top: 1px solid var(--panel-border); padding-top: 13px; }
 .fn-recon h4 { font-size: 0.9rem; margin: 0 0 10px; color: var(--text); }
 .fn-recon-table { width: 100%; max-width: 420px; border-collapse: collapse; font-size: 0.9rem; }

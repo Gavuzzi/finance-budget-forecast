@@ -108,6 +108,8 @@ async function syncOrg(admin: any, org_id: string) {
   const objektNames = new Map<string, string>();   // SIE dim-1 cost-centre code → name
   const codeCost = new Map<string, number>();       // cost-centre code → total operating cost
   const uaMonths = new Map<number, number>();       // month → unassigned operating cost
+  const kontoNames = new Map<number, string>();     // SIE #KONTO — account number → name
+  const detail = new Map<string, { amt: number; n: number }>(); // `${ccKey}|${month}|${acct}` (ccKey = ccId or "UA")
 
   const processLine = (raw: string) => {
     const line = raw.trimStart();
@@ -124,6 +126,11 @@ async function syncOrg(admin: any, org_id: string) {
     if (line.startsWith("#OBJEKT")) {   // cost-centre / project definitions (dim 1 = kostnadsställe)
       const o = line.match(/#OBJEKT\s+(\d+)\s+"([^"]*)"\s+"([^"]*)"/);
       if (o && o[1] === "1") objektNames.set(o[2], o[3]);
+      return;
+    }
+    if (line.startsWith("#KONTO")) {    // account definitions → names for the drill-down
+      const k = line.match(/^#KONTO\s+(\d+)\s+"([^"]*)"/);
+      if (k) kontoNames.set(Number(k[1]), k[2]);
       return;
     }
     if (!line.startsWith("#TRANS") || curMonth === null) return;
@@ -158,11 +165,19 @@ async function syncOrg(admin: any, org_id: string) {
       if (code) unmapped.add(code);
       unassignedCost += amount;   // never silently drop — lands in the Unassigned line
       uaMonths.set(curMonth, (uaMonths.get(curMonth) ?? 0) + amount);
+      const dk = `UA|${curMonth}|${acct}`;
+      const d = detail.get(dk) ?? { amt: 0, n: 0 };
+      d.amt += amount; d.n++;
+      detail.set(dk, d);
       return;
     }
     capturedCost += amount;
     const key = `${ccId}|${curMonth}`;
     totals.set(key, (totals.get(key) ?? 0) + amount);
+    const dk = `${ccId}|${curMonth}|${acct}`;
+    const d = detail.get(dk) ?? { amt: 0, n: 0 };
+    d.amt += amount; d.n++;
+    detail.set(dk, d);
   };
 
   const reader = sieRes.body.pipeThrough(new TextDecoderStream("latin1")).getReader();
@@ -207,6 +222,24 @@ async function syncOrg(admin: any, org_id: string) {
 
   await admin.from("monthly_actual").delete().eq("org_id", org_id);
   if (rows.length) await admin.from("monthly_actual").insert(rows);
+
+  // Drill-down detail: per (line × month × account), replaced wholesale like
+  // the actuals. Bounded size (lines × months × accounts), inserted in chunks.
+  const detailRows: Record<string, unknown>[] = [];
+  for (const [dk, d] of detail) {
+    const [ccKey, m, acct] = dk.split("|");
+    const cost_center_id = ccKey === "UA" ? uaId : ccKey;
+    if (!cost_center_id) continue;
+    detailRows.push({
+      org_id, cost_center_id, month: Number(m), account: Number(acct),
+      account_name: kontoNames.get(Number(acct)) ?? null,
+      amount: Math.round(d.amt), tx_count: d.n,
+    });
+  }
+  await admin.from("actual_detail").delete().eq("org_id", org_id);
+  for (let i = 0; i < detailRows.length; i += 2000) {
+    await admin.from("actual_detail").insert(detailRows.slice(i, i + 2000));
+  }
 
   // 5. Advance the actuals boundary (Fathom convention: only ever to the last
   //    FULLY-ELAPSED month — a partially-booked current month must never read
