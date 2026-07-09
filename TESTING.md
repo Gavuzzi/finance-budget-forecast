@@ -15,6 +15,9 @@ Collected while you're away — batch these whenever. (App: app.html, signed in,
 - [ ] **Recurring costs (important — replaces "Other costs").** Planning → each cost centre now has a **"Recurring costs"** table instead of the old single "Other costs" field.
   - Your existing values should already be there as one row named **"Other costs (migrated)"** with the same amount — **check your FY totals didn't change** (they shouldn't have).
   - Try **+ Add recurring cost**: e.g. a new lease starting mid-year (active from month X) or set a 3% escalation on one — confirm the FY total moves as expected.
+- [ ] **Projects mapping (new).** Monthly → Cost-centre mapping → after **Sync now**, if your books have any Fortnox **projects** tagged, a new **"Projects"** section should appear below the cost centres with the same Import/Link buttons.
+  - If you don't use projects in Fortnox, this section just won't appear — nothing to check.
+  - If you do: link/import one, re-sync, and its actuals should flow in (project tags take priority over cost-centre tags on the same booking).
 
 ---
 Previously verified live (2026-07-07): ✅
