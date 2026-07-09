@@ -253,9 +253,9 @@ A second forecast lens: **bank-balance projection, not P&L.** Different data
 and a running-balance view. Potentially *more* valuable to SMEs than the P&L —
 "can I make payroll?" — but a big, separate build. *(blind spot #2)*
 - [x] Decided: in scope — the flagship capstone, built last
-- [ ] `[B]` Pull open invoices + due dates from Fortnox → projected in/outflows
-- [ ] `[B]` VAT + payroll/tax payment timing
-- [ ] `[B]` Running bank-balance forecast view
+- [x] `[B]` Pull open invoices + due dates from Fortnox → projected in/outflows. Bank balance is extracted for free from the existing SIE download (`#UB` closing-balance directive, BAS 1900–1999, current year) — no extra API call. Open invoices come from two new REST calls (`/invoices`, `/supplierinvoices`, `filter=unpaid`, paginated). Verified live on the real sandbox: `#UB` parsing produced a real non-zero bank balance (−4,296,000, correctly negative given the synthetic test data models no cash receipts) and the sync ran with zero errors end-to-end. The invoice-ingestion code path itself is only structurally verified, not data-verified — the sandbox genuinely has no unpaid Fortnox Invoice/SupplierInvoice objects, and I deliberately did not create a test invoice via Fortnox's write API (would violate the read-only posture in the Compliance gate below). See the new TESTING.md item.
+- [ ] `[B]` VAT + payroll/tax payment timing — documented v2 scope, not built. v1 answers "will I have enough cash from what I can already see is owed"; it does not model VAT settlement or payroll/tax due-dates.
+- [x] `[B]` Running bank-balance forecast view — new `cashflow.html` page (added to nav): stat cards (bank balance, open AR, open AP, projected balance), a running-balance line chart, a 6-month inflow/outflow/net/balance table, and an open-invoices list. Verified in `?preview` (dark + light) via headless screenshot: 6.2 mkr bank + 2.9 mkr AR − 1.1 mkr AP = 8.0 mkr projected, and the monthly table's per-month arithmetic ties out exactly.
 
 ### Compliance gate — before onboarding a REAL client
 - [ ] `[F]` Confirm Fortnox **production** API access (partner agreement if needed)

@@ -188,6 +188,33 @@ drop policy if exists sync_exclusions_write on sync_exclusions;
 create policy sync_exclusions_read on sync_exclusions for select using (is_org_member(org_id));
 create policy sync_exclusions_write on sync_exclusions for all using (can_edit_org(org_id)) with check (can_edit_org(org_id));
 
+-- Phase 5 (cash flow): current bank balance (from the SIE's #UB closing-balance
+-- lines for bank accounts) and open invoices (from Fortnox's Customer/Supplier
+-- Invoices API, filter=unpaid) — the two ingredients for a projected running
+-- cash balance. Client-read only; written by the sync (service role).
+create table if not exists cash_position (
+  org_id        uuid primary key references organizations(id) on delete cascade,
+  bank_balance  numeric not null default 0,
+  as_of         timestamptz not null default now()
+);
+alter table cash_position enable row level security;
+drop policy if exists cash_position_read on cash_position;
+create policy cash_position_read on cash_position for select using (is_org_member(org_id));
+
+create table if not exists open_invoices (
+  id            uuid primary key default gen_random_uuid(),
+  org_id        uuid not null references organizations(id) on delete cascade,
+  kind          text not null check (kind in ('customer','supplier')), -- customer=inflow, supplier=outflow
+  amount        numeric not null default 0,
+  due_date      date not null,
+  description   text,
+  counterparty  text
+);
+alter table open_invoices enable row level security;
+drop policy if exists open_invoices_read on open_invoices;
+create policy open_invoices_read on open_invoices for select using (is_org_member(org_id));
+create index if not exists open_invoices_org on open_invoices (org_id, due_date);
+
 -- ---------------------------------------------------------------------------
 -- Row-Level Security: a user can touch a row only if they're a member of its org.
 -- Enabled on EVERY table. The anon key is safe in the browser only because of this.

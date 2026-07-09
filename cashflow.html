@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cash Flow — FP&A</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="app-main">
+      <header class="page-head">
+        <div class="page-head-text">
+          <h1>Cash Flow</h1>
+          <p class="page-sub">Will there be money in the bank — projected from your bank balance and open invoices</p>
+        </div>
+      </header>
+
+      <div id="emptyState" hidden></div>
+
+      <section class="stats-row" id="cashStatsRow"></section>
+
+      <section class="main-row single">
+        <div class="panel chart-panel">
+          <h2>Projected Bank Balance</h2>
+          <canvas id="cashChart"></canvas>
+        </div>
+      </section>
+
+      <section class="panel table-panel">
+        <h2>Monthly Projection</h2>
+        <p class="table-hint">Running balance = today's bank balance, walked forward by open invoices due each month. Doesn't yet include VAT or payroll/tax timing (v2).</p>
+        <div id="cashTable"></div>
+      </section>
+
+      <section class="panel table-panel" id="openInvoicesPanel">
+        <h2>Open Invoices</h2>
+        <p class="table-hint">Unpaid customer (money coming in) and supplier (money going out) invoices from Fortnox, by due date.</p>
+        <div id="openInvoicesTable"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="lib.js"></script>
+  <script src="data.js"></script>
+  <script src="sidebar.js"></script>
+  <script src="cashflow.js"></script>
+  <script>requireAuthAndLoad(() => { renderSidebar(); window.initPage(); });</script>
+</body>
+</html>

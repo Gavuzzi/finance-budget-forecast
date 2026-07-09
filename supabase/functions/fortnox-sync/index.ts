@@ -166,9 +166,18 @@ async function syncOrg(admin: any, org_id: string) {
   const uaMonths = new Map<number, number>();       // month → unassigned operating cost
   const kontoNames = new Map<number, string>();     // SIE #KONTO — account number → name
   const detail = new Map<string, { amt: number; n: number }>(); // `${ccKey}|${month}|${acct}` (ccKey = ccId or "UA")
+  let bankBalance = 0; // sum of #UB (closing balance) for bank accounts (BAS 1900–1999), current year (index 0)
 
   const processLine = (raw: string) => {
     const line = raw.trimStart();
+    if (line.startsWith("#UB")) {       // #UB <yearindex> <account> <amount> — closing balance
+      const u = line.match(/^#UB\s+(-?\d+)\s+(\d+)\s+(-?\d+(?:\.\d+)?)/);
+      if (u && u[1] === "0") {
+        const acct = Number(u[2]);
+        if (acct >= 1900 && acct < 2000) bankBalance += Number(u[3]);
+      }
+      return;
+    }
     if (line.startsWith("#VER")) {
       voucherCount++;
       const vm = line.match(/#VER\s+"?([^"\s]+)"?\s+\S+\s+(\d{8})/);
@@ -323,6 +332,40 @@ async function syncOrg(admin: any, org_id: string) {
   await admin.from("organizations").update(orgPatch).eq("id", org_id);
   const closeMonthOut = org?.close_month_manual ? org.close_month : autoClose;
 
+  // 5B. Cash flow (Phase 5 v1): current bank balance (already have it — summed
+  // from the SIE's #UB lines above, no extra call) + open invoices (2 REST
+  // calls; typically a small list, unlike vouchers, so plain pagination is
+  // fine). Best-effort — a cash-flow hiccup should never fail the P&L sync.
+  let openInvoiceCount = 0;
+  try {
+    await admin.from("cash_position").upsert({ org_id, bank_balance: Math.round(bankBalance), as_of: new Date().toISOString() });
+
+    const invoiceRows: Record<string, unknown>[] = [];
+    for (const [kind, path, listKey, dueField, balField, nameField] of [
+      ["customer", "/invoices", "Invoices", "DueDate", "Balance", "CustomerName"],
+      ["supplier", "/supplierinvoices", "SupplierInvoices", "DueDate", "Balance", "SupplierName"],
+    ] as const) {
+      let page = 1;
+      for (;;) {
+        const list = await fortnoxGet(`${path}?filter=unpaid&page=${page}&limit=500`, accessToken); // VERIFY filter/param names
+        const items = list?.[listKey] ?? [];
+        if (items.length === 0) break;
+        for (const inv of items) {
+          const bal = Number(inv[balField] ?? inv.Total ?? 0);
+          const due = inv[dueField];
+          if (!bal || !due) continue;
+          invoiceRows.push({ org_id, kind, amount: Math.round(Math.abs(bal)), due_date: due, description: inv.DocumentNumber ? `#${inv.DocumentNumber}` : null, counterparty: inv[nameField] ?? null });
+        }
+        const totalPages = list?.MetaInformation?.["@TotalPages"] ?? 1;
+        if (page >= totalPages) break;
+        page++;
+      }
+    }
+    openInvoiceCount = invoiceRows.length;
+    await admin.from("open_invoices").delete().eq("org_id", org_id);
+    if (invoiceRows.length) await admin.from("open_invoices").insert(invoiceRows);
+  } catch (e) { console.error("cash-flow step (non-fatal):", e); }
+
   // Master-data load: fetch Fortnox's FULL cost-centre + project lists (not
   // just codes seen in the ledger), so one created but never yet booked to —
   // the plan-ahead scenario — still shows up to link-or-create against.
@@ -404,6 +447,8 @@ async function syncOrg(admin: any, org_id: string) {
     cost_centers,
     projects,
     reconciliation: recon,
+    bank_balance: Math.round(bankBalance),
+    open_invoice_count: openInvoiceCount,
   };
 }
 

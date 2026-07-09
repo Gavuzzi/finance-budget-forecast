@@ -11,6 +11,7 @@ const NAV = [
   { id: "overview", label: "Overview", href: "app.html" },
   { id: "monthly", label: "Monthly", href: "monthly.html" },
   { id: "planning", label: "Planning", href: "planning.html" },
+  { id: "cashflow", label: "Cash Flow", href: "cashflow.html" },
   { id: "assumptions", label: "Assumptions", href: "assumptions.html" },
 ];
 
@@ -18,6 +19,7 @@ function currentPageId() {
   const file = (location.pathname.split("/").pop() || "app.html").toLowerCase();
   if (file.startsWith("monthly")) return "monthly";
   if (file.startsWith("planning")) return "planning";
+  if (file.startsWith("cashflow")) return "cashflow";
   if (file.startsWith("assumptions")) return "assumptions";
   return "overview";
 }

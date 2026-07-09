@@ -33,6 +33,8 @@ let DISPLAY_UNIT = "mkr"; // "kr" | "tkr" | "mkr" — set per org in loadData/lo
 let CURRENT_ORG_ID = null;
 let USER_ORGS = [];
 let BUDGET_VERSIONS = []; // locked budget snapshots, newest first
+let CASH_POSITION = null; // { bankBalance, asOf } — from the last sync's SIE #UB lines
+let OPEN_INVOICES = [];   // [{ kind: 'customer'|'supplier', amount, dueDate, description, counterparty }]
 let SCENARIOS = [];
 const ORG_STORAGE_KEY = "almgren-current-org";
 const ROLE_CATALOG = [];
@@ -192,6 +194,44 @@ function fullyLoadedTotal(cc) {
   return cc.isShared ? 0 : fySummary(cc).total + allocatedShare(cc);
 }
 
+// ---- Cash flow projection (Phase 5 v1) --------------------------------------
+// A second forecast lens: not "are we profitable" (the P&L) but "will there be
+// money in the bank" — the question that actually keeps an SME owner up at
+// night. Built from two Fortnox-sourced ingredients: the current bank balance
+// (summed from the SIE's #UB closing-balance lines) and open (unpaid)
+// invoices with real due dates. Buckets each invoice into a month using the
+// same fiscal-year-relative math the sync itself uses, then walks a running
+// balance forward from today.
+
+function cashFlowMonthIndex(dateStr) {
+  const d = new Date(dateStr + "T00:00:00Z");
+  return (d.getUTCFullYear() - FY_START_YEAR) * 12 + (d.getUTCMonth() + 1 - FY_START_MONTH) + 1;
+}
+
+function cashFlowProjection(monthsAhead = 6) {
+  if (!CASH_POSITION) return null;
+  const nowIdx = cashFlowMonthIndex(new Date().toISOString().slice(0, 10));
+
+  const inflowByMonth = new Map();
+  const outflowByMonth = new Map();
+  OPEN_INVOICES.forEach((inv) => {
+    const m = cashFlowMonthIndex(inv.dueDate);
+    const map = inv.kind === "customer" ? inflowByMonth : outflowByMonth;
+    map.set(m, (map.get(m) ?? 0) + inv.amount);
+  });
+
+  let running = CASH_POSITION.bankBalance;
+  const rows = [];
+  for (let i = 0; i < monthsAhead; i++) {
+    const m = nowIdx + i;
+    const inflow = inflowByMonth.get(m) ?? 0;
+    const outflow = outflowByMonth.get(m) ?? 0;
+    running += inflow - outflow;
+    rows.push({ month: m, inflow, outflow, net: inflow - outflow, balance: running });
+  }
+  return rows;
+}
+
 // ---- Budget versioning (locked baseline vs the live, editable budget) ------
 // "Variance vs budget" above always compares to the CURRENT annualBudget,
 // which keeps moving as people edit it. A locked version freezes a snapshot so
@@ -338,6 +378,15 @@ async function loadData(orgId) {
   BUDGET_VERSIONS.length = 0;
   const bvRes = await sb.from("budget_versions").select("*").eq("org_id", CURRENT_ORG_ID).order("locked_at", { ascending: false });
   if (!bvRes.error) bvRes.data.forEach((v) => BUDGET_VERSIONS.push({ id: v.id, name: v.name, lockedAt: v.locked_at, snapshot: v.snapshot, total: Number(v.total) }));
+
+  // Cash flow (Phase 5) — tolerant load; only populated once Fortnox is connected and synced.
+  CASH_POSITION = null;
+  const cpRes = await sb.from("cash_position").select("*").eq("org_id", CURRENT_ORG_ID).maybeSingle();
+  if (!cpRes.error && cpRes.data) CASH_POSITION = { bankBalance: Number(cpRes.data.bank_balance), asOf: cpRes.data.as_of };
+
+  OPEN_INVOICES.length = 0;
+  const oiRes = await sb.from("open_invoices").select("*").eq("org_id", CURRENT_ORG_ID).order("due_date");
+  if (!oiRes.error) oiRes.data.forEach((o) => OPEN_INVOICES.push({ kind: o.kind, amount: Number(o.amount), dueDate: o.due_date, description: o.description, counterparty: o.counterparty }));
 }
 
 // ---- Preview mode ----------------------------------------------------------
@@ -400,6 +449,17 @@ function loadPreviewData() {
 
   BUDGET_VERSIONS.length = 0;
   BUDGET_VERSIONS.push({ id: "bv1", name: "FY2026 Budget", lockedAt: "2026-01-15T09:00:00Z", snapshot: { c1: 28000000, c2: 9000000, c3: 5000000 }, total: 42000000 });
+
+  CASH_POSITION = { bankBalance: 6200000, asOf: "2026-07-07T05:00:00Z" };
+  OPEN_INVOICES.length = 0;
+  OPEN_INVOICES.push(
+    { kind: "customer", amount: 1450000, dueDate: "2026-07-20", description: "#10234", counterparty: "Nordisk Handel AB" },
+    { kind: "customer", amount: 820000, dueDate: "2026-08-05", description: "#10241", counterparty: "Bygg & Co" },
+    { kind: "customer", amount: 630000, dueDate: "2026-08-28", description: "#10255", counterparty: "Skandia Retail" },
+    { kind: "supplier", amount: 540000, dueDate: "2026-07-15", description: "#SI-8821", counterparty: "Komponent AB" },
+    { kind: "supplier", amount: 310000, dueDate: "2026-07-31", description: "#SI-8834", counterparty: "Fastighets AB" },
+    { kind: "supplier", amount: 275000, dueDate: "2026-08-12", description: "#SI-8850", counterparty: "IT-Partner AB" },
+  );
 }
 
 // ---- Writes (granular Supabase updates, scoped by org via RLS) -------------
