@@ -153,6 +153,45 @@ function fyComposition(cc) {
   return { actual, overridden, headcount, oneOff, recurring, total: actual + overridden + headcount + oneOff + recurring };
 }
 
+// ---- Simple allocation (corporate/shared costs → the rest) -----------------
+// "Keep allocation dead simple; default to the unallocated (directly
+// attributable) view — it's usually more useful for decisions." A cost centre
+// marked isShared (rent for the whole building, group IT, etc.) can OPTIONALLY
+// be spread across the other cost centres instead of sitting on its own line.
+// Key: headcount-weighted (FY-average active heads) — the standard, simplest
+// real-world allocation key — falling back to an equal split if nobody has
+// headcount yet. Always opt-in; never the default view.
+
+// FY-average active headcount for one cost centre — the allocation weight.
+function fyAverageHeadcount(cc) {
+  return cc.headcount.reduce((sum, h) => {
+    const from = Math.max(1, h.startMonth), to = Math.min(FY_MONTHS, h.endMonth);
+    const activeMonths = Math.max(0, to - from + 1);
+    return sum + h.count * (activeMonths / FY_MONTHS);
+  }, 0);
+}
+
+function sharedCostsTotal() {
+  return COST_CENTERS.filter((cc) => cc.isShared).reduce((s, cc) => s + fySummary(cc).total, 0);
+}
+
+// This cc's share of the shared-cost pool (0 for shared centres themselves —
+// they're the ones being redistributed, not receiving).
+function allocatedShare(cc) {
+  if (cc.isShared) return 0;
+  const receivers = COST_CENTERS.filter((c) => !c.isShared);
+  const weights = receivers.map(fyAverageHeadcount);
+  const totalWeight = weights.reduce((a, b) => a + b, 0);
+  const weight = totalWeight > 0 ? fyAverageHeadcount(cc) / totalWeight : (receivers.length ? 1 / receivers.length : 0);
+  return sharedCostsTotal() * weight;
+}
+
+// The "after allocation" total for one cost centre — 0 for shared centres
+// (their cost has moved to everyone else), fySummary(cc).total + its share otherwise.
+function fullyLoadedTotal(cc) {
+  return cc.isShared ? 0 : fySummary(cc).total + allocatedShare(cc);
+}
+
 // ---- Budget versioning (locked baseline vs the live, editable budget) ------
 // "Variance vs budget" above always compares to the CURRENT annualBudget,
 // which keeps moving as people edit it. A locked version freezes a snapshot so
@@ -253,6 +292,7 @@ async function loadData(orgId) {
         annualBudget: Number(cc.annual_budget),
         otherMonthly: Number(cc.other_monthly), // legacy — superseded by recurringCosts, kept only so old writes don't error
         note: cc.note || "",
+        isShared: !!cc.is_shared,
         headcount: hcRes.data
           .filter((h) => h.cost_center_id === cc.id)
           .map((h) => ({ id: h.id, roleId: h.role_id, count: h.count, startMonth: h.start_month, endMonth: h.end_month })),
@@ -332,7 +372,7 @@ function loadPreviewData() {
   const mk = (id, name, budget, other, hc, oo, act) => ({
     id, name, annualBudget: budget, otherMonthly: other, note: "", headcount: hc, oneOffs: oo, actualMonthly: act,
     recurringCosts: other ? [{ id: id + "-rec1", label: "Other costs", amount: other, startMonth: 1, endMonth: 24, escalationPct: 0 }] : [],
-    overrides: {},
+    overrides: {}, isShared: false,
   });
 
   COST_CENTERS.push(
@@ -430,7 +470,7 @@ async function dbInsertCostCenter() {
     .insert({ org_id: CURRENT_ORG_ID, name: "New cost center", annual_budget: 0, other_monthly: 0 })
     .select().single();
   if (error) { flagWriteError(error); return null; }
-  return { id: data.id, name: data.name, annualBudget: Number(data.annual_budget), otherMonthly: Number(data.other_monthly), headcount: [], oneOffs: [], recurringCosts: [], overrides: {}, actualMonthly: [] };
+  return { id: data.id, name: data.name, annualBudget: Number(data.annual_budget), otherMonthly: Number(data.other_monthly), isShared: false, headcount: [], oneOffs: [], recurringCosts: [], overrides: {}, actualMonthly: [] };
 }
 
 async function dbDeleteCostCenter(id) {
@@ -443,6 +483,11 @@ async function dbDeleteCostCenter(id) {
 // is run (the note column may not exist yet).
 async function dbSetCostCenterNote(cc) {
   const { error } = await sb.from("cost_centers").update({ note: cc.note || null }).eq("id", cc.id);
+  if (error) flagWriteError(error);
+}
+
+async function dbSetCostCenterShared(cc) {
+  const { error } = await sb.from("cost_centers").update({ is_shared: cc.isShared }).eq("id", cc.id);
   if (error) flagWriteError(error);
 }
 

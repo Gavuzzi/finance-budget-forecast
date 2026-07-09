@@ -1294,7 +1294,16 @@ html[data-theme="light"] .panel {
 
 .cc-delete:hover { border-color: var(--red); color: var(--red); }
 
-.planning-actions { margin-bottom: 4px; }
+.planning-actions { margin-bottom: 4px; display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
+
+.shared-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.82rem; color: var(--text-dim); cursor: pointer; user-select: none; white-space: nowrap;
+}
+.shared-toggle input { accent-color: var(--accent); cursor: pointer; }
+.shared-note { color: var(--accent-soft); font-size: 0.82rem; margin: -6px 0 12px; font-style: italic; }
+.alloc-out { color: var(--text-dim); font-style: italic; }
+.alloc-plus { color: var(--text-dim); }
 
 .add-cc-btn {
   background: var(--accent);

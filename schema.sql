@@ -149,6 +149,7 @@ alter table organizations add column if not exists fy_start_year  smallint not n
 alter table organizations add column if not exists close_month_manual boolean not null default false; -- user override of "booked through"
 alter table cost_centers add column if not exists source text not null default 'manual';  -- fortnox|manual (fortnox-sourced lines refresh on sync)
 alter table cost_centers add column if not exists state  text not null default 'linked';  -- planned|linked (plan-ahead lifecycle)
+alter table cost_centers add column if not exists is_shared boolean not null default false; -- corporate/overhead cost centre — optionally allocated to the others, never on by default
 alter table assumptions add column if not exists revenue_budget numeric not null default 0; -- simple annual revenue target — no driver engine, just a number to compare actuals against
 
 -- Re-forecast overrides: an EXPLICIT, per-line, user-applied replacement of the

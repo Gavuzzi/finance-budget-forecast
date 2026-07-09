@@ -1,3 +1,32 @@
+// "Fully-loaded" view is OFF by default — "keep allocation dead simple;
+// default to the unallocated (directly attributable) view" (researched
+// principle). It never changes stored data, only how the FY summary reads.
+let fullyLoadedView = false;
+
+function summaryHtml(cc, i) {
+  const fy = fySummary(cc);
+  const cls = varianceClass(fy.variance, fy.budget);
+  const pct = fy.budget ? (fy.variance / fy.budget) * 100 : 0;
+  if (!fullyLoadedView) {
+    return `
+      <span>FY2026 total: <strong>${fmtMkr(fy.total)}</strong></span>
+      <span class="variance ${cls}">vs budget: <strong>${fmtMkrSigned(fy.variance)} (${pct > 0 ? "+" : ""}${pct.toFixed(1)}%)</strong></span>
+      <button class="bridge-toggle" data-bridge="${i}" type="button">Why? ▾</button>
+    `;
+  }
+  if (cc.isShared) {
+    return `<span>FY2026 total: <strong>${fmtMkr(fy.total)}</strong></span><span class="alloc-out">→ allocated to the other cost centres</span>`;
+  }
+  const loaded = fullyLoadedTotal(cc);
+  const share = allocatedShare(cc);
+  return `
+    <span>Direct: <strong>${fmtMkr(fy.total)}</strong></span>
+    <span class="alloc-plus">+ ${fmtMkr(share)} allocated</span>
+    <span>= Fully-loaded: <strong>${fmtMkr(loaded)}</strong></span>
+    <button class="bridge-toggle" data-bridge="${i}" type="button">Why? ▾</button>
+  `;
+}
+
 function monthOptionsHtml(selected) {
   let html = "";
   for (let m = 1; m <= TIMELINE_LENGTH; m++) {
@@ -50,9 +79,6 @@ function renderRecurringRow(r, ri) {
 
 function renderCcBlock(i) {
   const cc = COST_CENTERS[i];
-  const fy = fySummary(cc);
-  const cls = varianceClass(fy.variance, fy.budget);
-  const pct = fy.budget ? (fy.variance / fy.budget) * 100 : 0;
 
   const headcountRows = cc.headcount.map(renderHeadcountRow).join("");
   const oneOffRows = cc.oneOffs.map(renderOneOffRow).join("");
@@ -66,10 +92,15 @@ function renderCcBlock(i) {
           <label class="budget-field">Annual budget (FY2026)
             <input type="number" data-ccfield="annualBudget" value="${cc.annualBudget}" step="10000">
           </label>
+          <label class="shared-toggle" title="Shared/corporate costs (rent for the whole building, group IT…) can be optionally allocated to the other cost centres instead of sitting on their own line.">
+            <input type="checkbox" data-ccfield="isShared" ${cc.isShared ? "checked" : ""}>
+            Shared / corporate
+          </label>
           <button class="cc-delete" data-deletecc="${i}" type="button" title="Delete this cost center">Delete</button>
         </div>
       </div>
       <p class="cc-actual">Actuals booked through <strong>${monthLabel(CLOSE_MONTH)}</strong> — months after that are forecast.</p>
+      ${cc.isShared ? `<p class="shared-note">Shared cost centre — with <strong>Fully-loaded view</strong> on, its total is allocated to the others below (by headcount) instead of shown here.</p>` : ""}
 
       <div class="driver-table-wrap">
         <table class="driver-table">
@@ -122,11 +153,7 @@ function renderCcBlock(i) {
         </label>
       </div>
 
-      <div class="cc-summary">
-        <span>FY2026 total: <strong>${fmtMkr(fy.total)}</strong></span>
-        <span class="variance ${cls}">vs budget: <strong>${fmtMkrSigned(fy.variance)} (${pct > 0 ? "+" : ""}${pct.toFixed(1)}%)</strong></span>
-        <button class="bridge-toggle" data-bridge="${i}" type="button">Why? ▾</button>
-      </div>
+      <div class="cc-summary">${summaryHtml(cc, i)}</div>
       <div class="cc-bridge" data-bridgepanel="${i}" hidden>${bridgeHtml(cc)}</div>
     </div>
   `;
@@ -178,15 +205,7 @@ function refreshCcComputed(ccIndex) {
     row.querySelector(".rate-cell").textContent = fmtSek(monthlyCostForRole(h.roleId));
   });
 
-  const fy = fySummary(cc);
-  const cls = varianceClass(fy.variance, fy.budget);
-  const pct = fy.budget ? (fy.variance / fy.budget) * 100 : 0;
-
-  block.querySelector(".cc-summary").innerHTML = `
-    <span>FY2026 total: <strong>${fmtMkr(fy.total)}</strong></span>
-    <span class="variance ${cls}">vs budget: <strong>${fmtMkrSigned(fy.variance)} (${pct > 0 ? "+" : ""}${pct.toFixed(1)}%)</strong></span>
-    <button class="bridge-toggle" data-bridge="${ccIndex}" type="button">Why? ▾</button>
-  `;
+  block.querySelector(".cc-summary").innerHTML = summaryHtml(cc, ccIndex);
 
   // If the bridge breakdown is currently open, keep it live too — it changes
   // with the same edits that change the FY total.
@@ -197,6 +216,20 @@ function refreshCcComputed(ccIndex) {
 function initPlanningGrid() {
   buildPlanningGrid();
   const ccBlocks = document.getElementById("ccBlocks");
+
+  document.getElementById("allocToggle").addEventListener("change", (e) => {
+    fullyLoadedView = e.target.checked;
+    buildPlanningGrid();
+  });
+
+  // Dev hook: #alloctest marks the first cost centre Shared and switches to
+  // fully-loaded view, for headless verification.
+  if (location.hash === "#alloctest" && COST_CENTERS.length > 1) {
+    COST_CENTERS[0].isShared = true;
+    fullyLoadedView = true;
+    document.getElementById("allocToggle").checked = true;
+    buildPlanningGrid();
+  }
 
   // Dev hook: #bridgetest auto-opens the first cost centre's bridge panel, for headless verification.
   if (location.hash === "#bridgetest") {
@@ -250,6 +283,10 @@ function initPlanningGrid() {
       if (field === "note") {
         cc.note = target.value;
         dbSetCostCenterNote(cc);
+      } else if (field === "isShared") {
+        cc.isShared = target.checked;
+        dbSetCostCenterShared(cc);
+        buildPlanningGrid(); // affects every block's allocation math + the shared-centre note
       } else {
         cc[field] = field === "name" ? target.value : Number(target.value) || 0;
         if (field !== "name") refreshCcComputed(ccIndex);
