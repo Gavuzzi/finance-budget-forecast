@@ -6,6 +6,13 @@ const SUPABASE_URL = "https://cgqfiugjsiwlefhguqnc.supabase.co";
 const SUPABASE_KEY = "sb_publishable_E8Ub9-ae-m9HPcS0EqTLPQ_KAklcqN9";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// Escape any user- or external-origin string before interpolating it into an
+// innerHTML template. Numbers and our own formatted output never need this.
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
 // If the session ends (token expired, or signed out in another tab), drop
 // cleanly back to the login screen instead of leaving a half-broken app.
 sb.auth.onAuthStateChange((event) => {
@@ -88,7 +95,7 @@ function showLoadError(message) {
   document.body.innerHTML =
     `<div class="load-error">
       <h2>Couldn't load your data</h2>
-      <p>${message}</p>
+      <p>${escapeHtml(message)}</p>
       <p class="load-error-hint">${hint}</p>
       <button type="button" onclick="location.reload()">Try again</button>
     </div>`;
@@ -109,6 +116,7 @@ function renderLogin(onSuccess) {
           <label>Email <input type="email" id="loginEmail" required autocomplete="username"></label>
           <label>Password <input type="password" id="loginPassword" required autocomplete="current-password"></label>
           <button type="submit">Sign in</button>
+          <button type="button" class="login-forgot" id="forgotBtn">Forgot password?</button>
           <p class="login-error" id="loginError"></p>
         </form>
       </details>
@@ -135,6 +143,27 @@ function renderLogin(onSuccess) {
     }
     overlay.remove();
     onSuccess();
+  });
+
+  document.getElementById("forgotBtn").addEventListener("click", async () => {
+    const email = document.getElementById("loginEmail").value.trim();
+    const errEl = document.getElementById("loginError");
+    errEl.classList.remove("error");
+    if (!email) {
+      errEl.textContent = "Enter your email first, then click “Forgot password?”";
+      errEl.classList.add("error");
+      return;
+    }
+    errEl.textContent = "Sending reset link…";
+    const { error } = await sb.auth.resetPasswordForEmail(email, {
+      redirectTo: location.origin + location.pathname,
+    });
+    if (error) {
+      errEl.textContent = error.message;
+      errEl.classList.add("error");
+      return;
+    }
+    errEl.textContent = "Reset link sent — check your email.";
   });
 }
 

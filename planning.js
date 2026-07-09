@@ -36,7 +36,7 @@ function monthOptionsHtml(selected) {
 }
 
 function roleOptionsHtml(selectedRoleId) {
-  return ROLE_CATALOG.map((r) => `<option value="${r.id}" ${r.id === selectedRoleId ? "selected" : ""}>${r.label}</option>`).join("");
+  return ROLE_CATALOG.map((r) => `<option value="${r.id}" ${r.id === selectedRoleId ? "selected" : ""}>${escapeHtml(r.label)}</option>`).join("");
 }
 
 function renderHeadcountRow(h, hc) {
@@ -56,7 +56,7 @@ function renderHeadcountRow(h, hc) {
 function renderOneOffRow(o, oi) {
   return `
     <tr data-oneoff="${oi}">
-      <td><input type="text" data-ofield="label" value="${o.label}"></td>
+      <td><input type="text" data-ofield="label" value="${escapeHtml(o.label)}"></td>
       <td><input type="number" data-ofield="amount" value="${o.amount}" step="10000"></td>
       <td><select data-ofield="month">${monthOptionsHtml(o.month)}</select></td>
       <td><button class="row-remove" data-removeoneoff="${oi}" title="Remove">✕</button></td>
@@ -67,7 +67,7 @@ function renderOneOffRow(o, oi) {
 function renderRecurringRow(r, ri) {
   return `
     <tr data-recurring="${ri}">
-      <td><input type="text" data-rfield="label" value="${r.label}"></td>
+      <td><input type="text" data-rfield="label" value="${escapeHtml(r.label)}"></td>
       <td><input type="number" data-rfield="amount" value="${r.amount}" step="1000"></td>
       <td><select data-rfield="startMonth">${monthOptionsHtml(r.startMonth)}</select></td>
       <td><select data-rfield="endMonth">${monthOptionsHtml(r.endMonth)}</select></td>
@@ -87,7 +87,7 @@ function renderCcBlock(i) {
   return `
     <div class="cc-block" data-cc="${i}">
       <div class="cc-header">
-        <input class="cc-name-input" data-ccfield="name" value="${cc.name}" aria-label="Reporting line name">
+        <input class="cc-name-input" data-ccfield="name" value="${escapeHtml(cc.name)}" aria-label="Reporting line name">
         <div class="cc-header-right">
           <label class="budget-field">Annual budget (FY2026)
             <input type="number" data-ccfield="annualBudget" value="${cc.annualBudget}" step="10000">
@@ -149,7 +149,7 @@ function renderCcBlock(i) {
 
       <div class="cc-note-row">
         <label>Comment / variance note <span class="cc-note-hint">— shows on the Overview &amp; board pack</span>
-          <input type="text" data-ccfield="note" value="${cc.note || ""}" placeholder="e.g. DevOps hire delayed to Q4 — under budget">
+          <input type="text" data-ccfield="note" value="${escapeHtml(cc.note || "")}" placeholder="e.g. DevOps hire delayed to Q4 — under budget">
         </label>
       </div>
 

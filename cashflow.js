@@ -136,8 +136,8 @@ function renderOpenInvoices() {
     html += `<tr>
       <td class="mt-name">${fmtDate(inv.dueDate)}</td>
       <td class="mt-name">${inv.kind === "customer" ? "AR (in)" : "AP (out)"}</td>
-      <td class="mt-name">${inv.counterparty || "—"}</td>
-      <td class="mt-name">${inv.description || ""}</td>
+      <td class="mt-name">${escapeHtml(inv.counterparty || "—")}</td>
+      <td class="mt-name">${escapeHtml(inv.description || "")}</td>
       <td class="num">${fmtSek(inv.amount)}</td>
     </tr>`;
   });

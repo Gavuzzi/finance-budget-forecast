@@ -83,7 +83,7 @@ function renderMonthlyGrid() {
   // One row per reporting line
   COST_CENTERS.forEach((cc) => {
     const smoothed = smoothActuals ? smoothedActual(cc) : null;
-    html += `<tr><td class="mt-name">${cc.name}</td>`;
+    html += `<tr><td class="mt-name">${escapeHtml(cc.name)}</td>`;
     months.forEach((m) => {
       const { value, isActual, isOverridden } = monthAmount(cc, m);
       // Display-only substitution — the drill-down (cc.id/m) still points at
@@ -209,7 +209,7 @@ async function showDrill(ccId, month) {
   el.innerHTML = `
     <div class="drill-card">
       <div class="drill-head">
-        <h3>${cc ? cc.name : ""} — ${monthLabel(month)}</h3>
+        <h3>${cc ? escapeHtml(cc.name) : ""} — ${monthLabel(month)}</h3>
         <button class="drill-close" type="button">✕</button>
       </div>
       <p class="drill-sub">Booked actuals by account — straight from your ledger.</p>
@@ -217,7 +217,7 @@ async function showDrill(ccId, month) {
       <div class="drill-rows">
         ${rows.map((r) => `
           <div class="drill-row">
-            <span><span class="fn-cc-code">${r.account}</span> ${r.account_name || ""}</span>
+            <span><span class="fn-cc-code">${r.account}</span> ${escapeHtml(r.account_name || "")}</span>
             <span class="drill-n">${r.tx_count} tx</span>
             <span class="num">${fmtSek(Number(r.amount))}</span>
           </div>`).join("")}
@@ -256,7 +256,7 @@ function initImport() {
     }
     parsed = parseActualsCsv(textArea.value);
     let msg = `<strong>${parsed.rows.length}</strong> value(s) ready to import.`;
-    if (parsed.unmatched.length) msg += ` <span class="import-warn">Unmatched reporting lines (skipped): ${parsed.unmatched.join(", ")}.</span>`;
+    if (parsed.unmatched.length) msg += ` <span class="import-warn">Unmatched reporting lines (skipped): ${parsed.unmatched.map(escapeHtml).join(", ")}.</span>`;
     if (parsed.skipped) msg += ` ${parsed.skipped} row(s) skipped.`;
     preview.innerHTML = msg;
     doBtn.disabled = parsed.rows.length === 0;
@@ -299,7 +299,7 @@ function initMonthly() {
   // Dev hooks for headless verification.
   if (location.hash === "#drilltest" && COST_CENTERS.length) showDrill(COST_CENTERS[0].id, 3);
   if (location.hash === "#csvtest") {
-    document.getElementById("monthlyGrid").innerHTML = `<pre style="font-size:11px">${buildExportCsv().replace(/</g, "&lt;")}</pre>`;
+    document.getElementById("monthlyGrid").innerHTML = `<pre style="font-size:11px">${escapeHtml(buildExportCsv())}</pre>`;
   }
   if (location.hash === "#smoothtest") {
     document.getElementById("smoothToggle").checked = true;

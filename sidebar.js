@@ -58,8 +58,8 @@ function sidebarHtml() {
   return `
     <div class="sidebar-brand">
       ${USER_ORGS.length > 1
-        ? `<select class="org-switcher" id="orgSwitcher">${USER_ORGS.map((o) => `<option value="${o.id}" ${o.id === CURRENT_ORG_ID ? "selected" : ""}>${o.name}</option>`).join("")}</select>`
-        : `<span class="sb-name">${(USER_ORGS[0] && USER_ORGS[0].name) || "—"}</span>`}
+        ? `<select class="org-switcher" id="orgSwitcher">${USER_ORGS.map((o) => `<option value="${o.id}" ${o.id === CURRENT_ORG_ID ? "selected" : ""}>${escapeHtml(o.name)}</option>`).join("")}</select>`
+        : `<span class="sb-name">${escapeHtml((USER_ORGS[0] && USER_ORGS[0].name) || "—")}</span>`}
       <span class="sb-sub">FP&amp;A Planning</span>
     </div>
     <button class="new-org-btn" id="newOrgBtn" type="button">+ New organization</button>

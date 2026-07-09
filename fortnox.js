@@ -187,10 +187,10 @@ function disconnectedHtml() {
 
 function connectedHtml(status) {
   const last = status.last_synced_at ? new Date(status.last_synced_at).toLocaleString("sv-SE") : "never";
-  const err = status.last_sync_error ? `<p class="integ-warn">Last sync error: ${status.last_sync_error}</p>` : "";
+  const err = status.last_sync_error ? `<p class="integ-warn">Last sync error: ${escapeHtml(status.last_sync_error)}</p>` : "";
   return `
     <div class="integration-card connected">
-      <div class="integ-head"><span class="integ-dot"></span> Connected to Fortnox${status.tenant_name ? " · " + status.tenant_name : ""}</div>
+      <div class="integ-head"><span class="integ-dot"></span> Connected to Fortnox${status.tenant_name ? " · " + escapeHtml(status.tenant_name) : ""}</div>
       <p class="integ-sub" id="fnLastSynced">Last synced: ${last}</p>
       <div class="integ-actions">
         <button class="integ-btn" id="fnSyncBtn" type="button">Sync now</button>
@@ -206,12 +206,12 @@ function connectedHtml(status) {
 // Shared row markup for a mappable Fortnox object (cost centre or project):
 // name + code + cost from the last sync, with one-click Import/Link.
 function codeRowsHtml(items, dimension) {
-  const options = COST_CENTERS.map((c) => `<option value="${c.id}">${c.name}</option>`).join("");
+  const options = COST_CENTERS.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
   return `
     <div class="fn-cc-rows">
       ${items.map((it) => `
-        <div class="fn-cc-row" data-code="${it.code}" data-dim="${dimension}">
-          <span class="fn-cc-name">${it.name} <span class="fn-cc-code">${it.code}</span></span>
+        <div class="fn-cc-row" data-code="${escapeHtml(it.code)}" data-dim="${dimension}">
+          <span class="fn-cc-name">${escapeHtml(it.name)} <span class="fn-cc-code">${escapeHtml(it.code)}</span></span>
           <span class="fn-cc-cost num">${fmtKr(it.cost)}</span>
           ${it.mapped
             ? `<span class="fn-cc-mapped">✓ mapped</span>`
@@ -273,12 +273,12 @@ async function renderAccountRanges(host) {
   const ranges = await loadAccountRanges();
   const el = host.querySelector("#fnAcctRanges");
   if (!el) return;
-  const options = COST_CENTERS.map((c) => `<option value="${c.id}">${c.name}</option>`).join("");
+  const options = COST_CENTERS.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
   el.innerHTML = `
     <p class="integ-map-hint"><strong>Account ranges</strong> — fallback for bookings without a cost-centre tag: any BAS account in a range lands on the chosen line. (E.g. 4000–4999 → Production.)</p>
     ${ranges.map((r) => `
       <div class="fn-cc-row">
-        <span class="fn-cc-name">${r.account_from}–${r.account_to} → ${(COST_CENTERS.find((c) => c.id === r.reporting_line_id) || {}).name || "?"}</span>
+        <span class="fn-cc-name">${r.account_from}–${r.account_to} → ${escapeHtml((COST_CENTERS.find((c) => c.id === r.reporting_line_id) || {}).name || "?")}</span>
         <span></span>
         <button class="integ-link" data-del="${r.id}" type="button">Remove</button>
       </div>`).join("")}
@@ -325,7 +325,7 @@ async function renderExclusions(host) {
     <p class="integ-map-hint"><strong>Sync exclusions</strong> — filter out noise: a correction/adjustment voucher series, or an account used for opening balances. Excluded rows are ignored entirely, everywhere (not just left unmapped).</p>
     ${rows.map((r) => `
       <div class="fn-cc-row">
-        <span class="fn-cc-name">${r.kind === "series" ? "Voucher series" : "Account"} <span class="fn-cc-code">${r.value}</span></span>
+        <span class="fn-cc-name">${r.kind === "series" ? "Voucher series" : "Account"} <span class="fn-cc-code">${escapeHtml(r.value)}</span></span>
         <span></span>
         <button class="integ-link" data-delexcl="${r.id}" type="button">Remove</button>
       </div>`).join("")}

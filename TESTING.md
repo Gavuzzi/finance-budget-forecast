@@ -1,7 +1,40 @@
+# Security review (2026-07-09)
+
+**Adversarial RLS audit — PASS, no findings.** Queried `pg_class.relrowsecurity` for every
+table in the public schema (21 tables): all have RLS enabled, none forced-but-bypassable.
+Queried `pg_policies` for every policy: every single one is scoped by `is_org_member(org_id)`
+(read) or `can_edit_org(org_id)` (write) — no policy uses an unscoped `true` condition, and
+no tenant table is missing a policy. `memberships`/`organizations` (the multi-tenant boundary
+itself) allow no client INSERT — org creation only happens via the `create_organization()`
+SECURITY DEFINER RPC, closing the "add myself to any org" hole by construction. `integrations`
+(OAuth tokens) has RLS enabled with **zero** policies — Postgres defaults to deny-all, so no
+client role (anon or authenticated) can read it under any circumstance; only the Edge Function's
+service_role key (which bypasses RLS entirely) touches it. Confirmed the isolation is server-side,
+not client-trust-based: `is_org_member()`/`can_edit_org()` check the real `auth.uid()` against
+the `memberships` table — a user editing `CURRENT_ORG_ID` in devtools to another org's UUID gets
+blocked at the database, not just hidden in the UI. Not tested: an actual live cross-org query
+attempt with two real user sessions (would need a second real login) — the policy-text audit is
+airtight, but a hands-on confirmation is a cheap thing to do once you have two test accounts.
+
+**XSS pass — fixed.** Every `innerHTML` template that interpolated a user-typed or
+Fortnox-sourced string (reporting-line names, notes, role labels, scenario/budget-version
+names, org names, invoice counterparty/description, synced account names, CSV-import
+unmatched names, sync-exclusion values, error messages) now runs through `escapeHtml()`
+(lib.js). Native `confirm()`/`prompt()` dialogs and `showToast()` (uses `textContent`) were
+already safe and left as-is. Verify: see the item below.
+
+**Password reset — added.** "Forgot password?" link on the login screen calls
+`sb.auth.resetPasswordForEmail`. Code-verified (renders, wires up, no console errors);
+the actual email send/click-through needs a real inbox — added as a manual check below.
+
+---
+
 # Pending manual tests (live app)
 
 Collected while you're away — batch these whenever. (App: app.html, signed in, hard-refresh first.)
 
+- [ ] **Password reset (new).** Log out (or open an incognito window to the live URL, don't sign in). On the login card, click **"Forgot password?"** without typing an email → should show "Enter your email first…". Type your real email, click it again → should show "Reset link sent — check your email." → check your inbox, click the link, confirm it takes you to a working reset flow.
+- [ ] **Cross-org RLS (new, needs a second real account — optional but cheap once you have one).** The policy-text audit says isolation is airtight (see "Security review" above), but a hands-on check is worth 2 minutes once you have a second test login: sign in as a second user with **no** membership in your main org, confirm they see an empty/no-org state, and that no request for your org's data succeeds.
 - [ ] **Cash Flow (Phase 5, now complete).** New **"Cash Flow"** nav item. Bank balance mechanism (`#UB` parsing) is already fault-injection-verified live — real, non-zero, correctly-signed number. Two mechanisms are NOT yet verified against real data (your Fortnox sandbox has neither, and I deliberately didn't fabricate either via the API to keep the read-only posture): (1) open invoices — whenever you have a real unpaid customer/supplier invoice, **Monthly → Sync now**, then check **Cash Flow** — it should show up in the "Open Invoices" table with the right due date/amount/counterparty, and shift the projection table's Inflow/Outflow for that month. (2) VAT/payroll tax — whenever your books have real postings on the VAT (default 2610–2659) or payroll-tax (default 2710–2739) account ranges, re-sync, then check the "Tax/VAT (est.)" column on Cash Flow — it should show a non-zero amount landing on the correct Skatteverket due-date (12th of the month, 17th in Jan/Aug). If the numbers look off, check **Assumptions → Tax & VAT Settings** — your chart of accounts or VAT reporting frequency (monthly/quarterly/annual) may differ from the defaults.
 - [ ] **Presets (new, needs a fresh org — can't fault-inject this one via SQL since it only shows on a genuinely empty org).** Sidebar → **+ New organization** → give it any name → you'll land on an empty org showing **4 preset cards** (Manufacturer / Consultancy / Retail / Small service) instead of the old single "load example data" link. Click one → confirm it seeds realistic cost centres + headcount + budget for that shape. (Delete the test org after, or keep it — up to you.)
 - [ ] **Noise filters (new).** Monthly → Cost-centre mapping → new **"Sync exclusions"** section at the bottom. Add an exclusion (e.g. a voucher series or account you know is a correction/opening-balance) → re-sync → confirm the P&L moved as expected. Already fault-injection-verified on real data by me; this is just a glance.

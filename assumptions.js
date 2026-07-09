@@ -15,7 +15,7 @@ function roleBreakdown(role) {
 function renderRoleRow(role) {
   return `
     <tr data-role="${role.id}">
-      <td><input type="text" data-rolefield="label" value="${role.label}"></td>
+      <td><input type="text" data-rolefield="label" value="${escapeHtml(role.label)}"></td>
       <td><input type="number" data-rolefield="baseSalary" value="${role.baseSalary}" step="500"></td>
       <td class="num computed rate-cell" title="Click to see how this is calculated">${fmtSek(monthlyCostForRole(role.id))}</td>
       <td><button class="row-remove" data-removerole="${role.id}" title="Remove role">✕</button></td>

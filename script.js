@@ -100,7 +100,7 @@ function renderTable() {
 
       html += `
         <div class="budget-row">
-          <span class="cc-name">${cc.name}${cc.note ? `<span class="cc-note">${cc.note}</span>` : ""}</span>
+          <span class="cc-name">${escapeHtml(cc.name)}${cc.note ? `<span class="cc-note">${escapeHtml(cc.note)}</span>` : ""}</span>
           <span class="num" data-label="Budget">${fmtMkr(fy.budget)}</span>
           <span class="num" data-label="FY2026 Total">${fmtMkr(fy.total)}</span>
           <span class="variance-cell ${cls}" data-label="Variance">
@@ -138,7 +138,7 @@ function renderTable() {
       const r = rollingSummary(cc);
       html += `
         <div class="budget-row rolling">
-          <span class="cc-name">${cc.name}${cc.note ? `<span class="cc-note">${cc.note}</span>` : ""}</span>
+          <span class="cc-name">${escapeHtml(cc.name)}${cc.note ? `<span class="cc-note">${escapeHtml(cc.note)}</span>` : ""}</span>
           <span class="num" data-label="Rolling 12 Total">${fmtMkr(r.total)}</span>
         </div>
       `;
@@ -285,7 +285,7 @@ function renderRoleBreakdown() {
   let html = `<div class="rb-row rb-head"><span>Role</span><span class="num">Headcount</span><span class="num">FY people cost</span><span class="num">Share</span></div>`;
   rows.forEach((r) => {
     const pct = total ? (r.cost / total) * 100 : 0;
-    html += `<div class="rb-row"><span>${r.label}</span><span class="num">${r.count}</span><span class="num">${fmtMkr(r.cost)}</span><span class="num">${pct.toFixed(0)}%</span></div>`;
+    html += `<div class="rb-row"><span>${escapeHtml(r.label)}</span><span class="num">${r.count}</span><span class="num">${fmtMkr(r.cost)}</span><span class="num">${pct.toFixed(0)}%</span></div>`;
   });
   html += `<div class="rb-row rb-total"><span>Total people cost</span><span class="num"></span><span class="num">${fmtMkr(total)}</span><span class="num">100%</span></div>`;
   el.innerHTML = html;
@@ -301,7 +301,7 @@ function renderScenarioDetail(s, currentByName) {
     const cls = d > 0 ? "over" : d < 0 ? "under" : "neutral";
     rows += `
       <div class="scen-detail-row">
-        <span>${name}</span>
+        <span>${escapeHtml(name)}</span>
         <span class="num">${scen != null ? fmtMkr(scen) : "—"}</span>
         <span class="num">${cur != null ? fmtMkr(cur) : "—"}</span>
         <span class="num ${cls}">${scen != null && cur != null ? fmtMkrSigned(d) : ""}</span>
@@ -332,7 +332,7 @@ function renderScenarios() {
       const cls = delta > 0 ? "over" : delta < 0 ? "under" : "neutral";
       html += `
         <div class="scenario-row scenario-toggle" data-scen="${s.id}">
-          <span>${s.name} <span class="scenario-caret">▾</span></span>
+          <span>${escapeHtml(s.name)} <span class="scenario-caret">▾</span></span>
           <span class="num">${fmtMkr(s.fyTotal)}</span>
           <span class="num ${cls}">${fmtMkrSigned(delta)}</span>
           <button class="row-remove" data-delscen="${s.id}" title="Delete scenario">✕</button>
@@ -433,7 +433,7 @@ function renderBudgetVersion() {
       <div class="bv-row">
         <div>
           <h2 class="bv-title">Budget version <span class="pnl-src">— locked ${dateStr}</span></h2>
-          <p class="table-hint"><strong>${v.name}</strong>: ${fmtMkr(v.total)} approved. ${driftHtml}</p>
+          <p class="table-hint"><strong>${escapeHtml(v.name)}</strong>: ${fmtMkr(v.total)} approved. ${driftHtml}</p>
         </div>
         ${lockBtn}
       </div>`;
@@ -505,7 +505,7 @@ function renderSignals() {
     signals.push({
       abs: Math.abs(fy.variance),
       over: fy.variance > 0,
-      html: `<strong>${cc.name}</strong> is tracking <strong>${fmtMkrSigned(fy.variance)}</strong> ${fy.variance > 0 ? "over" : "under"} budget (${pct > 0 ? "+" : ""}${pct.toFixed(1)}%)${cc.note ? ` <span class="signal-note">— ${cc.note}</span>` : ""}`,
+      html: `<strong>${escapeHtml(cc.name)}</strong> is tracking <strong>${fmtMkrSigned(fy.variance)}</strong> ${fy.variance > 0 ? "over" : "under"} budget (${pct > 0 ? "+" : ""}${pct.toFixed(1)}%)${cc.note ? ` <span class="signal-note">— ${escapeHtml(cc.note)}</span>` : ""}`,
     });
   });
 
@@ -554,7 +554,7 @@ function renderReforecast() {
   list.innerHTML = items.map((it) => `
     <div class="rf-row" data-cc="${it.cc.id}">
       <div>
-        <strong>${it.cc.name}</strong>
+        <strong>${escapeHtml(it.cc.name)}</strong>
         ${it.hasOverride
           ? `<span class="rf-badge">using run-rate override (${fmtSek(it.runRate)}/mo) for its remaining months</span>`
           : `<span class="rf-detail">recent actuals run ~${fmtSek(it.runRate)}/mo vs the plan's ${fmtSek(it.planForecast)}/mo (${it.pct.toFixed(0)}% off)</span>`}

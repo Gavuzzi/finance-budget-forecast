@@ -64,6 +64,17 @@
 
 .login-card button:hover { background: var(--accent-soft); }
 
+.login-card button.login-forgot {
+  margin-top: 0;
+  background: none;
+  color: var(--text-dim);
+  font-weight: 500;
+  font-size: 0.8rem;
+  padding: 2px;
+  text-align: center;
+}
+.login-card button.login-forgot:hover { background: none; color: var(--accent-soft); text-decoration: underline; }
+
 .login-error { font-size: 0.82rem; color: var(--text-dim); min-height: 1em; }
 .login-error.error { color: var(--red); }
 
