@@ -59,7 +59,7 @@ function renderCashStats() {
       <span class="stat-sub ${cls}">in ${CASHFLOW_MONTHS_AHEAD} months, incl. estimates</span>
     </div>
     <div class="stat-card highlight">
-      <span class="stat-label" title="Estimated from the driver forecast (salaries, recurring, one-offs) and a flat monthly revenue estimate — not a hard figure">Runway</span>
+      <span class="stat-label" title="Estimated from the driver forecast (salaries, recurring, one-offs) and the monthly revenue plan — not a hard figure">Runway</span>
       <span class="stat-value ${runwayCls}">${runwayLabel}</span>
       <span class="stat-sub ${runwayCls}">${runwaySub}</span>
     </div>
@@ -109,7 +109,7 @@ function renderCashTable() {
     <th class="mt-name">Month</th>
     <th class="num" title="Hard figures from unpaid Fortnox invoices">Inflow</th>
     <th class="num" title="Hard figures from unpaid Fortnox invoices">Outflow</th>
-    <th class="num" title="Estimated from the driver forecast (salaries, recurring costs, one-offs) netted against a flat monthly revenue estimate — not a hard Fortnox figure">Operating (est.)</th>
+    <th class="num" title="Estimated from the driver forecast (salaries, recurring costs, one-offs) netted against the monthly revenue plan (or a flat target ÷ 12 when no plan is set) — not a hard Fortnox figure">Operating (est.)</th>
     <th class="num" title="Estimated from tracked VAT/payroll-tax account balances + Skatteverket deadline rules — not a hard Fortnox figure">Tax/VAT (est.)</th>
     <th class="num">Net</th>
     <th class="num mt-summary">Running Balance</th>

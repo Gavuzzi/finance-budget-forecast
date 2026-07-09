@@ -44,6 +44,7 @@ const ORG_STORAGE_KEY = "almgren-current-org";
 const ROLE_CATALOG = [];
 const ASSUMPTIONS = {
   employerContributionPct: 31.42, equipmentMonthly: 1200, otherOverheadPct: 4, revenueBudget: 0,
+  revenuePlan: null, // optional [12] monthly SEK profile; null = flat revenueBudget/12
   vatFrequency: "quarterly", vatAccountFrom: 2610, vatAccountTo: 2659, payrollAccountFrom: 2710, payrollAccountTo: 2739,
 };
 const COST_CENTERS = [];
@@ -250,6 +251,27 @@ function taxDueDate(kind, fyMonth) {
   return skatteverketDueDate(year, month, 2);
 }
 
+// ---- Revenue plan (the forecast P&L's revenue side) -------------------------
+// An optional 12-month profile typed on Assumptions. When absent (or cleared
+// to all zeros) the engine falls back to a flat revenueBudget/12 — exactly the
+// pre-plan behavior, so orgs that never touch it see no change.
+
+function revenuePlanForMonth(m) {
+  const plan = ASSUMPTIONS.revenuePlan;
+  if (Array.isArray(plan) && plan.length === 12 && plan.some((v) => v > 0)) {
+    // Months 13-24 reuse the same profile — seasonality carries into next FY
+    // until a dedicated plan for it exists.
+    return Number(plan[(m - 1) % 12]) || 0;
+  }
+  return (ASSUMPTIONS.revenueBudget || 0) / 12;
+}
+
+function revenuePlanFyTotal() {
+  let total = 0;
+  for (let m = 1; m <= FY_MONTHS; m++) total += revenuePlanForMonth(m);
+  return total;
+}
+
 // Runway cap: how far ahead we'll walk looking for a zero-crossing before
 // giving up and calling it cash-positive. Matches the driver forecast's own
 // horizon — there's no data to project operating costs beyond it anyway.
@@ -284,13 +306,10 @@ function cashFlowProjection(monthsAhead = 6) {
   // Estimated operating cash flow: the SAME driver forecast that powers
   // Overview/Monthly (salaries, recurring costs, one-offs — the biggest,
   // most predictable outflow, and previously missing here entirely) netted
-  // against a flat monthly revenue estimate from the annual target. Kept as
-  // its own signed bucket, exactly like tax, so a hard invoice figure is
-  // never silently blended with a model estimate. The revenue side is
-  // deliberately crude (annual target / 12) — a real monthly revenue plan
-  // is a separate, later pass.
-  const estMonthlyRevenue = (ASSUMPTIONS.revenueBudget || 0) / 12;
-  const estOperating = (m) => estMonthlyRevenue - (m >= 1 && m <= TIMELINE_LENGTH ? companyMonthAmount(m) : 0);
+  // against the monthly revenue plan (or a flat annual-target/12 when no
+  // plan is set). Kept as its own signed bucket, exactly like tax, so a
+  // hard invoice figure is never silently blended with a model estimate.
+  const estOperating = (m) => revenuePlanForMonth(m) - (m >= 1 && m <= TIMELINE_LENGTH ? companyMonthAmount(m) : 0);
 
   let running = CASH_POSITION.bankBalance;
   const rows = [];
@@ -386,6 +405,11 @@ async function loadData(orgId) {
     equipmentMonthly: Number(assRes.data.equipment_monthly),
     otherOverheadPct: Number(assRes.data.other_overhead_pct),
     revenueBudget: Number(assRes.data.revenue_budget || 0),
+    // Optional 12-month revenue profile; anything malformed loads as null and
+    // the engine falls back to flat revenueBudget/12 (the pre-plan behavior).
+    revenuePlan: Array.isArray(assRes.data.revenue_plan) && assRes.data.revenue_plan.length === 12
+      ? assRes.data.revenue_plan.map((v) => Number(v) || 0)
+      : null,
     vatFrequency: assRes.data.vat_frequency || "quarterly",
     vatAccountFrom: Number(assRes.data.vat_account_from ?? 2610),
     vatAccountTo: Number(assRes.data.vat_account_to ?? 2659),
@@ -540,6 +564,11 @@ function loadPreviewData() {
   BUDGET_VERSIONS.length = 0;
   BUDGET_VERSIONS.push({ id: "bv1", name: "FY2026 Budget", lockedAt: "2026-01-15T09:00:00Z", snapshot: { c1: 28000000, c2: 9000000, c3: 5000000 }, total: 42000000 });
 
+  // Seasonal revenue profile summing to exactly the 50.0M annual target —
+  // July dips (industrisemester), Q4 pushes. Gives the demo a non-flat cash
+  // curve and exercises the plan → forecast-P&L → cash-flow chain.
+  ASSUMPTIONS.revenuePlan = [4200000, 4200000, 4600000, 4400000, 4300000, 4100000, 3000000, 3600000, 4400000, 4600000, 4600000, 4000000];
+
   CASH_POSITION = { bankBalance: 6200000, asOf: "2026-07-07T05:00:00Z" };
   OPEN_INVOICES.length = 0;
   OPEN_INVOICES.push(
@@ -592,6 +621,13 @@ async function dbUpdateAssumptions() {
     other_overhead_pct: ASSUMPTIONS.otherOverheadPct,
     revenue_budget: ASSUMPTIONS.revenueBudget,
   }).eq("org_id", CURRENT_ORG_ID);
+  if (error) flagWriteError(error);
+}
+
+async function dbUpdateRevenuePlan() {
+  const { error } = await sb.from("assumptions")
+    .update({ revenue_plan: ASSUMPTIONS.revenuePlan })
+    .eq("org_id", CURRENT_ORG_ID);
   if (error) flagWriteError(error);
 }
 

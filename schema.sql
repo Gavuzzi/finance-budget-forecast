@@ -151,6 +151,7 @@ alter table reporting_lines add column if not exists source text not null defaul
 alter table reporting_lines add column if not exists state  text not null default 'linked';  -- planned|linked (plan-ahead lifecycle)
 alter table reporting_lines add column if not exists is_shared boolean not null default false; -- corporate/overhead reporting line — optionally allocated to the others, never on by default
 alter table assumptions add column if not exists revenue_budget numeric not null default 0; -- simple annual revenue target — no driver engine, just a number to compare actuals against
+alter table assumptions add column if not exists revenue_plan jsonb; -- optional 12-month revenue profile (array of 12 SEK values, FY-relative); null/absent = flat revenue_budget/12
 -- VAT/payroll-tax cash-flow timing (Phase 5 v2). Account ranges default wide
 -- enough to be robust to either bookkeeping style (whether or not sub-accounts
 -- get formally closed into the settlement account mid-year) — reclassification

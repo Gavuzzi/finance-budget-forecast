@@ -33,16 +33,48 @@ function renderRoleTableBody() {
   return ROLE_CATALOG.map(renderRoleRow).join("");
 }
 
+function revPlanTotalHtml() {
+  const plan = ASSUMPTIONS.revenuePlan;
+  const hasPlan = Array.isArray(plan) && plan.length === 12 && plan.some((v) => v > 0);
+  const target = ASSUMPTIONS.revenueBudget || 0;
+  if (!hasPlan) {
+    return target
+      ? `No monthly plan — forecasts use a flat <strong>${fmtSek(Math.round(target / 12))}</strong>/month (target ÷ 12).`
+      : `No revenue target set — revenue stays hidden from the P&L comparison and forecasts.`;
+  }
+  const total = plan.reduce((s, v) => s + (Number(v) || 0), 0);
+  const diff = total - target;
+  // Green when the plan is at/above the target, red below — revenue semantics,
+  // the inverse of the cost tables' over/under coloring.
+  const drift = Math.abs(diff) < 1000
+    ? `<span class="bv-clean">✓ matches the annual target</span>`
+    : `<span class="${diff > 0 ? "under" : "over"}">${fmtMkrSigned(diff)} vs the ${fmtMkr(target)} target</span>`;
+  return `<strong>Plan total: ${fmtMkr(total)}</strong> ${drift}`;
+}
+
 function renderRevenueBlock() {
+  const plan = ASSUMPTIONS.revenuePlan;
+  const hasPlan = Array.isArray(plan) && plan.length === 12 && plan.some((v) => v > 0);
+  const flat = Math.round((ASSUMPTIONS.revenueBudget || 0) / 12);
+  const cells = Array.from({ length: 12 }, (_, i) => `
+    <label>${monthLabel(i + 1)}
+      <input type="number" step="10000" data-revmonth="${i}" value="${hasPlan ? Number(plan[i]) || 0 : ""}" placeholder="${flat || ""}">
+    </label>`).join("");
   return `
     <div class="cc-block rate-block revenue-block">
-      <h2>Revenue Target</h2>
-      <p class="rate-hint">A simple annual target — no driver engine, just a number to compare actual revenue (synced from Fortnox) against. Leave at 0 to hide revenue variance.</p>
+      <h2>Revenue Plan <span class="pnl-src">— feeds the projected FY result &amp; Cash Flow</span></h2>
+      <p class="rate-hint">An annual target plus an optional month-by-month profile. The target is what actual revenue (synced from Fortnox) is compared against; the monthly plan shapes the forecast — the projected FY result on Overview and the Operating estimate on Cash Flow. No plan = a flat target ÷ 12. Leave the target at 0 to hide revenue entirely.</p>
       <div class="assumption-fields">
-        <label>Annual revenue budget (SEK)
+        <label>Annual revenue target (SEK)
           <input type="number" data-assumption="revenueBudget" value="${ASSUMPTIONS.revenueBudget}" step="10000">
         </label>
       </div>
+      <div class="rev-plan-grid">${cells}</div>
+      <div class="rev-plan-actions">
+        <button class="add-headcount" id="revSpreadBtn" type="button">Spread target evenly</button>
+        <button class="add-headcount" id="revClearBtn" type="button"${hasPlan ? "" : " disabled"}>Clear plan (use flat ÷ 12)</button>
+      </div>
+      <p class="rate-formula" id="revPlanTotal">${revPlanTotalHtml()}</p>
     </div>
   `;
 }
@@ -156,7 +188,26 @@ function initAssumptions() {
       ASSUMPTIONS[target.dataset.assumption] = Number(target.value) || 0;
       refreshRoleRatesDisplay();
       updateRateFormula();
+      const rpTotal = document.getElementById("revPlanTotal");
+      if (rpTotal) rpTotal.innerHTML = revPlanTotalHtml();
       dbUpdateAssumptions();
+      return;
+    }
+
+    if (target.dataset.revmonth != null) {
+      if (!Array.isArray(ASSUMPTIONS.revenuePlan) || ASSUMPTIONS.revenuePlan.length !== 12) {
+        // First touch seeds the whole profile from the flat target ÷ 12, so
+        // adjusting one month doesn't silently zero out the other eleven.
+        ASSUMPTIONS.revenuePlan = Array.from({ length: 12 }, () => Math.round((ASSUMPTIONS.revenueBudget || 0) / 12));
+        document.querySelectorAll("[data-revmonth]").forEach((inp) => {
+          if (inp !== target && inp.value === "") inp.value = ASSUMPTIONS.revenuePlan[Number(inp.dataset.revmonth)];
+        });
+      }
+      ASSUMPTIONS.revenuePlan[Number(target.dataset.revmonth)] = Number(target.value) || 0;
+      document.getElementById("revPlanTotal").innerHTML = revPlanTotalHtml();
+      const clearBtn = document.getElementById("revClearBtn");
+      if (clearBtn) clearBtn.disabled = false;
+      dbUpdateRevenuePlan();
       return;
     }
 
@@ -177,6 +228,19 @@ function initAssumptions() {
   });
 
   rateEngine.addEventListener("click", async (e) => {
+    if (e.target.id === "revSpreadBtn") {
+      ASSUMPTIONS.revenuePlan = Array.from({ length: 12 }, () => Math.round((ASSUMPTIONS.revenueBudget || 0) / 12));
+      dbUpdateRevenuePlan();
+      buildRateEngine();
+      return;
+    }
+    if (e.target.id === "revClearBtn") {
+      ASSUMPTIONS.revenuePlan = null;
+      dbUpdateRevenuePlan();
+      buildRateEngine();
+      return;
+    }
+
     // Click a loaded-cost cell to reveal/hide its step-by-step breakdown.
     const rateCell = e.target.closest("tr[data-role] .rate-cell");
     if (rateCell) {

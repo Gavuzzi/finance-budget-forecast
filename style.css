@@ -866,6 +866,11 @@ td.mt-drill:hover { background: rgba(77,124,199,0.12); border-radius: 4px; }
 .bv-drift.over { color: var(--red); }
 .bv-drift.under { color: var(--accent-soft); }
 
+/* Projected-result figure (Overview) + revenue-plan drift (Assumptions):
+   green = making money / plan above target, red = the opposite. */
+.forecast-pnl-panel strong.over, #revPlanTotal .over { color: var(--red); }
+.forecast-pnl-panel strong.under, #revPlanTotal .under { color: var(--green); }
+
 /* Re-forecast suggestions */
 .rf-row {
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
@@ -1553,6 +1558,37 @@ html[data-theme="light"] .panel {
   font-family: inherit;
   font-variant-numeric: tabular-nums;
 }
+
+/* Monthly revenue plan: 12 compact month cells (2 rows of 6 on desktop) */
+.rev-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px 12px;
+  margin: 4px 0 12px;
+}
+.rev-plan-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+.rev-plan-grid input {
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  min-width: 0;
+}
+.rev-plan-grid input:focus { outline: none; border-color: var(--accent); }
+.rev-plan-actions { display: flex; gap: 14px; align-items: center; margin-bottom: 10px; }
+.rev-plan-actions button[disabled] { opacity: 0.4; cursor: default; }
+@media (max-width: 900px) { .rev-plan-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .rev-plan-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 
 .range-inputs {
   display: flex;

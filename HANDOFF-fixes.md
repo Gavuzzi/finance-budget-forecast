@@ -91,7 +91,7 @@ Dark + light.
 
 ---
 
-## TASK 3 — Monthly revenue plan → forecast P&L (bigger; do after 1–2)
+## TASK 3 — Monthly revenue plan → forecast P&L ✅ DONE 2026-07-10
 Give revenue a simple monthly plan (not just one annual number): either a typed 12-month profile
 or "last-year actual × growth %". Then Overview/Monthly can show a **projected full-year result**
 (revenue − cost), not just actuals. Design it like the recurring-costs UI. This is the jump from

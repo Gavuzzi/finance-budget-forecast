@@ -378,7 +378,7 @@ function initScenarios() {
 }
 
 function renderAll() {
-  const sections = document.querySelectorAll(".lens-controls, .stats-row, .main-row, .table-panel, .role-breakdown-panel, .scenarios-panel, .signals-panel, .fortnox-pnl-panel, .budget-version-panel, .reforecast-panel");
+  const sections = document.querySelectorAll(".lens-controls, .stats-row, .main-row, .table-panel, .role-breakdown-panel, .scenarios-panel, .signals-panel, .fortnox-pnl-panel, .budget-version-panel, .forecast-pnl-panel, .reforecast-panel");
   let empty = document.getElementById("emptyState");
 
   if (COST_CENTERS.length === 0) {
@@ -402,7 +402,32 @@ function renderAll() {
   renderScenarios();
   renderSignals();
   renderBudgetVersion();
+  renderForecastPnl();
   renderReforecast();
+}
+
+// The forward answer to "will we make money this year": the revenue plan
+// (Assumptions) minus the full-year cost picture (booked actuals through the
+// close month + driver forecast after). Hidden until a revenue target or
+// monthly plan exists — no invented numbers.
+function renderForecastPnl() {
+  const panel = document.getElementById("forecastPnlPanel");
+  if (!panel) return;
+  const revenue = revenuePlanFyTotal();
+  if (!revenue) { panel.hidden = true; return; }
+  const cost = companyFySummary().total;
+  const result = revenue - cost;
+  const margin = Math.round((result / revenue) * 100);
+  const cls = result >= 0 ? "under" : "over";
+  const hasPlan = Array.isArray(ASSUMPTIONS.revenuePlan) && ASSUMPTIONS.revenuePlan.some((v) => v > 0);
+  panel.hidden = false;
+  panel.innerHTML = `
+    <div class="bv-row">
+      <div>
+        <h2 class="bv-title">Projected FY2026 result <span class="pnl-src">— revenue plan vs full-year cost</span></h2>
+        <p class="table-hint"><strong class="${cls}">${fmtMkrSigned(result)}</strong> = ${fmtMkr(revenue)} planned revenue − ${fmtMkr(cost)} cost (booked + forecast) · ${margin}% margin${hasPlan ? "" : ` · using a flat target ÷ 12 — set a monthly profile on <a href="assumptions.html">Assumptions</a>`}</p>
+      </div>
+    </div>`;
 }
 
 // Steal-list (Abacum): budgets are locked/versioned, not just a live editable
