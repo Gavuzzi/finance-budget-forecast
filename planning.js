@@ -87,20 +87,20 @@ function renderCcBlock(i) {
   return `
     <div class="cc-block" data-cc="${i}">
       <div class="cc-header">
-        <input class="cc-name-input" data-ccfield="name" value="${cc.name}" aria-label="Cost center name">
+        <input class="cc-name-input" data-ccfield="name" value="${cc.name}" aria-label="Reporting line name">
         <div class="cc-header-right">
           <label class="budget-field">Annual budget (FY2026)
             <input type="number" data-ccfield="annualBudget" value="${cc.annualBudget}" step="10000">
           </label>
-          <label class="shared-toggle" title="Shared/corporate costs (rent for the whole building, group IT…) can be optionally allocated to the other cost centres instead of sitting on their own line.">
+          <label class="shared-toggle" title="Shared/corporate costs (rent for the whole building, group IT…) can be optionally allocated to the other reporting lines instead of sitting on their own line.">
             <input type="checkbox" data-ccfield="isShared" ${cc.isShared ? "checked" : ""}>
             Shared / corporate
           </label>
-          <button class="cc-delete" data-deletecc="${i}" type="button" title="Delete this cost center">Delete</button>
+          <button class="cc-delete" data-deletecc="${i}" type="button" title="Delete this reporting line">Delete</button>
         </div>
       </div>
       <p class="cc-actual">Actuals booked through <strong>${monthLabel(CLOSE_MONTH)}</strong> — months after that are forecast.</p>
-      ${cc.isShared ? `<p class="shared-note">Shared cost centre — with <strong>Fully-loaded view</strong> on, its total is allocated to the others below (by headcount) instead of shown here.</p>` : ""}
+      ${cc.isShared ? `<p class="shared-note">Shared reporting line — with <strong>Fully-loaded view</strong> on, its total is allocated to the others below (by headcount) instead of shown here.</p>` : ""}
 
       <div class="driver-table-wrap">
         <table class="driver-table">
@@ -181,7 +181,7 @@ function bridgeHtml(cc) {
 function buildPlanningGrid() {
   if (COST_CENTERS.length === 0) {
     document.getElementById("ccBlocks").innerHTML =
-      `<p class="empty-hint">No cost centers yet — click "+ Add cost center" above to create your first one.</p>`;
+      `<p class="empty-hint">No reporting lines yet — click "+ Add reporting line" above to create your first one.</p>`;
     return;
   }
   document.getElementById("ccBlocks").innerHTML = COST_CENTERS.map((cc, i) => renderCcBlock(i)).join("");
@@ -318,7 +318,7 @@ function initPlanningGrid() {
     if (deleteCcBtn) {
       const ccIndex = Number(deleteCcBtn.dataset.deletecc);
       const cc = COST_CENTERS[ccIndex];
-      if (!confirm(`Delete the cost center "${cc.name}" and everything in it (headcount, one-offs, actuals)? This can't be undone.`)) return;
+      if (!confirm(`Delete the reporting line "${cc.name}" and everything in it (headcount, one-offs, actuals)? This can't be undone.`)) return;
       const ok = await dbDeleteCostCenter(cc.id);
       if (!ok) return;
       COST_CENTERS.splice(ccIndex, 1);

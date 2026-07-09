@@ -69,7 +69,7 @@ function renderMonthlyGrid() {
   const isFy = currentLens === "fy";
 
   // Header
-  let html = `<table class="monthly-table"><thead><tr><th class="mt-name">Cost Center</th>`;
+  let html = `<table class="monthly-table"><thead><tr><th class="mt-name">Reporting Line</th>`;
   months.forEach((m) => {
     const forecast = m > CLOSE_MONTH;
     const divider = m === CLOSE_MONTH + 1;
@@ -80,7 +80,7 @@ function renderMonthlyGrid() {
     : `<th class="num mt-summary">12-mo Total</th>`;
   html += `</tr></thead><tbody>`;
 
-  // One row per cost center
+  // One row per reporting line
   COST_CENTERS.forEach((cc) => {
     const smoothed = smoothActuals ? smoothedActual(cc) : null;
     html += `<tr><td class="mt-name">${cc.name}</td>`;
@@ -144,7 +144,7 @@ function buildExportCsv() {
   const orgName = (USER_ORGS.find((o) => o.id === CURRENT_ORG_ID) || {}).name || "";
   lines.push(`${orgName} — Monthly P&L (SEK); exported ${new Date().toLocaleDateString("sv-SE")}`);
   lines.push(
-    ["Cost Center", ...months.map(monthLabel), ...(isFy ? ["FY Total", "Budget", "Variance"] : ["12-mo Total"])].join(";")
+    ["Reporting Line", ...months.map(monthLabel), ...(isFy ? ["FY Total", "Budget", "Variance"] : ["12-mo Total"])].join(";")
   );
 
   COST_CENTERS.forEach((cc) => {
@@ -192,7 +192,7 @@ async function loadDrill(ccId, month) {
   }
   const { data } = await sb.from("actual_detail")
     .select("account, account_name, amount, tx_count")
-    .eq("org_id", CURRENT_ORG_ID).eq("cost_center_id", ccId).eq("month", month)
+    .eq("org_id", CURRENT_ORG_ID).eq("reporting_line_id", ccId).eq("month", month)
     .order("amount", { ascending: false });
   return data || [];
 }
@@ -256,7 +256,7 @@ function initImport() {
     }
     parsed = parseActualsCsv(textArea.value);
     let msg = `<strong>${parsed.rows.length}</strong> value(s) ready to import.`;
-    if (parsed.unmatched.length) msg += ` <span class="import-warn">Unmatched cost centers (skipped): ${parsed.unmatched.join(", ")}.</span>`;
+    if (parsed.unmatched.length) msg += ` <span class="import-warn">Unmatched reporting lines (skipped): ${parsed.unmatched.join(", ")}.</span>`;
     if (parsed.skipped) msg += ` ${parsed.skipped} row(s) skipped.`;
     preview.innerHTML = msg;
     doBtn.disabled = parsed.rows.length === 0;

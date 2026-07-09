@@ -86,7 +86,7 @@ function renderTable() {
   if (currentLens === "fy") {
     let html = `
       <div class="budget-row header">
-        <span class="cc-name">Cost Center</span>
+        <span class="cc-name">Reporting Line</span>
         <span class="num">Budget</span>
         <span class="num">FY2026 Total</span>
         <span class="num">Variance</span>
@@ -129,7 +129,7 @@ function renderTable() {
   } else {
     let html = `
       <div class="budget-row header rolling">
-        <span class="cc-name">Cost Center</span>
+        <span class="cc-name">Reporting Line</span>
         <span class="num">Rolling 12 Total</span>
       </div>
     `;
@@ -255,7 +255,7 @@ function renderOnboard() {
   });
 }
 
-// Total people cost per role across all cost centers, for the fiscal year.
+// Total people cost per role across all reporting lines, for the fiscal year.
 function roleFyTotals() {
   const totals = {};
   COST_CENTERS.forEach((cc) => {
@@ -307,7 +307,7 @@ function renderScenarioDetail(s, currentByName) {
         <span class="num ${cls}">${scen != null && cur != null ? fmtMkrSigned(d) : ""}</span>
       </div>`;
   });
-  return `<div class="scen-detail-head"><span>Cost center</span><span class="num">Scenario</span><span class="num">Current</span><span class="num">Δ</span></div>${rows}`;
+  return `<div class="scen-detail-head"><span>Reporting line</span><span class="num">Scenario</span><span class="num">Current</span><span class="num">Δ</span></div>${rows}`;
 }
 
 function renderScenarios() {

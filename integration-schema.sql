@@ -6,7 +6,7 @@
 -- has RLS on and NO policies — meaning the browser (anon/authenticated) can
 -- never read it. Only Edge Functions, using the service_role key, touch it
 -- (the service role bypasses RLS). The client only ever reads `integration_status`
--- (no secrets) and manages `cost_center_mappings`.
+-- (no secrets) and manages `reporting_line_mappings`.
 -- ============================================================================
 
 -- --- Token store (server-only) ---------------------------------------------
@@ -33,10 +33,10 @@ create table if not exists integration_status (
   last_synced_at    timestamptz,
   last_sync_error   text,
   last_reconciliation jsonb,          -- the P&L from the last sync, so the app shows it on load
-  last_cost_centers jsonb,            -- the cost-centre list from the last sync (mapping UI works without a fresh sync)
+  last_reporting_lines jsonb,         -- the reporting-line list from the last sync (mapping UI works without a fresh sync)
   last_projects jsonb                 -- likewise for projects
 );
-alter table integration_status add column if not exists last_cost_centers jsonb;
+alter table integration_status add column if not exists last_reporting_lines jsonb;
 alter table integration_status add column if not exists last_projects jsonb;
 -- Idempotent catch-up for DBs created before the column existed:
 alter table integration_status add column if not exists last_reconciliation jsonb;
@@ -46,59 +46,59 @@ create policy integration_status_read on integration_status
   for select using (is_org_member(org_id));
 -- Writes are server-side (service role); no client write policy.
 
--- --- Cost-centre mapping (client-managed, no secrets) -----------------------
--- Maps a Fortnox cost-centre CODE (kostnadsställe) to one of our cost centers.
-create table if not exists cost_center_mappings (
-  id              uuid primary key default gen_random_uuid(),
-  org_id          uuid not null references organizations(id) on delete cascade,
-  external_code   text not null,            -- Fortnox kostnadsställe/project code, or an account-range key
-  external_name   text,
-  cost_center_id  uuid references cost_centers(id) on delete cascade,
+-- --- Reporting-line mapping (client-managed, no secrets) --------------------
+-- Maps a Fortnox cost-centre CODE (kostnadsställe) to one of our reporting lines.
+create table if not exists reporting_line_mappings (
+  id                uuid primary key default gen_random_uuid(),
+  org_id            uuid not null references organizations(id) on delete cascade,
+  external_code     text not null,            -- Fortnox kostnadsställe/project code, or an account-range key
+  external_name     text,
+  reporting_line_id uuid references reporting_lines(id) on delete cascade,
   unique (org_id, external_code)
 );
 -- Dimension-agnostic mapping (Phase 1): a rule can match a cost-centre code,
 -- a project code, or an ACCOUNT RANGE (fallback for untagged bookings).
-alter table cost_center_mappings add column if not exists dimension text not null default 'costcenter'; -- costcenter|project|account
-alter table cost_center_mappings add column if not exists account_from integer;
-alter table cost_center_mappings add column if not exists account_to integer;
+alter table reporting_line_mappings add column if not exists dimension text not null default 'costcenter'; -- costcenter|project|account
+alter table reporting_line_mappings add column if not exists account_from integer;
+alter table reporting_line_mappings add column if not exists account_to integer;
 -- Project codes and cost-centre codes are independent namespaces in Fortnox and
 -- CAN collide as the same string (e.g. both "10") — the unique key must include
 -- dimension, or mapping one silently clobbers the other. Idempotent repair for
 -- databases created before this was caught.
 do $$
 begin
-  if exists (select 1 from pg_constraint where conname = 'cost_center_mappings_org_id_external_code_key') then
-    alter table cost_center_mappings drop constraint cost_center_mappings_org_id_external_code_key;
+  if exists (select 1 from pg_constraint where conname = 'reporting_line_mappings_org_id_external_code_key') then
+    alter table reporting_line_mappings drop constraint reporting_line_mappings_org_id_external_code_key;
   end if;
-  if not exists (select 1 from pg_constraint where conname = 'cost_center_mappings_org_dim_code_key') then
-    alter table cost_center_mappings add constraint cost_center_mappings_org_dim_code_key unique (org_id, dimension, external_code);
+  if not exists (select 1 from pg_constraint where conname = 'reporting_line_mappings_org_dim_code_key') then
+    alter table reporting_line_mappings add constraint reporting_line_mappings_org_dim_code_key unique (org_id, dimension, external_code);
   end if;
 end $$;
-alter table cost_center_mappings enable row level security;
-drop policy if exists cost_center_mappings_read  on cost_center_mappings;
-drop policy if exists cost_center_mappings_write on cost_center_mappings;
-create policy cost_center_mappings_read  on cost_center_mappings
+alter table reporting_line_mappings enable row level security;
+drop policy if exists reporting_line_mappings_read  on reporting_line_mappings;
+drop policy if exists reporting_line_mappings_write on reporting_line_mappings;
+create policy reporting_line_mappings_read  on reporting_line_mappings
   for select using (is_org_member(org_id));
-create policy cost_center_mappings_write on cost_center_mappings
+create policy reporting_line_mappings_write on reporting_line_mappings
   for all using (can_edit_org(org_id)) with check (can_edit_org(org_id));
 
 -- --- Account-level drill detail (client-readable) ----------------------------
 -- "What's in this number?" — per (reporting line × month × BAS account),
 -- written by the sync (service role), read by members. Powers cell drill-down.
 create table if not exists actual_detail (
-  id              uuid primary key default gen_random_uuid(),
-  org_id          uuid not null references organizations(id) on delete cascade,
-  cost_center_id  uuid not null references cost_centers(id) on delete cascade,
-  month           smallint not null,
-  account         integer not null,
-  account_name    text,
-  amount          numeric not null default 0,
-  tx_count        integer not null default 0
+  id                uuid primary key default gen_random_uuid(),
+  org_id            uuid not null references organizations(id) on delete cascade,
+  reporting_line_id uuid not null references reporting_lines(id) on delete cascade,
+  month             smallint not null,
+  account           integer not null,
+  account_name      text,
+  amount            numeric not null default 0,
+  tx_count          integer not null default 0
 );
 alter table actual_detail enable row level security;
 drop policy if exists actual_detail_read on actual_detail;
 create policy actual_detail_read on actual_detail for select using (is_org_member(org_id));
-create index if not exists actual_detail_cell on actual_detail (cost_center_id, month);
+create index if not exists actual_detail_cell on actual_detail (reporting_line_id, month);
 
 -- --- OAuth handshake state (CSRF binding) -----------------------------------
 -- The client inserts a random `state` bound to its org before redirecting to

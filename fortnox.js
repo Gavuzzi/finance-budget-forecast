@@ -23,23 +23,23 @@ async function loadIntegrationStatus() {
 }
 
 async function loadMappings() {
-  const { data } = await sb.from("cost_center_mappings").select("external_code, cost_center_id").eq("org_id", CURRENT_ORG_ID);
+  const { data } = await sb.from("reporting_line_mappings").select("external_code, reporting_line_id").eq("org_id", CURRENT_ORG_ID);
   const byCc = {};
-  (data || []).forEach((m) => { if (m.cost_center_id) byCc[m.cost_center_id] = m.external_code; });
+  (data || []).forEach((m) => { if (m.reporting_line_id) byCc[m.reporting_line_id] = m.external_code; });
   return byCc;
 }
 
 // dimension: "costcenter" (default) or "project" — project codes and cost-
 // centre codes are independent namespaces and can collide as the same string,
 // so the unique key (and this upsert's conflict target) includes dimension.
-async function saveMapping(costCenterId, code, dimension = "costcenter") {
+async function saveMapping(reportingLineId, code, dimension = "costcenter") {
   code = (code || "").trim();
   if (!code) {
-    await sb.from("cost_center_mappings").delete().eq("org_id", CURRENT_ORG_ID).eq("cost_center_id", costCenterId).eq("dimension", dimension);
+    await sb.from("reporting_line_mappings").delete().eq("org_id", CURRENT_ORG_ID).eq("reporting_line_id", reportingLineId).eq("dimension", dimension);
     return;
   }
-  await sb.from("cost_center_mappings").upsert(
-    { org_id: CURRENT_ORG_ID, external_code: code, cost_center_id: costCenterId, dimension },
+  await sb.from("reporting_line_mappings").upsert(
+    { org_id: CURRENT_ORG_ID, external_code: code, reporting_line_id: reportingLineId, dimension },
     { onConflict: "org_id,dimension,external_code" }
   );
 }
@@ -82,12 +82,12 @@ async function runFortnoxSync(btn) {
     });
     const out = await res.json();
     if (!res.ok) throw new Error(out.error || res.statusText);
-    let msg = `Synced — ${out.months_updated} cost-centre-month(s) updated.`;
-    if (out.unmapped_cost_centers && out.unmapped_cost_centers.length) {
-      msg += ` Unmapped Fortnox codes: ${out.unmapped_cost_centers.join(", ")}.`;
+    let msg = `Synced — ${out.months_updated} reporting-line-month(s) updated.`;
+    if (out.unmapped_reporting_lines && out.unmapped_reporting_lines.length) {
+      msg += ` Unmapped Fortnox codes: ${out.unmapped_reporting_lines.join(", ")}.`;
     }
     showToast(msg);
-    lastCostCenters = out.cost_centers || [];
+    lastCostCenters = out.reporting_lines || [];
     lastProjects = out.projects || [];
     renderReconciliation(out);
     const ls = document.getElementById("fnLastSynced");
@@ -194,7 +194,7 @@ function connectedHtml(status) {
       <p class="integ-sub" id="fnLastSynced">Last synced: ${last}</p>
       <div class="integ-actions">
         <button class="integ-btn" id="fnSyncBtn" type="button">Sync now</button>
-        <button class="integ-link" id="fnMapToggle" type="button">Cost-centre mapping</button>
+        <button class="integ-link" id="fnMapToggle" type="button">Reporting-line mapping</button>
         <button class="integ-link" id="fnReconnectBtn" type="button">Switch company</button>
       </div>
       ${err}
@@ -235,7 +235,7 @@ async function renderMappingEditor(host) {
   if (lastCostCenters.length === 0 && lastProjects.length === 0 && !(typeof DEMO_MODE !== "undefined" && DEMO_MODE)) {
     const status = await loadIntegrationStatus();
     if (status) {
-      lastCostCenters = status.last_cost_centers || [];
+      lastCostCenters = status.last_reporting_lines || [];
       lastProjects = status.last_projects || [];
     }
   }
@@ -263,8 +263,8 @@ async function renderMappingEditor(host) {
 // ---- Account-range mappings (fallback for untagged bookings) ----------------
 
 async function loadAccountRanges() {
-  const { data } = await sb.from("cost_center_mappings")
-    .select("id, account_from, account_to, cost_center_id")
+  const { data } = await sb.from("reporting_line_mappings")
+    .select("id, account_from, account_to, reporting_line_id")
     .eq("org_id", CURRENT_ORG_ID).eq("dimension", "account");
   return data || [];
 }
@@ -278,7 +278,7 @@ async function renderAccountRanges(host) {
     <p class="integ-map-hint"><strong>Account ranges</strong> — fallback for bookings without a cost-centre tag: any BAS account in a range lands on the chosen line. (E.g. 4000–4999 → Production.)</p>
     ${ranges.map((r) => `
       <div class="fn-cc-row">
-        <span class="fn-cc-name">${r.account_from}–${r.account_to} → ${(COST_CENTERS.find((c) => c.id === r.cost_center_id) || {}).name || "?"}</span>
+        <span class="fn-cc-name">${r.account_from}–${r.account_to} → ${(COST_CENTERS.find((c) => c.id === r.reporting_line_id) || {}).name || "?"}</span>
         <span></span>
         <button class="integ-link" data-del="${r.id}" type="button">Remove</button>
       </div>`).join("")}
@@ -291,7 +291,7 @@ async function renderAccountRanges(host) {
       <button class="fn-cc-import" id="fnAcctAdd" type="button">Add</button>
     </div>`;
   el.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", async () => {
-    await sb.from("cost_center_mappings").delete().eq("id", b.dataset.del);
+    await sb.from("reporting_line_mappings").delete().eq("id", b.dataset.del);
     showToast("Range removed — re-sync to apply.");
     renderAccountRanges(host);
   }));
@@ -300,9 +300,9 @@ async function renderAccountRanges(host) {
     const to = parseInt(el.querySelector("#fnAcctTo").value, 10);
     const ccId = el.querySelector("#fnAcctCc").value;
     if (!from || !to || from > to || !ccId) { showToast("Enter a valid range (from ≤ to).", "error"); return; }
-    const { error } = await sb.from("cost_center_mappings").insert({
+    const { error } = await sb.from("reporting_line_mappings").insert({
       org_id: CURRENT_ORG_ID, dimension: "account", external_code: `${from}-${to}`,
-      account_from: from, account_to: to, cost_center_id: ccId,
+      account_from: from, account_to: to, reporting_line_id: ccId,
     });
     if (error) { showToast("Couldn't add — " + error.message, "error"); return; }
     showToast("Range added — re-sync to apply.");
@@ -351,7 +351,7 @@ async function renderExclusions(host) {
 }
 
 async function importCostCenter(item, host, dimension = "costcenter") {
-  const { data, error } = await sb.from("cost_centers")
+  const { data, error } = await sb.from("reporting_lines")
     .insert({ org_id: CURRENT_ORG_ID, name: item.name, annual_budget: 0, other_monthly: 0 })
     .select().single();
   if (error) { showToast("Couldn't create — " + error.message, "error"); return; }

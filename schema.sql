@@ -47,7 +47,7 @@ create table if not exists roles (
   base_salary       numeric not null default 0
 );
 
-create table if not exists cost_centers (
+create table if not exists reporting_lines (
   id                uuid primary key default gen_random_uuid(),
   org_id            uuid not null references organizations(id) on delete cascade,
   name              text not null,
@@ -60,7 +60,7 @@ create table if not exists cost_centers (
 create table if not exists headcount_lines (
   id                uuid primary key default gen_random_uuid(),
   org_id            uuid not null references organizations(id) on delete cascade,
-  cost_center_id    uuid not null references cost_centers(id) on delete cascade,
+  reporting_line_id uuid not null references reporting_lines(id) on delete cascade,
   role_id           uuid not null references roles(id) on delete restrict,
   count             integer not null default 1,    -- negative = leaver
   start_month       smallint not null,
@@ -70,20 +70,20 @@ create table if not exists headcount_lines (
 create table if not exists one_offs (
   id                uuid primary key default gen_random_uuid(),
   org_id            uuid not null references organizations(id) on delete cascade,
-  cost_center_id    uuid not null references cost_centers(id) on delete cascade,
+  reporting_line_id uuid not null references reporting_lines(id) on delete cascade,
   label             text not null,
   amount            numeric not null default 0,
   month             smallint not null
 );
 
--- Booked actuals per cost center per absolute month (later fed by the ERP import).
+-- Booked actuals per reporting line per absolute month (later fed by the ERP import).
 create table if not exists monthly_actual (
   id                uuid primary key default gen_random_uuid(),
   org_id            uuid not null references organizations(id) on delete cascade,
-  cost_center_id    uuid not null references cost_centers(id) on delete cascade,
+  reporting_line_id uuid not null references reporting_lines(id) on delete cascade,
   month             smallint not null,
   amount            numeric not null default 0,
-  unique (cost_center_id, month)
+  unique (reporting_line_id, month)
 );
 
 -- What-if scenario snapshots: name + full-year total + per-cost-center breakdown.
@@ -104,7 +104,7 @@ create table if not exists budget_versions (
   org_id            uuid not null references organizations(id) on delete cascade,
   name              text not null,
   locked_at         timestamptz not null default now(),
-  snapshot          jsonb not null,   -- { cost_center_id: annual_budget }
+  snapshot          jsonb not null,   -- { reporting_line_id: annual_budget }
   total             numeric not null default 0
 );
 alter table budget_versions enable row level security;
@@ -118,14 +118,14 @@ create policy budget_versions_write on budget_versions for all using (can_edit_o
 -- column, no longer read by the engine) so run-rate costs (rent, subs, leases)
 -- can start/stop and grow over time instead of being one flat number forever.
 create table if not exists recurring_costs (
-  id             uuid primary key default gen_random_uuid(),
-  org_id         uuid not null references organizations(id) on delete cascade,
-  cost_center_id uuid not null references cost_centers(id) on delete cascade,
-  label          text not null default 'Other costs',
-  amount         numeric not null default 0,
-  start_month    smallint not null default 1,
-  end_month      smallint not null default 24,
-  escalation_pct numeric not null default 0
+  id                uuid primary key default gen_random_uuid(),
+  org_id            uuid not null references organizations(id) on delete cascade,
+  reporting_line_id uuid not null references reporting_lines(id) on delete cascade,
+  label             text not null default 'Other costs',
+  amount            numeric not null default 0,
+  start_month       smallint not null default 1,
+  end_month         smallint not null default 24,
+  escalation_pct    numeric not null default 0
 );
 alter table recurring_costs enable row level security;
 drop policy if exists recurring_costs_read on recurring_costs;
@@ -133,23 +133,23 @@ drop policy if exists recurring_costs_write on recurring_costs;
 create policy recurring_costs_read on recurring_costs for select using (is_org_member(org_id));
 create policy recurring_costs_write on recurring_costs for all using (can_edit_org(org_id)) with check (can_edit_org(org_id));
 
--- One-time backward-compat migration: preserve every cost centre's existing
+-- One-time backward-compat migration: preserve every reporting line's existing
 -- other_monthly as an equivalent recurring-cost row (idempotent — only inserts
--- where one doesn't already exist for that cost centre).
-insert into recurring_costs (org_id, cost_center_id, label, amount, start_month, end_month, escalation_pct)
+-- where one doesn't already exist for that reporting line).
+insert into recurring_costs (org_id, reporting_line_id, label, amount, start_month, end_month, escalation_pct)
 select cc.org_id, cc.id, 'Other costs (migrated)', cc.other_monthly, 1, 24, 0
-from cost_centers cc
+from reporting_lines cc
 where cc.other_monthly > 0
-and not exists (select 1 from recurring_costs rc where rc.cost_center_id = cc.id);
+and not exists (select 1 from recurring_costs rc where rc.reporting_line_id = cc.id);
 
 -- Idempotent catch-up for databases created before newer columns existed.
-alter table cost_centers add column if not exists note text;
+alter table reporting_lines add column if not exists note text;
 alter table organizations add column if not exists fy_start_month smallint not null default 1;  -- broken fiscal years (May–Apr etc.)
 alter table organizations add column if not exists fy_start_year  smallint not null default 2026;
 alter table organizations add column if not exists close_month_manual boolean not null default false; -- user override of "booked through"
-alter table cost_centers add column if not exists source text not null default 'manual';  -- fortnox|manual (fortnox-sourced lines refresh on sync)
-alter table cost_centers add column if not exists state  text not null default 'linked';  -- planned|linked (plan-ahead lifecycle)
-alter table cost_centers add column if not exists is_shared boolean not null default false; -- corporate/overhead cost centre — optionally allocated to the others, never on by default
+alter table reporting_lines add column if not exists source text not null default 'manual';  -- fortnox|manual (fortnox-sourced lines refresh on sync)
+alter table reporting_lines add column if not exists state  text not null default 'linked';  -- planned|linked (plan-ahead lifecycle)
+alter table reporting_lines add column if not exists is_shared boolean not null default false; -- corporate/overhead reporting line — optionally allocated to the others, never on by default
 alter table assumptions add column if not exists revenue_budget numeric not null default 0; -- simple annual revenue target — no driver engine, just a number to compare actuals against
 -- VAT/payroll-tax cash-flow timing (Phase 5 v2). Account ranges default wide
 -- enough to be robust to either bookkeeping style (whether or not sub-accounts
@@ -168,13 +168,13 @@ alter table assumptions add column if not exists payroll_account_to   smallint n
 -- Apply — and fully reversible (delete the rows, the driver forecast resumes
 -- unchanged since headcount/one-offs/recurring costs are never touched).
 create table if not exists forecast_overrides (
-  id              uuid primary key default gen_random_uuid(),
-  org_id          uuid not null references organizations(id) on delete cascade,
-  cost_center_id  uuid not null references cost_centers(id) on delete cascade,
-  month           smallint not null,
-  amount          numeric not null default 0,
-  created_at      timestamptz not null default now(),
-  unique (cost_center_id, month)
+  id                uuid primary key default gen_random_uuid(),
+  org_id            uuid not null references organizations(id) on delete cascade,
+  reporting_line_id uuid not null references reporting_lines(id) on delete cascade,
+  month             smallint not null,
+  amount            numeric not null default 0,
+  created_at        timestamptz not null default now(),
+  unique (reporting_line_id, month)
 );
 alter table forecast_overrides enable row level security;
 drop policy if exists forecast_overrides_read on forecast_overrides;
@@ -252,7 +252,7 @@ alter table organizations   enable row level security;
 alter table memberships     enable row level security;
 alter table assumptions     enable row level security;
 alter table roles           enable row level security;
-alter table cost_centers    enable row level security;
+alter table reporting_lines enable row level security;
 alter table headcount_lines enable row level security;
 alter table one_offs        enable row level security;
 alter table monthly_actual  enable row level security;
@@ -321,7 +321,7 @@ create policy "org edit" on organizations for update using (can_edit_org(id)) wi
 do $$
 declare t text;
 begin
-  foreach t in array array['assumptions','roles','cost_centers','headcount_lines','one_offs','monthly_actual','scenarios']
+  foreach t in array array['assumptions','roles','reporting_lines','headcount_lines','one_offs','monthly_actual','scenarios']
   loop
     execute format('drop policy if exists "member access" on %I', t);
     execute format('drop policy if exists %I on %I', t || '_read', t);
@@ -376,14 +376,14 @@ begin
     (r_it,     v_org, 'IT Support Specialist', 36000),
     (r_devops, v_org, 'Cloud/DevOps Contractor', 48000);
 
-  insert into cost_centers (id, org_id, name, annual_budget, other_monthly) values
+  insert into reporting_lines (id, org_id, name, annual_budget, other_monthly) values
     (c_prod,  v_org, 'Production', 28000000, 1350000),
     (c_sales, v_org, 'Sales & Marketing', 12000000, 583000),
     (c_rnd,   v_org, 'R&D', 9000000, 283000),
     (c_admin, v_org, 'Administration', 6000000, 250000),
     (c_it,    v_org, 'IT', 5000000, 166000);
 
-  insert into headcount_lines (org_id, cost_center_id, role_id, count, start_month, end_month) values
+  insert into headcount_lines (org_id, reporting_line_id, role_id, count, start_month, end_month) values
     (v_org, c_prod,  r_prodop, 18, 1, 24),
     (v_org, c_prod,  r_shift,   1, 9, 24),
     (v_org, c_sales, r_acct,    5, 1, 24),
@@ -394,14 +394,14 @@ begin
     (v_org, c_it,    r_it,      2, 1, 24),
     (v_org, c_it,    r_devops,  1, 10, 12);
 
-  insert into one_offs (org_id, cost_center_id, label, amount, month) values
+  insert into one_offs (org_id, reporting_line_id, label, amount, month) values
     (v_org, c_prod,  'Press line maintenance overhaul', 650000, 9),
     (v_org, c_sales, 'Autumn trade-fair campaign', 480000, 10),
     (v_org, c_rnd,   'Prototype tooling', 320000, 8),
     (v_org, c_admin, 'Office renovation', 150000, 11),
     (v_org, c_it,    'Laptop refresh batch', 180000, 8);
 
-  insert into monthly_actual (org_id, cost_center_id, month, amount) values
+  insert into monthly_actual (org_id, reporting_line_id, month, amount) values
     (v_org, c_prod, 1,2380000),(v_org, c_prod, 2,2410000),(v_org, c_prod, 3,2510000),
     (v_org, c_prod, 4,2440000),(v_org, c_prod, 5,2460000),(v_org, c_prod, 6,2400000),
     (v_org, c_prod, 7,2250000),(v_org, c_prod, 8,2150000),(v_org, c_prod, 9,2950000),

@@ -108,19 +108,19 @@ async function syncOrg(admin: any, org_id: string) {
   //    account-range fallback → Unassigned. Account ranges make untagged
   //    companies syncable; project codes and cost-centre codes are independent
   //    namespaces (can collide as the same string), hence two separate maps.
-  const { data: maps } = await admin.from("cost_center_mappings")
-    .select("external_code, cost_center_id, dimension, account_from, account_to").eq("org_id", org_id);
+  const { data: maps } = await admin.from("reporting_line_mappings")
+    .select("external_code, reporting_line_id, dimension, account_from, account_to").eq("org_id", org_id);
   const costCodeToCc = new Map<string, string>();
   const projCodeToCc = new Map<string, string>();
   const acctRanges: { from: number; to: number; ccId: string }[] = [];
   (maps ?? []).forEach((m: any) => {
-    if (!m.cost_center_id) return;
+    if (!m.reporting_line_id) return;
     if (m.dimension === "account" && m.account_from != null && m.account_to != null) {
-      acctRanges.push({ from: m.account_from, to: m.account_to, ccId: m.cost_center_id });
+      acctRanges.push({ from: m.account_from, to: m.account_to, ccId: m.reporting_line_id });
     } else if (m.dimension === "project") {
-      projCodeToCc.set(m.external_code, m.cost_center_id);
+      projCodeToCc.set(m.external_code, m.reporting_line_id);
     } else {
-      costCodeToCc.set(m.external_code, m.cost_center_id);
+      costCodeToCc.set(m.external_code, m.reporting_line_id);
     }
   });
 
@@ -298,28 +298,28 @@ async function syncOrg(admin: any, org_id: string) {
   //    the current truth, so vouchers deleted/reversed in Fortnox can't leave
   //    stale rows behind. Fortnox is the source of truth for a connected org.
   const rows = [...totals.entries()].map(([key, amount]) => {
-    const [cost_center_id, month] = key.split("|");
-    return { org_id, cost_center_id, month: Number(month), amount: Math.round(amount) };
+    const [reporting_line_id, month] = key.split("|");
+    return { org_id, reporting_line_id, month: Number(month), amount: Math.round(amount) };
   });
 
   // Unassigned bucket → a real reporting line, so unplaced money is VISIBLE in
   // the grid (never silently dropped). Auto-created when needed, auto-removed
   // when everything is assigned again.
   const UA_NAME = "Unassigned (Fortnox)";
-  const { data: uaLine } = await admin.from("cost_centers")
+  const { data: uaLine } = await admin.from("reporting_lines")
     .select("id").eq("org_id", org_id).eq("name", UA_NAME).maybeSingle();
   let uaId = uaLine?.id ?? null;
   if (uaMonths.size > 0) {
     if (!uaId) {
-      const { data: created, error: uaErr } = await admin.from("cost_centers")
+      const { data: created, error: uaErr } = await admin.from("reporting_lines")
         .insert({ org_id, name: UA_NAME, annual_budget: 0, other_monthly: 0, source: "fortnox" })
         .select().single();
       if (uaErr) throw new Error(`unassigned line: ${uaErr.message}`);
       uaId = created.id;
     }
-    for (const [m, amt] of uaMonths) rows.push({ org_id, cost_center_id: uaId, month: m, amount: Math.round(amt) });
+    for (const [m, amt] of uaMonths) rows.push({ org_id, reporting_line_id: uaId, month: m, amount: Math.round(amt) });
   } else if (uaId) {
-    await admin.from("cost_centers").delete().eq("id", uaId);
+    await admin.from("reporting_lines").delete().eq("id", uaId);
   }
 
   await admin.from("monthly_actual").delete().eq("org_id", org_id);
@@ -330,10 +330,10 @@ async function syncOrg(admin: any, org_id: string) {
   const detailRows: Record<string, unknown>[] = [];
   for (const [dk, d] of detail) {
     const [ccKey, m, acct] = dk.split("|");
-    const cost_center_id = ccKey === "UA" ? uaId : ccKey;
-    if (!cost_center_id) continue;
+    const reporting_line_id = ccKey === "UA" ? uaId : ccKey;
+    if (!reporting_line_id) continue;
     detailRows.push({
-      org_id, cost_center_id, month: Number(m), account: Number(acct),
+      org_id, reporting_line_id, month: Number(m), account: Number(acct),
       account_name: kontoNames.get(Number(acct)) ?? null,
       amount: Math.round(d.amt), tx_count: d.n,
     });
@@ -431,10 +431,10 @@ async function syncOrg(admin: any, org_id: string) {
     }
   } catch (_) { /* non-fatal — SIE-derived list still works */ }
 
-  // Cost-centre / project lists (master data + any codes seen in transactions),
+  // Reporting-line / project lists (master data + any codes seen in transactions),
   // with operating cost and mapped status — power the one-click mapping UI.
   const seenCodes = new Set<string>([...objektNames.keys(), ...codeCost.keys()]);
-  const cost_centers = [...seenCodes].map((code) => ({
+  const reporting_lines = [...seenCodes].map((code) => ({
     code,
     name: objektNames.get(code) ?? code,
     cost: Math.round(codeCost.get(code) ?? 0),
@@ -478,19 +478,19 @@ async function syncOrg(admin: any, org_id: string) {
     prior_year: priorYear,   // null when the company has no previous FY
   };
 
-  // Persist the P&L + cost-centre/project lists on the status row so the app
+  // Persist the P&L + reporting-line/project lists on the status row so the app
   // shows them on load, not just immediately after a sync.
   await admin.from("integration_status").update({
     last_synced_at: new Date().toISOString(), last_sync_error: null, last_reconciliation: recon,
-    last_cost_centers: cost_centers, last_projects: projects,
+    last_reporting_lines: reporting_lines, last_projects: projects,
   }).eq("org_id", org_id);
 
   return {
     ok: true,
     months_updated: rows.length,
     close_month: closeMonthOut,
-    unmapped_cost_centers: [...unmapped],
-    cost_centers,
+    unmapped_reporting_lines: [...unmapped],
+    reporting_lines,
     projects,
     reconciliation: recon,
     bank_balance: Math.round(bankBalance),

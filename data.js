@@ -351,7 +351,7 @@ async function loadData(orgId) {
   const [assRes, rolesRes, ccRes, hcRes, ooRes, actRes] = await Promise.all([
     sb.from("assumptions").select("*").eq("org_id", CURRENT_ORG_ID).single(),
     sb.from("roles").select("*").eq("org_id", CURRENT_ORG_ID),
-    sb.from("cost_centers").select("*").eq("org_id", CURRENT_ORG_ID),
+    sb.from("reporting_lines").select("*").eq("org_id", CURRENT_ORG_ID),
     sb.from("headcount_lines").select("*").eq("org_id", CURRENT_ORG_ID),
     sb.from("one_offs").select("*").eq("org_id", CURRENT_ORG_ID),
     sb.from("monthly_actual").select("*").eq("org_id", CURRENT_ORG_ID),
@@ -385,7 +385,7 @@ async function loadData(orgId) {
     .forEach((cc) => {
       const actualMonthly = [];
       actRes.data
-        .filter((a) => a.cost_center_id === cc.id)
+        .filter((a) => a.reporting_line_id === cc.id)
         .forEach((a) => (actualMonthly[a.month - 1] = Number(a.amount)));
 
       COST_CENTERS.push({
@@ -396,10 +396,10 @@ async function loadData(orgId) {
         note: cc.note || "",
         isShared: !!cc.is_shared,
         headcount: hcRes.data
-          .filter((h) => h.cost_center_id === cc.id)
+          .filter((h) => h.reporting_line_id === cc.id)
           .map((h) => ({ id: h.id, roleId: h.role_id, count: h.count, startMonth: h.start_month, endMonth: h.end_month })),
         oneOffs: ooRes.data
-          .filter((o) => o.cost_center_id === cc.id)
+          .filter((o) => o.reporting_line_id === cc.id)
           .map((o) => ({ id: o.id, label: o.label, amount: Number(o.amount), month: o.month })),
         recurringCosts: [],
         overrides: {},
@@ -412,7 +412,7 @@ async function loadData(orgId) {
   const rcRes = await sb.from("recurring_costs").select("*").eq("org_id", CURRENT_ORG_ID);
   if (!rcRes.error) {
     rcRes.data.forEach((r) => {
-      const cc = COST_CENTERS.find((c) => c.id === r.cost_center_id);
+      const cc = COST_CENTERS.find((c) => c.id === r.reporting_line_id);
       if (cc) cc.recurringCosts.push({
         id: r.id, label: r.label, amount: Number(r.amount),
         startMonth: r.start_month, endMonth: r.end_month, escalationPct: Number(r.escalation_pct || 0),
@@ -425,7 +425,7 @@ async function loadData(orgId) {
   const foRes = await sb.from("forecast_overrides").select("*").eq("org_id", CURRENT_ORG_ID);
   if (!foRes.error) {
     foRes.data.forEach((o) => {
-      const cc = COST_CENTERS.find((c) => c.id === o.cost_center_id);
+      const cc = COST_CENTERS.find((c) => c.id === o.reporting_line_id);
       if (cc) cc.overrides[o.month] = Number(o.amount);
     });
   }
@@ -607,22 +607,22 @@ async function dbDeleteRole(id) {
 }
 
 async function dbUpdateCostCenter(cc) {
-  const { error } = await sb.from("cost_centers")
+  const { error } = await sb.from("reporting_lines")
     .update({ name: cc.name, annual_budget: cc.annualBudget, other_monthly: cc.otherMonthly })
     .eq("id", cc.id);
   if (error) flagWriteError(error);
 }
 
 async function dbInsertCostCenter() {
-  const { data, error } = await sb.from("cost_centers")
-    .insert({ org_id: CURRENT_ORG_ID, name: "New cost center", annual_budget: 0, other_monthly: 0 })
+  const { data, error } = await sb.from("reporting_lines")
+    .insert({ org_id: CURRENT_ORG_ID, name: "New reporting line", annual_budget: 0, other_monthly: 0 })
     .select().single();
   if (error) { flagWriteError(error); return null; }
   return { id: data.id, name: data.name, annualBudget: Number(data.annual_budget), otherMonthly: Number(data.other_monthly), isShared: false, headcount: [], oneOffs: [], recurringCosts: [], overrides: {}, actualMonthly: [] };
 }
 
 async function dbDeleteCostCenter(id) {
-  const { error } = await sb.from("cost_centers").delete().eq("id", id);
+  const { error } = await sb.from("reporting_lines").delete().eq("id", id);
   if (error) { flagWriteError(error); return false; }
   return true;
 }
@@ -630,18 +630,18 @@ async function dbDeleteCostCenter(id) {
 // Separate + error-tolerant so the app still works before migration-notes.sql
 // is run (the note column may not exist yet).
 async function dbSetCostCenterNote(cc) {
-  const { error } = await sb.from("cost_centers").update({ note: cc.note || null }).eq("id", cc.id);
+  const { error } = await sb.from("reporting_lines").update({ note: cc.note || null }).eq("id", cc.id);
   if (error) flagWriteError(error);
 }
 
 async function dbSetCostCenterShared(cc) {
-  const { error } = await sb.from("cost_centers").update({ is_shared: cc.isShared }).eq("id", cc.id);
+  const { error } = await sb.from("reporting_lines").update({ is_shared: cc.isShared }).eq("id", cc.id);
   if (error) flagWriteError(error);
 }
 
 async function dbInsertHeadcount(ccId, line) {
   const { data, error } = await sb.from("headcount_lines")
-    .insert({ org_id: CURRENT_ORG_ID, cost_center_id: ccId, role_id: line.roleId, count: line.count, start_month: line.startMonth, end_month: line.endMonth })
+    .insert({ org_id: CURRENT_ORG_ID, reporting_line_id: ccId, role_id: line.roleId, count: line.count, start_month: line.startMonth, end_month: line.endMonth })
     .select().single();
   if (error) { flagWriteError(error); return null; }
   return data.id;
@@ -661,7 +661,7 @@ async function dbDeleteHeadcount(id) {
 
 async function dbInsertOneOff(ccId, o) {
   const { data, error } = await sb.from("one_offs")
-    .insert({ org_id: CURRENT_ORG_ID, cost_center_id: ccId, label: o.label, amount: o.amount, month: o.month })
+    .insert({ org_id: CURRENT_ORG_ID, reporting_line_id: ccId, label: o.label, amount: o.amount, month: o.month })
     .select().single();
   if (error) { flagWriteError(error); return null; }
   return data.id;
@@ -681,7 +681,7 @@ async function dbDeleteOneOff(id) {
 
 async function dbInsertRecurringCost(ccId, r) {
   const { data, error } = await sb.from("recurring_costs")
-    .insert({ org_id: CURRENT_ORG_ID, cost_center_id: ccId, label: r.label, amount: r.amount, start_month: r.startMonth, end_month: r.endMonth, escalation_pct: r.escalationPct })
+    .insert({ org_id: CURRENT_ORG_ID, reporting_line_id: ccId, label: r.label, amount: r.amount, start_month: r.startMonth, end_month: r.endMonth, escalation_pct: r.escalationPct })
     .select().single();
   if (error) { flagWriteError(error); return null; }
   return data.id;
@@ -714,8 +714,8 @@ async function dbApplyRunRate(cc) {
   const runRate = Math.round(recent.reduce((a, b) => a + b, 0) / recent.length);
 
   const rows = [];
-  for (let m = CLOSE_MONTH + 1; m <= TIMELINE_LENGTH; m++) rows.push({ org_id: CURRENT_ORG_ID, cost_center_id: cc.id, month: m, amount: runRate });
-  const { error } = await sb.from("forecast_overrides").upsert(rows, { onConflict: "cost_center_id,month" });
+  for (let m = CLOSE_MONTH + 1; m <= TIMELINE_LENGTH; m++) rows.push({ org_id: CURRENT_ORG_ID, reporting_line_id: cc.id, month: m, amount: runRate });
+  const { error } = await sb.from("forecast_overrides").upsert(rows, { onConflict: "reporting_line_id,month" });
   if (error) { flagWriteError(error); return null; }
   rows.forEach((r) => (cc.overrides[r.month] = runRate));
   return runRate;
@@ -724,7 +724,7 @@ async function dbApplyRunRate(cc) {
 // Reversible: delete the override rows and the driver-based forecast resumes
 // unchanged (headcount/one-offs/recurring costs were never touched).
 async function dbClearOverrides(cc) {
-  const { error } = await sb.from("forecast_overrides").delete().eq("cost_center_id", cc.id);
+  const { error } = await sb.from("forecast_overrides").delete().eq("reporting_line_id", cc.id);
   if (error) { flagWriteError(error); return false; }
   cc.overrides = {};
   return true;
@@ -737,19 +737,19 @@ async function dbUpdateCloseMonth() {
   if (error) flagWriteError(error);
 }
 
-// Bulk import actuals. rows: [{ cost_center_id, month, amount }].
-// Upserts on the (cost_center_id, month) unique key, so re-importing a month
+// Bulk import actuals. rows: [{ reporting_line_id, month, amount }].
+// Upserts on the (reporting_line_id, month) unique key, so re-importing a month
 // overwrites rather than duplicating.
 async function dbUpsertActuals(rows) {
-  const payload = rows.map((r) => ({ org_id: CURRENT_ORG_ID, cost_center_id: r.cost_center_id, month: r.month, amount: r.amount }));
-  const { error } = await sb.from("monthly_actual").upsert(payload, { onConflict: "cost_center_id,month" });
+  const payload = rows.map((r) => ({ org_id: CURRENT_ORG_ID, reporting_line_id: r.reporting_line_id, month: r.month, amount: r.amount }));
+  const { error } = await sb.from("monthly_actual").upsert(payload, { onConflict: "reporting_line_id,month" });
   if (error) { flagWriteError(error); return false; }
   return true;
 }
 
 // Parse a simple CSV of actuals: one row per value, columns
-// "Cost Center", "Month (1–24)", "Amount", separated by ; , or tab.
-// A header row is auto-skipped (its month field isn't numeric). Cost centers
+// "Reporting Line", "Month (1–24)", "Amount", separated by ; , or tab.
+// A header row is auto-skipped (its month field isn't numeric). Reporting lines
 // are matched by name (case-insensitive); unmatched names are reported, not imported.
 function parseActualsCsv(text) {
   const rows = [];
@@ -769,7 +769,7 @@ function parseActualsCsv(text) {
     const cc = COST_CENTERS.find((c) => c.name.toLowerCase() === name.toLowerCase());
     if (!cc) { unmatched.add(name); continue; }
 
-    rows.push({ cost_center_id: cc.id, month, amount });
+    rows.push({ reporting_line_id: cc.id, month, amount });
   }
 
   return { rows, unmatched: [...unmatched], skipped };
@@ -905,7 +905,7 @@ const BUSINESS_PRESETS = {
   },
 };
 
-// Shown on Overview/Monthly when an organization has no cost centers yet.
+// Shown on Overview/Monthly when an organization has no reporting lines yet.
 function emptyOrgHtml() {
   const presetButtons = Object.entries(BUSINESS_PRESETS).map(([key, p]) =>
     `<button class="preset-card" data-loadpreset="${key}" type="button">
@@ -915,10 +915,10 @@ function emptyOrgHtml() {
   return `
     <div class="empty-state">
       <h2>Let's set up this organization</h2>
-      <p>There are no cost centers here yet. Two quick steps and the forecast comes to life:</p>
+      <p>There are no reporting lines here yet. Two quick steps and the forecast comes to life:</p>
       <ol>
         <li>Add your <strong>roles</strong> and their salaries on the <a href="assumptions.html">Assumptions</a> page.</li>
-        <li>Add <strong>cost centers</strong> and their headcount on the <a href="planning.html">Planning</a> page.</li>
+        <li>Add <strong>reporting lines</strong> and their headcount on the <a href="planning.html">Planning</a> page.</li>
       </ol>
       <a class="empty-cta" href="assumptions.html">Start on Assumptions →</a>
       <p class="preset-lead">Or start from what's closest to your business — a working example you edit from there:</p>
@@ -943,18 +943,18 @@ async function seedPreset(presetKey) {
   }
 
   for (const cc of preset.costCenters) {
-    const { data: ccRow, error } = await sb.from("cost_centers")
+    const { data: ccRow, error } = await sb.from("reporting_lines")
       .insert({ org_id: CURRENT_ORG_ID, name: cc.name, annual_budget: cc.budget, other_monthly: 0 })
       .select().single();
     if (error) { flagWriteError(error); return false; }
     const ccId = ccRow.id;
 
-    const hcRows = cc.hc.map(([label, count]) => ({ org_id: CURRENT_ORG_ID, cost_center_id: ccId, role_id: roleIds[label], count, start_month: 1, end_month: 24 }));
+    const hcRows = cc.hc.map(([label, count]) => ({ org_id: CURRENT_ORG_ID, reporting_line_id: ccId, role_id: roleIds[label], count, start_month: 1, end_month: 24 }));
     const hcRes = await sb.from("headcount_lines").insert(hcRows);
     if (hcRes.error) { flagWriteError(hcRes.error); return false; }
 
     const rcRes = await sb.from("recurring_costs")
-      .insert({ org_id: CURRENT_ORG_ID, cost_center_id: ccId, label: "Other costs", amount: cc.other, start_month: 1, end_month: 24, escalation_pct: 0 });
+      .insert({ org_id: CURRENT_ORG_ID, reporting_line_id: ccId, label: "Other costs", amount: cc.other, start_month: 1, end_month: 24, escalation_pct: 0 });
     if (rcRes.error) { flagWriteError(rcRes.error); return false; }
 
     // Believable 6 months of actuals derived from the monthly budget run-rate
@@ -962,7 +962,7 @@ async function seedPreset(presetKey) {
     const monthlyBudget = (cc.budget + cc.other * 12) / 12;
     const factors = [0.93, 0.97, 1.02, 0.99, 1.01, 0.98];
     const actRows = factors.map((f, i) => ({
-      org_id: CURRENT_ORG_ID, cost_center_id: ccId, month: i + 1,
+      org_id: CURRENT_ORG_ID, reporting_line_id: ccId, month: i + 1,
       amount: Math.round((monthlyBudget * f) / 1000) * 1000,
     }));
     const actRes = await sb.from("monthly_actual").insert(actRows);

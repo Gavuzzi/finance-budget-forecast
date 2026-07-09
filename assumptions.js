@@ -1,6 +1,6 @@
 // assumptions.js — the rate engine: payroll assumptions + the role salary
 // catalog. Edits persist to Supabase (scoped to this org by RLS). Changing
-// anything here cascades into every cost center's forecast on the other pages
+// anything here cascades into every reporting line's forecast on the other pages
 // (they recompute from this data on their next load).
 
 function roleBreakdown(role) {
@@ -83,7 +83,7 @@ function renderRateEngineBlock() {
   return `
     <div class="cc-block rate-block">
       <h2>Rate Assumptions</h2>
-      <p class="rate-hint">Costs are derived from these, not typed. Set the payroll assumptions and each role's base salary once — the loaded monthly cost is calculated, and every cost center using a role recalculates automatically.</p>
+      <p class="rate-hint">Costs are derived from these, not typed. Set the payroll assumptions and each role's base salary once — the loaded monthly cost is calculated, and every reporting line using a role recalculates automatically.</p>
       <div class="assumption-fields">
         <label>Employer contribution (%)
           <input type="number" data-assumption="employerContributionPct" value="${ASSUMPTIONS.employerContributionPct}" step="0.01">
@@ -192,7 +192,7 @@ function initAssumptions() {
       const role = getRole(roleId);
       const status = document.getElementById("roleStatus");
       if (isRoleInUse(roleId)) {
-        status.textContent = "Can't remove — this role is still used by a cost center on the Planning page.";
+        status.textContent = "Can't remove — this role is still used by a reporting line on the Planning page.";
         status.classList.add("error");
         return;
       }

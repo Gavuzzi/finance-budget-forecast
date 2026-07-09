@@ -1,6 +1,6 @@
 -- ============================================================================
 -- Second tenant — "Vantage Consulting AB", a small consulting firm.
--- Deliberately a DIFFERENT shape from the manufacturer (different cost centers, roles,
+-- Deliberately a DIFFERENT shape from the manufacturer (different reporting lines, roles,
 -- assumptions, and scale) to prove config-not-code: the same app renders a
 -- completely different company with zero code changes.
 --
@@ -38,12 +38,12 @@ begin
     (d_ops,   v_org, 'Operations Manager', 48000),
     (d_admin, v_org, 'Office Administrator', 30000);
 
-  insert into cost_centers (id, org_id, name, annual_budget, other_monthly) values
+  insert into reporting_lines (id, org_id, name, annual_budget, other_monthly) values
     (e_deliv,  v_org, 'Consulting Delivery', 8000000, 80000),
     (e_bizdev, v_org, 'Business Development', 3000000, 60000),
     (e_ops,    v_org, 'Operations', 2500000, 120000);
 
-  insert into headcount_lines (org_id, cost_center_id, role_id, count, start_month, end_month) values
+  insert into headcount_lines (org_id, reporting_line_id, role_id, count, start_month, end_month) values
     (v_org, e_deliv,  d_sr,   4, 1, 24),
     (v_org, e_deliv,  d_cons, 6, 1, 24),
     (v_org, e_deliv,  d_jr,   2, 3, 24),
@@ -51,12 +51,12 @@ begin
     (v_org, e_ops,    d_ops,  1, 1, 24),
     (v_org, e_ops,    d_admin, 2, 1, 24);
 
-  insert into one_offs (org_id, cost_center_id, label, amount, month) values
+  insert into one_offs (org_id, reporting_line_id, label, amount, month) values
     (v_org, e_deliv,  'Team conference & training', 120000, 9),
     (v_org, e_bizdev, 'Rebrand & new website', 250000, 10),
     (v_org, e_ops,    'Office relocation', 180000, 8);
 
-  insert into monthly_actual (org_id, cost_center_id, month, amount) values
+  insert into monthly_actual (org_id, reporting_line_id, month, amount) values
     (v_org, e_deliv, 1,640000),(v_org, e_deliv, 2,660000),(v_org, e_deliv, 3,700000),
     (v_org, e_deliv, 4,680000),(v_org, e_deliv, 5,690000),(v_org, e_deliv, 6,710000),
     (v_org, e_bizdev,1,240000),(v_org, e_bizdev,2,250000),(v_org, e_bizdev,3,260000),
