@@ -10,6 +10,8 @@ Collected while you're away — batch these whenever. (App: app.html, signed in,
   - Click **Lock current budget** → name it → it should show "Locked [today] · [name]: [total] approved · ✓ matches the live budget".
   - Go to **Planning**, change a cost centre's annual budget, back to **Overview** → the panel should now show a **drift amount** (over/under) instead of the ✓.
   - Click **Lock current as new version** again → drift should clear back to ✓ against the new snapshot.
+- [ ] **Revenue target.** Assumptions page → new **"Revenue Target"** panel at the top → set an annual number (e.g. your real rough target) → go to Monthly, **Sync now**.
+  - Expect: the P&L panel's Revenue row shows an extra **"±X% vs budget"** next to the actual figure. Set it back to 0 → the "vs budget" text should disappear.
 
 ---
 Previously verified live (2026-07-07): ✅
