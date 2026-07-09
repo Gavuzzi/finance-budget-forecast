@@ -1,4 +1,18 @@
 let currentLens = "fy"; // "fy" | "rolling"
+// Periodization lens: OFF by default ("show honestly" — the actuals-only rule
+// stays sacred, this never touches real data). When ON, a cost centre's booked
+// actuals display as their period average instead of the raw lumpy monthly
+// figure — e.g. one annual insurance payment in March no longer reads as a
+// spike with everything else near-zero. Purely a display transform: average ×
+// count = the same sum, so FY/company totals are computed from the real
+// monthAmount() and never change; drill-down still shows the real month.
+let smoothActuals = false;
+
+function smoothedActual(cc) {
+  const vals = [];
+  for (let m = 1; m <= CLOSE_MONTH; m++) { const v = cc.actualMonthly[m - 1]; if (v != null) vals.push(v); }
+  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+}
 
 // Compact cell value — just the number in the org's display unit (stated once in the hint).
 function fmtCell(n) {
@@ -18,14 +32,16 @@ function lensMonths() {
   return a;
 }
 
-function monthCell(value, isActual, isDivider, ccId, month, isOverridden) {
+function monthCell(value, isActual, isDivider, ccId, month, isOverridden, isSmoothed) {
   // Actual cells are drillable ("what's in this number?"); forecast cells aren't.
   const drill = isActual && ccId ? ` mt-drill" data-cc="${ccId}" data-m="${month}` : "";
-  // A run-rate override is visibly distinct from the driver-computed plan — never silent.
-  const cls = (isActual ? "" : "mt-forecast") + (isDivider ? " mt-divider" : "") + (isOverridden ? " mt-override" : "");
-  // A booked-but-empty cell (actual = 0) reads as "nothing booked" — show a dash.
-  const display = isActual && value === 0 ? "–" : fmtCell(value);
-  const title = isOverridden ? ` title="Using a re-forecast run-rate override, not the driver plan"` : "";
+  // A run-rate override, or a smoothed display value, is visibly distinct from
+  // the real driver plan / raw booked figure — never silent.
+  const cls = (isActual ? "" : "mt-forecast") + (isDivider ? " mt-divider" : "") + (isOverridden ? " mt-override" : "") + (isSmoothed ? " mt-smoothed" : "");
+  // A booked-but-empty cell (actual = 0, not smoothed) reads as "nothing booked" — show a dash.
+  const display = isActual && !isSmoothed && value === 0 ? "–" : fmtCell(value);
+  const title = isOverridden ? ` title="Using a re-forecast run-rate override, not the driver plan"`
+    : isSmoothed ? ` title="Smoothed — the period average, not the raw booked figure. Click to see the real month."` : "";
   return `<td class="num ${cls}${drill}"${title}>${display}</td>`;
 }
 
@@ -66,10 +82,14 @@ function renderMonthlyGrid() {
 
   // One row per cost center
   COST_CENTERS.forEach((cc) => {
+    const smoothed = smoothActuals ? smoothedActual(cc) : null;
     html += `<tr><td class="mt-name">${cc.name}</td>`;
     months.forEach((m) => {
       const { value, isActual, isOverridden } = monthAmount(cc, m);
-      html += monthCell(value, isActual, m === CLOSE_MONTH + 1, cc.id, m, isOverridden);
+      // Display-only substitution — the drill-down (cc.id/m) still points at
+      // the real month, so clicking always shows what actually happened.
+      const shown = isActual && smoothed != null ? smoothed : value;
+      html += monthCell(shown, isActual, m === CLOSE_MONTH + 1, cc.id, m, isOverridden, isActual && smoothed != null);
     });
     if (isFy) {
       const fy = fySummary(cc);
@@ -83,10 +103,19 @@ function renderMonthlyGrid() {
     html += `</tr>`;
   });
 
-  // Company total row
+  // Company total row — smoothed consistently with the per-cc rows above
+  // (sum of smoothed = smoothed sum, since averaging is linear).
+  let smoothedTotal = null;
+  if (smoothActuals) {
+    const vals = [];
+    for (let m = 1; m <= CLOSE_MONTH; m++) vals.push(companyMonthAmount(m));
+    smoothedTotal = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+  }
   html += `<tr class="mt-total"><td class="mt-name">Total</td>`;
   months.forEach((m) => {
-    html += monthCell(companyMonthAmount(m), m <= CLOSE_MONTH, m === CLOSE_MONTH + 1);
+    const isActualM = m <= CLOSE_MONTH;
+    const shown = isActualM && smoothedTotal != null ? smoothedTotal : companyMonthAmount(m);
+    html += monthCell(shown, isActualM, m === CLOSE_MONTH + 1, null, m, false, isActualM && smoothedTotal != null);
   });
   if (isFy) {
     const t = companyFySummary();
@@ -257,6 +286,10 @@ function initMonthly() {
       renderMonthlyGrid();
     });
   });
+  document.getElementById("smoothToggle").addEventListener("change", (e) => {
+    smoothActuals = e.target.checked;
+    renderMonthlyGrid();
+  });
   document.getElementById("exportBtn").addEventListener("click", downloadExport);
   initDrill();
   initImport();
@@ -267,6 +300,11 @@ function initMonthly() {
   if (location.hash === "#drilltest" && COST_CENTERS.length) showDrill(COST_CENTERS[0].id, 3);
   if (location.hash === "#csvtest") {
     document.getElementById("monthlyGrid").innerHTML = `<pre style="font-size:11px">${buildExportCsv().replace(/</g, "&lt;")}</pre>`;
+  }
+  if (location.hash === "#smoothtest") {
+    document.getElementById("smoothToggle").checked = true;
+    smoothActuals = true;
+    renderMonthlyGrid();
   }
 }
 

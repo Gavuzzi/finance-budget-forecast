@@ -24,6 +24,10 @@
           <button class="lens-btn active" data-lens="fy" type="button">This Fiscal Year</button>
           <button class="lens-btn" data-lens="rolling" type="button">Rolling 12 Months</button>
         </div>
+        <label class="smooth-toggle">
+          <input type="checkbox" id="smoothToggle">
+          Spread lumpy actuals <span class="smooth-hint">(period average, for trend reading — doesn't change totals)</span>
+        </label>
       </section>
 
       <p class="table-hint">Figures in <span id="unitLabel">mkr</span>. <span class="mt-legend-actual">Solid</span> columns are booked actuals; <span class="mt-legend-forecast">lighter</span> columns are forecast. The accent line marks where actuals end.</p>

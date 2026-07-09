@@ -216,6 +216,11 @@
   text-underline-offset: 3px;
 }
 
+.monthly-table .mt-smoothed {
+  font-style: italic;
+  background: rgba(200,170,90,0.08);
+}
+
 .monthly-table td.over { color: var(--red); }
 .monthly-table td.under { color: var(--green); }
 .monthly-table td.neutral { color: var(--amber); }
@@ -1028,6 +1033,13 @@ html[data-theme="light"] .panel {
   flex-wrap: wrap;
   gap: 14px;
 }
+
+.smooth-toggle {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 0.85rem; color: var(--text-dim); cursor: pointer; user-select: none;
+}
+.smooth-toggle input { accent-color: var(--accent); cursor: pointer; }
+.smooth-hint { color: var(--text-dim); font-size: 0.76rem; }
 
 .lens-toggle {
   display: inline-flex;
