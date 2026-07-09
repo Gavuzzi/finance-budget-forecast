@@ -103,18 +103,24 @@ async function syncOrg(admin: any, org_id: string) {
     }).eq("org_id", org_id);
   }
 
-  // 2. Mapping rules. Precedence per cost row: cost-centre tag → account-range
-  //    fallback → Unassigned. Account ranges make untagged companies syncable.
+  // 2. Mapping rules, split by dimension. Precedence per cost row: PROJECT tag
+  //    (SIE dim 6, the more specific dimension) → COST-CENTRE tag (dim 1) →
+  //    account-range fallback → Unassigned. Account ranges make untagged
+  //    companies syncable; project codes and cost-centre codes are independent
+  //    namespaces (can collide as the same string), hence two separate maps.
   const { data: maps } = await admin.from("cost_center_mappings")
     .select("external_code, cost_center_id, dimension, account_from, account_to").eq("org_id", org_id);
-  const codeToCc = new Map<string, string>();
+  const costCodeToCc = new Map<string, string>();
+  const projCodeToCc = new Map<string, string>();
   const acctRanges: { from: number; to: number; ccId: string }[] = [];
   (maps ?? []).forEach((m: any) => {
     if (!m.cost_center_id) return;
     if (m.dimension === "account" && m.account_from != null && m.account_to != null) {
       acctRanges.push({ from: m.account_from, to: m.account_to, ccId: m.cost_center_id });
-    } else if (m.dimension !== "account") {
-      codeToCc.set(m.external_code, m.cost_center_id);
+    } else if (m.dimension === "project") {
+      projCodeToCc.set(m.external_code, m.cost_center_id);
+    } else {
+      costCodeToCc.set(m.external_code, m.cost_center_id);
     }
   });
 
@@ -142,8 +148,10 @@ async function syncOrg(admin: any, org_id: string) {
   let revRaw = 0, cogs = 0, opex = 0, personnel = 0;   // raw P&L by BAS class
   let capturedCost = 0, unassignedCost = 0;
   let curMonth: number | null = null;
-  const objektNames = new Map<string, string>();   // SIE dim-1 cost-centre code → name
+  const objektNames = new Map<string, string>();    // SIE dim-1 cost-centre code → name
+  const projektNames = new Map<string, string>();   // SIE dim-6 project code → name
   const codeCost = new Map<string, number>();       // cost-centre code → total operating cost
+  const projCost = new Map<string, number>();       // project code → total operating cost
   const uaMonths = new Map<number, number>();       // month → unassigned operating cost
   const kontoNames = new Map<number, string>();     // SIE #KONTO — account number → name
   const detail = new Map<string, { amt: number; n: number }>(); // `${ccKey}|${month}|${acct}` (ccKey = ccId or "UA")
@@ -160,9 +168,10 @@ async function syncOrg(admin: any, org_id: string) {
       } else curMonth = null;
       return;
     }
-    if (line.startsWith("#OBJEKT")) {   // cost-centre / project definitions (dim 1 = kostnadsställe)
+    if (line.startsWith("#OBJEKT")) {   // dim 1 = kostnadsställe, dim 6 = projekt (both SIE4-reserved)
       const o = line.match(/#OBJEKT\s+(\d+)\s+"([^"]*)"\s+"([^"]*)"/);
       if (o && o[1] === "1") objektNames.set(o[2], o[3]);
+      else if (o && o[1] === "6") projektNames.set(o[2], o[3]);
       return;
     }
     if (line.startsWith("#KONTO")) {    // account definitions → names for the drill-down
@@ -186,20 +195,26 @@ async function syncOrg(admin: any, org_id: string) {
     else if (cls === 7) personnel += amount;
 
     // Cost capture into reporting lines: operating costs (BAS 4–7) only.
-    // Precedence: cost-centre tag → account-range fallback → Unassigned bucket.
+    // Precedence: PROJECT tag (more specific) → cost-centre tag → account-range
+    // fallback → Unassigned bucket.
     if (!(acct >= 4000 && acct < 8000)) return;
     const pairs = [...t[2].matchAll(/(\d+)\s+"([^"]*)"/g)];
-    const ccPair = pairs.find((p) => p[1] === "1"); // SIE dimension 1 = kostnadsställe
+    const ccPair = pairs.find((p) => p[1] === "1");   // SIE dimension 1 = kostnadsställe
+    const projPair = pairs.find((p) => p[1] === "6"); // SIE dimension 6 = projekt
     const code = ccPair ? ccPair[2].trim() : "";
+    const projCode = projPair ? projPair[2].trim() : "";
     if (code) codeCost.set(code, (codeCost.get(code) ?? 0) + amount);
+    if (projCode) projCost.set(projCode, (projCost.get(projCode) ?? 0) + amount);
 
-    let ccId = code ? codeToCc.get(code) : undefined;
+    let ccId = projCode ? projCodeToCc.get(projCode) : undefined;
+    if (!ccId) ccId = code ? costCodeToCc.get(code) : undefined;
     if (!ccId) {
       const r = acctRanges.find((r) => acct >= r.from && acct <= r.to);
       if (r) ccId = r.ccId;
     }
     if (!ccId) {
-      if (code) unmapped.add(code);
+      if (projCode) unmapped.add(projCode);
+      else if (code) unmapped.add(code);
       unassignedCost += amount;   // never silently drop — lands in the Unassigned line
       uaMonths.set(curMonth, (uaMonths.get(curMonth) ?? 0) + amount);
       const dk = `UA|${curMonth}|${acct}`;
@@ -294,10 +309,10 @@ async function syncOrg(admin: any, org_id: string) {
   await admin.from("organizations").update(orgPatch).eq("id", org_id);
   const closeMonthOut = org?.close_month_manual ? org.close_month : autoClose;
 
-  // Master-data load: fetch Fortnox's FULL cost-centre list (not just codes seen
-  // in the ledger), so a cost-centre created but never yet booked to — the
-  // plan-ahead scenario — still shows up to link-or-create against. Best-effort;
-  // the SIE-derived list alone is still enough if this call fails.
+  // Master-data load: fetch Fortnox's FULL cost-centre + project lists (not
+  // just codes seen in the ledger), so one created but never yet booked to —
+  // the plan-ahead scenario — still shows up to link-or-create against.
+  // Best-effort; the SIE-derived lists alone are still enough if these fail.
   try {
     const cc = await fortnoxGet(`/costcenters`, accessToken);
     for (const c of cc?.CostCenters ?? []) {
@@ -305,15 +320,30 @@ async function syncOrg(admin: any, org_id: string) {
       if (code && !objektNames.has(code)) objektNames.set(code, c.Description ?? c.Name ?? code);
     }
   } catch (_) { /* non-fatal — SIE-derived list still works */ }
+  try {
+    const pr = await fortnoxGet(`/projects`, accessToken);
+    for (const p of pr?.Projects ?? []) {
+      const code = String(p.ProjectNumber ?? p.Code ?? p.code ?? "").trim();
+      if (code && !projektNames.has(code)) projektNames.set(code, p.Description ?? p.Name ?? code);
+    }
+  } catch (_) { /* non-fatal — SIE-derived list still works */ }
 
-  // Cost-centre list (master data + any codes seen in transactions), with
-  // operating cost and mapped status — powers the one-click mapping UI.
+  // Cost-centre / project lists (master data + any codes seen in transactions),
+  // with operating cost and mapped status — power the one-click mapping UI.
   const seenCodes = new Set<string>([...objektNames.keys(), ...codeCost.keys()]);
   const cost_centers = [...seenCodes].map((code) => ({
     code,
     name: objektNames.get(code) ?? code,
     cost: Math.round(codeCost.get(code) ?? 0),
-    mapped: codeToCc.has(code),
+    mapped: costCodeToCc.has(code),
+  })).sort((a, b) => b.cost - a.cost);
+
+  const seenProjCodes = new Set<string>([...projektNames.keys(), ...projCost.keys()]);
+  const projects = [...seenProjCodes].map((code) => ({
+    code,
+    name: projektNames.get(code) ?? code,
+    cost: Math.round(projCost.get(code) ?? 0),
+    mapped: projCodeToCc.has(code),
   })).sort((a, b) => b.cost - a.cost);
 
   // Prior fiscal year (if the company has one) → "vs last year" baseline.
@@ -356,6 +386,7 @@ async function syncOrg(admin: any, org_id: string) {
     close_month: closeMonthOut,
     unmapped_cost_centers: [...unmapped],
     cost_centers,
+    projects,
     reconciliation: recon,
   };
 }

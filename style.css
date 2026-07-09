@@ -771,6 +771,7 @@ html, body {
 .fn-cc-link:focus { outline: none; border-color: var(--accent); }
 
 .fn-acct-ranges { margin-top: 16px; border-top: 1px dashed var(--panel-border); padding-top: 12px; }
+.fn-section-gap { margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--panel-border); }
 .fn-acct-add { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 .fn-acct-add input {
   width: 84px; background: var(--bg); border: 1px solid var(--panel-border); color: var(--text);

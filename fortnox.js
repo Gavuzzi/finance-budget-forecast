@@ -11,8 +11,9 @@ const FORTNOX_AUTHORIZE_URL = "https://apps.fortnox.se/oauth-v1/auth";
 const FN_REDIRECT_URI = `${SUPABASE_URL}/functions/v1/fortnox-oauth`;
 const fortnoxConfigured = () => FORTNOX_CLIENT_ID && !FORTNOX_CLIENT_ID.startsWith("SET_");
 
-// The cost centres returned by the last sync (from the SIE), for the mapping UI.
+// The cost centres / projects returned by the last sync (from the SIE), for the mapping UI.
 let lastCostCenters = [];
+let lastProjects = [];
 
 // ---- Data access -----------------------------------------------------------
 
@@ -28,15 +29,18 @@ async function loadMappings() {
   return byCc;
 }
 
-async function saveMapping(costCenterId, code) {
+// dimension: "costcenter" (default) or "project" — project codes and cost-
+// centre codes are independent namespaces and can collide as the same string,
+// so the unique key (and this upsert's conflict target) includes dimension.
+async function saveMapping(costCenterId, code, dimension = "costcenter") {
   code = (code || "").trim();
   if (!code) {
-    await sb.from("cost_center_mappings").delete().eq("org_id", CURRENT_ORG_ID).eq("cost_center_id", costCenterId);
+    await sb.from("cost_center_mappings").delete().eq("org_id", CURRENT_ORG_ID).eq("cost_center_id", costCenterId).eq("dimension", dimension);
     return;
   }
   await sb.from("cost_center_mappings").upsert(
-    { org_id: CURRENT_ORG_ID, external_code: code, cost_center_id: costCenterId },
-    { onConflict: "org_id,external_code" }
+    { org_id: CURRENT_ORG_ID, external_code: code, cost_center_id: costCenterId, dimension },
+    { onConflict: "org_id,dimension,external_code" }
   );
 }
 
@@ -84,6 +88,7 @@ async function runFortnoxSync(btn) {
     }
     showToast(msg);
     lastCostCenters = out.cost_centers || [];
+    lastProjects = out.projects || [];
     renderReconciliation(out);
     const ls = document.getElementById("fnLastSynced");
     if (ls) ls.textContent = "Last synced: " + new Date().toLocaleString("sv-SE");
@@ -198,34 +203,47 @@ function connectedHtml(status) {
     </div>`;
 }
 
-// Shows the REAL Fortnox cost centres (name + code + cost) from the last sync,
-// each with a one-click "Import as new reporting line" or "Link to existing".
-async function renderMappingEditor(host) {
+// Shared row markup for a mappable Fortnox object (cost centre or project):
+// name + code + cost from the last sync, with one-click Import/Link.
+function codeRowsHtml(items, dimension) {
   const options = COST_CENTERS.map((c) => `<option value="${c.id}">${c.name}</option>`).join("");
+  return `
+    <div class="fn-cc-rows">
+      ${items.map((it) => `
+        <div class="fn-cc-row" data-code="${it.code}" data-dim="${dimension}">
+          <span class="fn-cc-name">${it.name} <span class="fn-cc-code">${it.code}</span></span>
+          <span class="fn-cc-cost num">${fmtKr(it.cost)}</span>
+          ${it.mapped
+            ? `<span class="fn-cc-mapped">✓ mapped</span>`
+            : `<span class="fn-cc-actions">
+                 <button class="fn-cc-import" type="button">Import</button>
+                 <select class="fn-cc-link"><option value="">Link to…</option>${options}</select>
+               </span>`}
+        </div>`).join("")}
+    </div>`;
+}
+
+// Shows the REAL Fortnox cost centres AND projects (name + code + cost) from
+// the last sync, each with a one-click "Import as new reporting line" or
+// "Link to existing". Precedence on sync: project tag → cost-centre tag →
+// account range → Unassigned (a row rarely carries both, but if it does, the
+// project is more specific and wins).
+async function renderMappingEditor(host) {
   const ccSection = lastCostCenters.length
-    ? `<p class="integ-map-hint">Your Fortnox cost centres. <strong>Import</strong> each as a reporting line, or <strong>link</strong> it to an existing one, then re-sync to pull its actuals in. Nothing is dropped.</p>
-       <div class="fn-cc-rows">
-         ${lastCostCenters.map((cc) => `
-           <div class="fn-cc-row" data-code="${cc.code}">
-             <span class="fn-cc-name">${cc.name} <span class="fn-cc-code">${cc.code}</span></span>
-             <span class="fn-cc-cost num">${fmtKr(cc.cost)}</span>
-             ${cc.mapped
-               ? `<span class="fn-cc-mapped">✓ mapped</span>`
-               : `<span class="fn-cc-actions">
-                    <button class="fn-cc-import" type="button">Import</button>
-                    <select class="fn-cc-link"><option value="">Link to…</option>${options}</select>
-                  </span>`}
-           </div>`).join("")}
-       </div>`
+    ? `<p class="integ-map-hint">Your Fortnox <strong>cost centres</strong>. <strong>Import</strong> each as a reporting line, or <strong>link</strong> it to an existing one, then re-sync to pull its actuals in. Nothing is dropped.</p>` + codeRowsHtml(lastCostCenters, "costcenter")
     : `<p class="integ-map-hint">Hit <strong>Sync now</strong> first — then your Fortnox cost centres appear here to map in one click. (No cost centres in your books? Use account ranges below.)</p>`;
-  host.innerHTML = ccSection + `<div id="fnAcctRanges" class="fn-acct-ranges"></div>`;
+  const projSection = lastProjects.length
+    ? `<p class="integ-map-hint fn-section-gap"><strong>Projects</strong> — matched before cost centres when a booking carries both.</p>` + codeRowsHtml(lastProjects, "project")
+    : "";
+  host.innerHTML = ccSection + projSection + `<div id="fnAcctRanges" class="fn-acct-ranges"></div>`;
   renderAccountRanges(host);
-  host.querySelectorAll(".fn-cc-row").forEach((row) => {
-    const cc = lastCostCenters.find((c) => c.code === row.dataset.code);
+  host.querySelectorAll(".fn-cc-row[data-code]").forEach((row) => {
+    const dim = row.dataset.dim;
+    const item = (dim === "project" ? lastProjects : lastCostCenters).find((c) => c.code === row.dataset.code);
     const imp = row.querySelector(".fn-cc-import");
-    if (imp) imp.addEventListener("click", () => importCostCenter(cc, host));
+    if (imp) imp.addEventListener("click", () => importCostCenter(item, host, dim));
     const sel = row.querySelector(".fn-cc-link");
-    if (sel) sel.addEventListener("change", () => { if (sel.value) linkCostCenter(cc, sel.value, host); });
+    if (sel) sel.addEventListener("change", () => { if (sel.value) linkCostCenter(item, sel.value, host, dim); });
   });
 }
 
@@ -279,22 +297,22 @@ async function renderAccountRanges(host) {
   });
 }
 
-async function importCostCenter(cc, host) {
+async function importCostCenter(item, host, dimension = "costcenter") {
   const { data, error } = await sb.from("cost_centers")
-    .insert({ org_id: CURRENT_ORG_ID, name: cc.name, annual_budget: 0, other_monthly: 0 })
+    .insert({ org_id: CURRENT_ORG_ID, name: item.name, annual_budget: 0, other_monthly: 0 })
     .select().single();
   if (error) { showToast("Couldn't create — " + error.message, "error"); return; }
   COST_CENTERS.push({ id: data.id, name: data.name, annualBudget: 0, otherMonthly: 0, note: "", headcount: [], oneOffs: [], recurringCosts: [], actualMonthly: [] });
-  await saveMapping(data.id, cc.code);
-  cc.mapped = true;
-  showToast(`Imported "${cc.name}" and mapped it.`);
+  await saveMapping(data.id, item.code, dimension);
+  item.mapped = true;
+  showToast(`Imported "${item.name}" and mapped it.`);
   renderMappingEditor(host);
 }
 
-async function linkCostCenter(cc, appCcId, host) {
-  await saveMapping(appCcId, cc.code);
-  cc.mapped = true;
-  showToast(`Linked ${cc.code} → ${COST_CENTERS.find((c) => c.id === appCcId)?.name || "line"}.`);
+async function linkCostCenter(item, appCcId, host, dimension = "costcenter") {
+  await saveMapping(appCcId, item.code, dimension);
+  item.mapped = true;
+  showToast(`Linked ${item.code} → ${COST_CENTERS.find((c) => c.id === appCcId)?.name || "line"}.`);
   renderMappingEditor(host);
 }
 

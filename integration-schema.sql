@@ -47,7 +47,7 @@ create policy integration_status_read on integration_status
 create table if not exists cost_center_mappings (
   id              uuid primary key default gen_random_uuid(),
   org_id          uuid not null references organizations(id) on delete cascade,
-  external_code   text not null,            -- Fortnox kostnadsställe code
+  external_code   text not null,            -- Fortnox kostnadsställe/project code, or an account-range key
   external_name   text,
   cost_center_id  uuid references cost_centers(id) on delete cascade,
   unique (org_id, external_code)
@@ -57,6 +57,19 @@ create table if not exists cost_center_mappings (
 alter table cost_center_mappings add column if not exists dimension text not null default 'costcenter'; -- costcenter|project|account
 alter table cost_center_mappings add column if not exists account_from integer;
 alter table cost_center_mappings add column if not exists account_to integer;
+-- Project codes and cost-centre codes are independent namespaces in Fortnox and
+-- CAN collide as the same string (e.g. both "10") — the unique key must include
+-- dimension, or mapping one silently clobbers the other. Idempotent repair for
+-- databases created before this was caught.
+do $$
+begin
+  if exists (select 1 from pg_constraint where conname = 'cost_center_mappings_org_id_external_code_key') then
+    alter table cost_center_mappings drop constraint cost_center_mappings_org_id_external_code_key;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'cost_center_mappings_org_dim_code_key') then
+    alter table cost_center_mappings add constraint cost_center_mappings_org_dim_code_key unique (org_id, dimension, external_code);
+  end if;
+end $$;
 alter table cost_center_mappings enable row level security;
 drop policy if exists cost_center_mappings_read  on cost_center_mappings;
 drop policy if exists cost_center_mappings_write on cost_center_mappings;
