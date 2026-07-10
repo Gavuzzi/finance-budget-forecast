@@ -419,5 +419,8 @@ verify_jwt = false
 [functions.send-digest]
 verify_jwt = false
 
+[functions.org-members]
+verify_jwt = false
+
 [functions.fortnox-sync]
 verify_jwt = false

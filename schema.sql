@@ -277,6 +277,16 @@ create or replace function public.can_edit_org(p_org uuid)
   );
 $$;
 
+-- Membership management (invite/remove/change role) is owner-only — stricter
+-- than can_edit_org, since it's an administrative action, not a data edit.
+create or replace function public.is_org_owner(p_org uuid)
+  returns boolean language sql security definer stable set search_path = public as $$
+  select exists (
+    select 1 from memberships
+    where org_id = p_org and user_id = auth.uid() and role = 'owner'
+  );
+$$;
+
 -- The ONLY way to create an org + membership: atomic, and it stops a client from
 -- inserting a membership directly (which would let anyone join any org they know
 -- the id of). Called from the app via sb.rpc('create_organization', {...}).

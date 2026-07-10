@@ -147,6 +147,103 @@ function renderRateEngineBlock() {
   `;
 }
 
+// ---- Team (membership management) ------------------------------------------
+
+async function callOrgMembers(payload) {
+  const { data: { session } } = await sb.auth.getSession();
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/org-members`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${session.access_token}`, apikey: SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ org_id: CURRENT_ORG_ID, ...payload }),
+  });
+  const out = await res.json();
+  if (!res.ok || out.error) throw new Error(out.error || res.statusText);
+  return out;
+}
+
+const ROLE_LABEL = { owner: "Owner", editor: "Editor", viewer: "Viewer" };
+
+function roleSelectHtml(userId, currentRole) {
+  return `<select class="team-role-select" data-member="${userId}">
+    ${["owner", "editor", "viewer"].map((r) => `<option value="${r}"${r === currentRole ? " selected" : ""}>${ROLE_LABEL[r]}</option>`).join("")}
+  </select>`;
+}
+
+function teamRowHtml(m, isOwnerView) {
+  const manage = isOwnerView && !m.is_you
+    ? `${roleSelectHtml(m.user_id, m.role)} <button class="row-remove" data-removemember="${m.user_id}" title="Remove from this organization">✕</button>`
+    : isOwnerView
+      ? roleSelectHtml(m.user_id, m.role) // can change your own role (server blocks removing the last owner)
+      : `<span class="role-pill role-${m.role}">${ROLE_LABEL[m.role]}</span>`;
+  return `
+    <div class="team-row">
+      <span class="team-email">${escapeHtml(m.email)}${m.is_you ? ` <span class="team-you">— you</span>` : ""}</span>
+      <span class="team-manage">${manage}</span>
+    </div>`;
+}
+
+function demoTeamHtml() {
+  return `
+    <div class="team-row"><span class="team-email">you@example.com <span class="team-you">— you</span></span><span class="role-pill role-owner">Owner</span></div>
+    <div class="team-row"><span class="team-email">colleague@example.com</span><span class="role-pill role-editor">Editor</span></div>
+    <p class="rate-hint" style="margin:10px 0 0;">Sign in to invite real teammates.</p>`;
+}
+
+function teamInviteFormHtml() {
+  return `<div class="team-invite">
+    <input type="email" id="teamInviteEmail" placeholder="teammate@company.com">
+    <select id="teamInviteRole"><option value="editor">Editor</option><option value="viewer">Viewer</option></select>
+    <button class="add-headcount" id="teamInviteBtn" type="button">Invite</button>
+  </div>`;
+}
+
+async function renderTeamPanel() {
+  const listEl = document.getElementById("teamList");
+  const formEl = document.getElementById("teamInviteForm");
+  if (!listEl) return;
+
+  // Dev hook: ?preview#teamtest renders the interactive owner view (role
+  // selects, remove buttons, invite form) without a live edge-function call
+  // — headless-verifiable, unlike the real authenticated path.
+  if (location.hash === "#teamtest" && typeof DEMO_MODE !== "undefined" && DEMO_MODE) {
+    const fake = [
+      { user_id: "u1", email: "felixroos@gmail.com", role: "owner", is_you: true },
+      { user_id: "u2", email: "colleague@company.se", role: "editor", is_you: false },
+      { user_id: "u3", email: "accountant@company.se", role: "viewer", is_you: false },
+    ];
+    listEl.innerHTML = fake.map((m) => teamRowHtml(m, true)).join("");
+    formEl.innerHTML = teamInviteFormHtml();
+    return;
+  }
+
+  if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) {
+    listEl.innerHTML = demoTeamHtml();
+    formEl.innerHTML = "";
+    return;
+  }
+
+  try {
+    const { members } = await callOrgMembers({ action: "list" });
+    const isOwnerView = members.some((m) => m.is_you && m.role === "owner");
+    listEl.innerHTML = members.map((m) => teamRowHtml(m, isOwnerView)).join("");
+    formEl.innerHTML = isOwnerView ? teamInviteFormHtml() : "";
+  } catch (e) {
+    listEl.innerHTML = `<p class="rate-hint">Couldn't load the team list — ${escapeHtml(e.message)}</p>`;
+  }
+}
+
+function renderTeamBlock() {
+  return `
+    <div class="cc-block rate-block team-block">
+      <h2>Team</h2>
+      <p class="rate-hint">Who has access to this organization. Owners can invite people, change roles, and remove access; editors can edit all the data but not manage who's on the team; viewers are read-only.</p>
+      <div id="teamList" class="team-list">Loading…</div>
+      <div id="teamInviteForm"></div>
+      <p class="form-status" id="teamStatus"></p>
+    </div>
+  `;
+}
+
 function renderDataBlock() {
   return `
     <div class="cc-block rate-block data-block">
@@ -158,8 +255,10 @@ function renderDataBlock() {
 }
 
 function buildRateEngine() {
-  document.getElementById("rateEngine").innerHTML = renderRevenueBlock() + renderRateEngineBlock() + renderTaxBlock() + renderDataBlock();
+  document.getElementById("rateEngine").innerHTML =
+    renderRevenueBlock() + renderRateEngineBlock() + renderTaxBlock() + renderTeamBlock() + renderDataBlock();
   updateRateFormula();
+  renderTeamPanel();
 }
 
 // Shows, in plain language with the live assumptions plugged in, exactly how
@@ -237,9 +336,70 @@ function initAssumptions() {
     }
   });
 
+  rateEngine.addEventListener("change", async (e) => {
+    const sel = e.target.closest(".team-role-select");
+    if (!sel) return;
+    const status = document.getElementById("teamStatus");
+    status.classList.remove("error");
+    status.textContent = "Updating…";
+    try {
+      await callOrgMembers({ action: "set_role", user_id: sel.dataset.member, role: sel.value });
+      status.textContent = "Role updated.";
+      renderTeamPanel();
+    } catch (err) {
+      status.textContent = err.message;
+      status.classList.add("error");
+      renderTeamPanel(); // revert the dropdown to the actual server state
+    }
+  });
+
   rateEngine.addEventListener("click", async (e) => {
     if (e.target.id === "exportAllBtn") {
       exportAllData();
+      return;
+    }
+
+    if (e.target.id === "teamInviteBtn") {
+      const emailInput = document.getElementById("teamInviteEmail");
+      const roleSelect = document.getElementById("teamInviteRole");
+      const status = document.getElementById("teamStatus");
+      const email = emailInput.value.trim();
+      status.classList.remove("error");
+      if (!email) { status.textContent = "Enter an email first."; status.classList.add("error"); return; }
+      e.target.disabled = true;
+      e.target.textContent = "Inviting…";
+      try {
+        const out = await callOrgMembers({ action: "invite", email, role: roleSelect.value });
+        status.textContent = out.mode === "invited"
+          ? `Invite sent to ${out.email}.`
+          : `${out.email} already has an account — added directly.`;
+        emailInput.value = "";
+        renderTeamPanel();
+      } catch (err) {
+        status.textContent = err.message;
+        status.classList.add("error");
+      } finally {
+        e.target.disabled = false;
+        e.target.textContent = "Invite";
+      }
+      return;
+    }
+
+    const removeMemberBtn = e.target.closest("[data-removemember]");
+    if (removeMemberBtn) {
+      const row = removeMemberBtn.closest(".team-row");
+      const email = row ? row.querySelector(".team-email").textContent.trim() : "this person";
+      if (!confirm(`Remove ${email} from this organization? They'll lose access immediately.`)) return;
+      const status = document.getElementById("teamStatus");
+      status.classList.remove("error");
+      try {
+        await callOrgMembers({ action: "remove", user_id: removeMemberBtn.dataset.removemember });
+        status.textContent = "Removed.";
+        renderTeamPanel();
+      } catch (err) {
+        status.textContent = err.message;
+        status.classList.add("error");
+      }
       return;
     }
     if (e.target.id === "revSpreadBtn") {

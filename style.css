@@ -1610,6 +1610,39 @@ html[data-theme="light"] .panel {
 @media (max-width: 900px) { .rev-plan-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .rev-plan-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 
+/* Team (membership management) */
+.team-list { margin-bottom: 14px; }
+.team-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--panel-border);
+  font-size: 0.9rem;
+}
+.team-row:last-child { border-bottom: none; }
+.team-email { color: var(--text); }
+.team-you { color: var(--text-dim); font-size: 0.8rem; }
+.team-manage { display: flex; align-items: center; gap: 8px; flex: none; }
+.role-pill { font-size: 0.75rem; padding: 2px 10px; border-radius: 999px; font-weight: 600; }
+.role-pill.role-owner { background: rgba(122, 163, 224, 0.15); color: var(--accent-soft); }
+.role-pill.role-editor { background: rgba(217, 166, 71, 0.15); color: var(--amber); }
+.role-pill.role-viewer { background: var(--panel-border); color: var(--text-dim); }
+.team-role-select {
+  background: var(--bg); border: 1px solid var(--panel-border); color: var(--text);
+  border-radius: 7px; padding: 5px 8px; font-size: 0.82rem; font-family: inherit;
+}
+.team-invite { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
+.team-invite input[type="email"] {
+  background: var(--bg); border: 1px solid var(--panel-border); color: var(--text);
+  border-radius: 8px; padding: 8px 10px; font-size: 0.9rem; font-family: inherit; flex: 1; min-width: 200px;
+}
+.team-invite select {
+  background: var(--bg); border: 1px solid var(--panel-border); color: var(--text);
+  border-radius: 8px; padding: 8px 10px; font-size: 0.9rem; font-family: inherit;
+}
+
 .range-inputs {
   display: flex;
   align-items: center;
