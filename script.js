@@ -495,6 +495,7 @@ function renderAll() {
     }
     empty.innerHTML = emptyOrgHtml();
     empty.style.display = "";
+    renderIntegrationPanel(document.getElementById("onboardIntegrationPanel"));
     return;
   }
 

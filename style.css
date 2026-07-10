@@ -449,7 +449,15 @@
 
 .empty-cta.secondary:hover { border-color: var(--accent); background: none; }
 
-.preset-lead { color: var(--text-dim); font-size: 0.88rem; margin: 22px 0 12px; padding-top: 18px; border-top: 1px solid var(--panel-border); }
+/* Three ranked onboarding paths (TEARDOWN C11 — connect-the-ledger first) */
+.empty-option { padding-top: 22px; margin-top: 22px; border-top: 1px solid var(--panel-border); }
+.empty-option:first-of-type { padding-top: 0; margin-top: 18px; border-top: none; }
+.empty-option-kicker {
+  font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--accent-soft); margin-bottom: 10px;
+}
+.empty-option-primary .integration-card { background: var(--bg); margin-bottom: 0; }
+
 .preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .preset-card {
   display: flex; flex-direction: column; gap: 4px; text-align: left;

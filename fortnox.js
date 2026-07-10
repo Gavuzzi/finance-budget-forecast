@@ -422,7 +422,20 @@ function wireIntegrationPanel(host, status) {
 
 async function renderIntegrationPanel(host) {
   if (!host) return;
-  if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { host.innerHTML = demoIntegrationHtml(); return; }
+  if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) {
+    // An empty org showing an already-connected P&L would be a contradiction
+    // (real empty orgs never have live Fortnox data) — the ?preview&empty dev
+    // hook is the only way this combination happens, so show the same
+    // not-connected state a real new user would see instead of demo data.
+    if (COST_CENTERS.length === 0) {
+      host.innerHTML = disconnectedHtml();
+      const btn = host.querySelector("#fnConnectBtn");
+      if (btn) btn.addEventListener("click", () => showToast(t("toast_signin_connect_fortnox")));
+    } else {
+      host.innerHTML = demoIntegrationHtml();
+    }
+    return;
+  }
   const status = await loadIntegrationStatus();
   host.innerHTML = status && status.connected ? connectedHtml(status) : disconnectedHtml();
   wireIntegrationPanel(host, status);

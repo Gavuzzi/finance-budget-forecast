@@ -1065,6 +1065,12 @@ const BUSINESS_PRESETS = {
 };
 
 // Shown on Overview/Monthly when an organization has no reporting lines yet.
+// Three ranked paths to real numbers (TEARDOWN C11: connect-the-ledger comes
+// first — it's the fastest route to a trustworthy number, ahead of both the
+// preset shortcut and manual entry). onboardIntegrationPanel is populated
+// separately by renderIntegrationPanel() once this markup is in the DOM,
+// reusing the exact same connect flow already shipped on Monthly — no new
+// OAuth code, just a second place it's offered.
 function emptyOrgHtml() {
   const presetButtons = Object.entries(BUSINESS_PRESETS).map(([key, p]) =>
     `<button class="preset-card" data-loadpreset="${key}" type="button">
@@ -1074,14 +1080,26 @@ function emptyOrgHtml() {
   return `
     <div class="empty-state">
       <h2>${t("empty_org_h2")}</h2>
-      <p>${t("empty_org_p")}</p>
-      <ol>
-        <li>${t("empty_org_step1")}</li>
-        <li>${t("empty_org_step2")}</li>
-      </ol>
-      <a class="empty-cta" href="assumptions.html">${t("empty_org_cta")}</a>
-      <p class="preset-lead">${t("empty_org_preset_lead")}</p>
-      <div class="preset-grid">${presetButtons}</div>
+      <p>${t("empty_org_intro")}</p>
+
+      <div class="empty-option empty-option-primary">
+        <div class="empty-option-kicker">${t("empty_org_option_fortnox")}</div>
+        <div id="onboardIntegrationPanel"></div>
+      </div>
+
+      <div class="empty-option">
+        <div class="empty-option-kicker">${t("empty_org_option_preset")}</div>
+        <div class="preset-grid">${presetButtons}</div>
+      </div>
+
+      <div class="empty-option">
+        <div class="empty-option-kicker">${t("empty_org_option_manual")}</div>
+        <ol>
+          <li>${t("empty_org_step1")}</li>
+          <li>${t("empty_org_step2")}</li>
+        </ol>
+        <a class="empty-cta" href="assumptions.html">${t("empty_org_cta")}</a>
+      </div>
     </div>`;
 }
 

@@ -354,9 +354,26 @@ repaint, so we never restyle twice.
   (zero data.js touched), shadowing grep clean. NOT checked: a real accessibility contrast-ratio audit
   (eyeballed via screenshots only) — reasonable given the accent was deliberately kept at the old
   luminance, but a formal WCAG pass is cheap and worth doing before a real client demo.
-- [ ] `[B]` **4. First-run experience (~1 day)** — a signed-in first-time user should reach "I see my
-  numbers" in minutes: preset or Fortnox connect → guided 3-step checklist instead of the current wall.
-  Plus a written 7-minute demo script for Felix.
+- [x] `[B]` **4a. First-run experience** *(done 2026-07-10 — demo script deferred, Felix's call)* —
+  the empty-org screen (`emptyOrgHtml()`, shared by Overview/Monthly) offered two paths: a preset or
+  manual entry. Neither was "connect Fortnox," even though that's the fastest route to a real number for
+  our actual buyer (a Fortnox SME) and the app already has a fully-built one-click import flow for it —
+  per C11, connect-the-ledger comes first, ahead of both the demo-quality preset and manual entry.
+  Restructured into three explicitly ranked options: **Connect Fortnox** (featured — warm-tinted card,
+  reuses the exact same `renderIntegrationPanel()`/OAuth flow already shipped and verified on Monthly,
+  zero new backend code), then the preset grid, then manual steps — each under a plain-language kicker
+  instead of one undifferentiated block. **Bug found and fixed during verification:** demo mode
+  (`?preview`) always rendered the Fortnox panel as already-connected with fake P&L data, which on an
+  *empty* org (only reachable via the `?preview&empty` dev hook, but that's also how I screenshot-verify
+  this exact screen) is a visible contradiction — fixed by showing the real not-connected state instead
+  when `COST_CENTERS.length === 0`; that in turn exposed a second bug — the connect button in that
+  branch had no click handler at all (dead button, no feedback) — fixed with a toast, matching the
+  existing demo-blocked-action convention used elsewhere (`toast_signin_*`). **Verified:** engine tests
+  green, screenshotted in English/Swedish/light/dark, confirmed the normal (non-empty) demo Overview is
+  pixel-identical to before this change — this only touches the zero-data first-run path.
+- [ ] `[B]` **4b. Demo script** *(deferred — "probably later" per Felix 2026-07-10)* — a written outline
+  for a live screen-share call (not a recording) walking a prospect through login → the Overview verdict
+  → the loop → Assumptions. Pick back up whenever real customer conversations are close.
 - [ ] `[F]` **5. Dress rehearsal — the exit criterion** — Felix runs the full TESTING.md backlog, closes a
   real month on real data solo, and performs the demo script end-to-end without notes. Every stumble gets
   fixed same-day. **When the rehearsal passes, product prep is DONE and customer conversations start** —
