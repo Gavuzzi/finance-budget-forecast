@@ -382,6 +382,32 @@ repaint, so we never restyle twice.
 
 ### Compliance gate — before onboarding a REAL client
 - [ ] `[F]` Confirm Fortnox **production** API access (partner agreement if needed)
-- [ ] `[F/B]` DPA + security review for holding real financial data (GDPR). **DPA** = the GDPR-required processor contract with each client (you process their employees'/company's data on their instruction): scope, sub-processors (Supabase, Fortnox), security measures, breach notice, deletion-on-exit — have a template ready before demoing to a serious prospect ("can you sign a DPA?" is an early buyer question). **Security review** = the Phase 6 security-pass findings (XSS fix, RLS audit, read-only posture) written up as an honest posture doc + data-retention/deletion story, not a paid pentest until a client demands one.
-- [ ] `[B]` Read-only posture (token has write scope; we never write) — documented + enforced
+- [x] `[B]` **Security review write-up** *(done 2026-07-10)* — see **`SECURITY.md`**: the Phase 6
+  security-pass findings (RLS audit, XSS fix, credential isolation) plus the read-only posture
+  below, written as a client-facing posture doc rather than internal dev notes, organized by
+  GDPR-relevant category (tenant isolation, secrets, XSS, read-only integration, retention,
+  sub-processors) with what's NOT done stated plainly (no third-party pentest, no live two-account
+  cross-tenant test, no formal deletion-timeline commitment). Sub-processor hosting region
+  (Supabase, AWS `eu-west-1`/Ireland — EU, no SCCs needed for that transfer) verified live via the
+  Supabase CLI rather than assumed.
+- [x] `[B]` **Read-only posture — documented + enforced** *(done 2026-07-10)* — re-verified by
+  grepping every `fetch()` call touching Fortnox's API across `fortnox.js` and the edge function:
+  every data-fetching call is a GET; the only non-GET call is the OAuth token exchange (not a data
+  write). Documented honestly in `SECURITY.md` §4 that this is enforced by code discipline, NOT by
+  an OAuth scope technically incapable of writing (Fortnox doesn't offer a strictly-read-only scope
+  for this data category) — an important distinction for anyone relying on this claim. Added an
+  explicit warning comment directly above the fetch calls in `fortnox-sync/index.ts` so a future
+  edit can't add a write call without seeing it, and redeployed the function (comment-only change,
+  zero behavior difference, deploy confirmed clean).
+- [ ] `[F/B]` **DPA** *(drafted 2026-07-10, NOT usable as-is)* — see **`DPA-TEMPLATE.md`**: a
+  structural skeleton (parties, processing scope, sub-processors, breach notice, deletion,
+  liability) built from `SECURITY.md`'s verified facts, with every placeholder marked and a
+  top-of-file banner that this is not legal advice. Deliberately left blank rather than
+  confidently filled in: the liability and governing-law clauses (drafting these without a lawyer
+  risks a clause that's either toothless or dangerously one-sided, and there's no way to verify
+  which from the text alone), the actual breach-notification window and deletion timeline (need
+  real numbers Felix can commit to, not plausible-sounding placeholders), and whether data entered
+  is named-individual or role-aggregate (changes GDPR scope). **Get this reviewed by an actual
+  lawyer before any customer sees it** — this is not a model-capability gap that a stronger model
+  closes; no LLM output should be treated as legal advice for a binding contract.
 - [ ] `[F]` **Live UI click-through pass** — every backend mechanism built this session was fault-injection-tested via direct DB/SQL access (coverage/Unassigned, account ranges, projects, drill-down, budget drift, revenue target, re-forecast apply/revert — all verified correct against real synced data). What's NOT yet done: clicking the real buttons as a logged-in user in a browser. Low risk (same render code already screenshot-verified in `?preview`; same write functions verified by hand) but not zero — do one full pass through Monthly/Overview/Planning/Assumptions before a real client's data is on the line.

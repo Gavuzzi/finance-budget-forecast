@@ -9,6 +9,11 @@
 //   • the nightly pg_cron job (x-cron-key header === CRON_SECRET, all connected orgs).
 //
 // "Enforce JWT" stays OFF. Secrets: FORTNOX_CLIENT_ID, FORTNOX_CLIENT_SECRET, CRON_SECRET.
+//
+// READ-ONLY, BY CODE, NOT BY SCOPE (see SECURITY.md #4): every fortnoxGet() call and every
+// direct fetch() to API_BASE below must stay a GET. The Fortnox OAuth scope granted here does
+// not itself forbid writes — never add a POST/PUT/DELETE against API_BASE, ever, for any reason,
+// including "just to create test data".
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 

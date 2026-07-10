@@ -17,6 +17,8 @@ Live: https://gavuzzi.github.io/finance-budget-forecast/ · Supabase project ref
 - `index.html` — the marketing landing page. Separate from the app (no sidebar/data.js) but loads `i18n.js` for its own `lp_*` strings and a nav language toggle
 - `ROADMAP.md` — backlog + honest verification notes · `TESTING.md` — manual checks collected for Felix
 - `TEARDOWN.md` — competitor UI convention sheet (C1–C12). Any UI/design change must cite a convention ID from it
+- `SECURITY.md` — client-facing security/data-protection posture doc, re-verify claims against the live system before reuse
+- `DPA-TEMPLATE.md` — DPA skeleton, explicitly NOT usable until a lawyer reviews it (see its own banner)
 
 ## Sacred rules (violating these is a bug even if the code works)
 1. **Fortnox is READ-ONLY.** Never call any Fortnox write endpoint, not even to create test data. No exceptions.
