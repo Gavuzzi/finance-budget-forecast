@@ -286,6 +286,38 @@ built so a cheaper model can execute + self-verify mechanically. Do those first.
 
 **Explicitly NOT now** (still correct calls): React/Svelte migration (vanilla is creaking but holding — a client sees nothing for it), multi-currency, approval workflows, complex allocation.
 
+### Phase 7 — Make it feel like a product (pre-customer polish, planned 2026-07-10)
+Felix's verdict opening the app fresh: confusing, too much everywhere, unsure about the color, and — the
+most important signal — he doesn't yet feel he could use it to the fullest himself. Diagnosis (honest):
+the problem is NOT the blue. It's (a) **density/information architecture** — Overview stacks ~11 sections
+with equal visual weight, so nothing is the headline; (b) **dark-by-default** — every praised SME finance
+tool (Runway, Causal, Fathom, Abacum) is light-first with one restrained accent; dark-first reads
+"developer tool", not "finance tool your accountant would trust"; (c) **jargon** — "FP&A", "drivers",
+"reporting lines" assume a finance-team reader; the buyer is an SME owner/controller. Method: **copy, don't
+invent** — same rule we already use for features, now applied to UI. Order matters: teardown BEFORE any
+repaint, so we never restyle twice.
+
+- [ ] `[B]` **1. Competitor UI teardown (~1 day)** — Runway, Causal, Fathom, Abacum: product screenshots,
+  design writeups, G2/user reviews for *why* each is praised. Output: a convention sheet committed to the
+  repo (default theme, palette, typography, nav structure, dashboard hierarchy, density rules, empty-state
+  and onboarding patterns). Every Phase 7 design decision must cite a line from this sheet — if we can't
+  point at who we're copying, we don't do it.
+- [ ] `[B]` **2. Information architecture restructure (1–2 days)** — Overview becomes: one hero row
+  (the number that matters + variance), one chart, one **"This month"** action block (Signals + review
+  ritual + Re-forecast — the loop, front and center since it's our differentiator), everything else
+  demoted to collapsed sections or moved to its own page. Plain-language pass on nav/headings (what a
+  Swedish SME owner says, not what a CFO says). No engine changes — presentation layer only, tests stay green.
+- [ ] `[B]` **3. Visual reskin (~1 day)** — light theme becomes the DEFAULT (dark stays as toggle),
+  palette/typography/spacing copied from the convention sheet. Re-shoot all landing-page screenshots after.
+- [ ] `[B]` **4. First-run experience (~1 day)** — a signed-in first-time user should reach "I see my
+  numbers" in minutes: preset or Fortnox connect → guided 3-step checklist instead of the current wall.
+  Plus a written 7-minute demo script for Felix.
+- [ ] `[F]` **5. Dress rehearsal — the exit criterion** — Felix runs the full TESTING.md backlog, closes a
+  real month on real data solo, and performs the demo script end-to-end without notes. Every stumble gets
+  fixed same-day. **When the rehearsal passes, product prep is DONE and customer conversations start** —
+  "the UI feels perfect" is explicitly NOT the bar, because taste has no finish line and this becomes
+  avoidance. The product is already functionally ahead of what any SME expects from a first meeting.
+
 ### Compliance gate — before onboarding a REAL client
 - [ ] `[F]` Confirm Fortnox **production** API access (partner agreement if needed)
 - [ ] `[F/B]` DPA + security review for holding real financial data (GDPR). **DPA** = the GDPR-required processor contract with each client (you process their employees'/company's data on their instruction): scope, sub-processors (Supabase, Fortnox), security measures, breach notice, deletion-on-exit — have a template ready before demoing to a serious prospect ("can you sign a DPA?" is an early buyer question). **Security review** = the Phase 6 security-pass findings (XSS fix, RLS audit, read-only posture) written up as an honest posture doc + data-retention/deletion story, not a paid pentest until a client demands one.
