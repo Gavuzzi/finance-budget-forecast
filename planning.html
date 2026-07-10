@@ -14,18 +14,18 @@
     <main class="app-main">
       <header class="page-head">
         <div class="page-head-text">
-          <h1>Planning</h1>
-          <p class="page-sub">The headcount and cost drivers behind each reporting line</p>
+          <h1 data-i18n="planning_h1">Planning</h1>
+          <p class="page-sub" data-i18n="planning_subtitle">The headcount and cost drivers behind each reporting line</p>
         </div>
       </header>
 
-      <p class="planning-intro">Headcount lines run on an absolute timeline — hires, leavers, and temporary contracts each have a real start and end month, so every month gets its own forecast. Pay rates are derived on the <a href="assumptions.html">Assumptions page</a>, not typed here.</p>
+      <p class="planning-intro" data-i18n-html="planning_intro">Headcount lines run on an absolute timeline — hires, leavers, and temporary contracts each have a real start and end month, so every month gets its own forecast. Pay rates are derived on the <a href="assumptions.html">Assumptions page</a>, not typed here.</p>
 
       <div class="planning-actions">
-        <button class="add-cc-btn" id="addCostCenter" type="button">+ Add reporting line</button>
+        <button class="add-cc-btn" id="addCostCenter" type="button" data-i18n="add_reporting_line_btn">+ Add reporting line</button>
         <label class="smooth-toggle">
           <input type="checkbox" id="allocToggle">
-          Fully-loaded view <span class="smooth-hint">(allocate shared/corporate cost centres to the others, by headcount)</span>
+          <span data-i18n="fully_loaded_toggle">Fully-loaded view</span> <span class="smooth-hint" data-i18n="fully_loaded_hint">(allocate shared/corporate cost centres to the others, by headcount)</span>
         </label>
       </div>
 
@@ -35,6 +35,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="lib.js"></script>
+  <script src="i18n.js"></script>
   <script src="data.js"></script>
   <script src="sidebar.js"></script>
   <script src="planning.js"></script>

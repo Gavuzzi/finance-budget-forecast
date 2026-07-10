@@ -35,20 +35,20 @@ function renderStats() {
 
     statsRow.innerHTML = `
       <div class="stat-card">
-        <span class="stat-label">Annual Budget (FY2026)</span>
+        <span class="stat-label">${t("stat_annual_budget")}</span>
         <span class="stat-value">${fmtMkr(fy.budget)}</span>
       </div>
       <div class="stat-card">
-        <span class="stat-label">Booked Actuals</span>
+        <span class="stat-label">${t("stat_booked_actuals")}</span>
         <span class="stat-value">${fmtMkr(bookedActual)}</span>
-        <span class="stat-sub">through ${monthLabel(CLOSE_MONTH)}</span>
+        <span class="stat-sub">${t("stat_through", monthLabel(CLOSE_MONTH))}</span>
       </div>
       <div class="stat-card">
-        <span class="stat-label">Full-Year Total</span>
+        <span class="stat-label">${t("stat_fy_total")}</span>
         <span class="stat-value">${fmtMkr(fy.total)}</span>
       </div>
       <div class="stat-card highlight">
-        <span class="stat-label">Variance vs Budget</span>
+        <span class="stat-label">${t("stat_variance_vs_budget")}</span>
         <span class="stat-value ${cls}">${fmtMkrSigned(fy.variance)}</span>
         <span class="stat-sub ${cls}">${pct > 0 ? "+" : ""}${pct.toFixed(1)}%</span>
       </div>
@@ -60,21 +60,21 @@ function renderStats() {
 
     statsRow.innerHTML = `
       <div class="stat-card">
-        <span class="stat-label">Rolling 12 Total</span>
+        <span class="stat-label">${t("stat_rolling_12")}</span>
         <span class="stat-value">${fmtMkr(rolling.total)}</span>
       </div>
       <div class="stat-card">
-        <span class="stat-label">Window</span>
+        <span class="stat-label">${t("stat_window")}</span>
         <span class="stat-value small">${monthLabel(start)} – ${monthLabel(end)}</span>
       </div>
       <div class="stat-card">
-        <span class="stat-label">Avg Monthly Run-Rate</span>
+        <span class="stat-label">${t("stat_avg_monthly")}</span>
         <span class="stat-value">${fmtMkr(rolling.total / 12)}</span>
       </div>
       <div class="stat-card highlight">
-        <span class="stat-label">Months Without FY Budget</span>
+        <span class="stat-label">${t("stat_months_without_budget")}</span>
         <span class="stat-value">${monthsBeyondBudget}</span>
-        <span class="stat-sub">next year's budget isn't set yet</span>
+        <span class="stat-sub">${t("stat_budget_not_set")}</span>
       </div>
     `;
   }
@@ -86,10 +86,10 @@ function renderTable() {
   if (currentLens === "fy") {
     let html = `
       <div class="budget-row header">
-        <span class="cc-name">Reporting Line</span>
-        <span class="num">Budget</span>
-        <span class="num">FY2026 Total</span>
-        <span class="num">Variance</span>
+        <span class="cc-name">${t("col_reporting_line")}</span>
+        <span class="num">${t("col_budget")}</span>
+        <span class="num">${t("col_fy_total")}</span>
+        <span class="num">${t("col_variance")}</span>
       </div>
     `;
 
@@ -101,9 +101,9 @@ function renderTable() {
       html += `
         <div class="budget-row">
           <span class="cc-name">${escapeHtml(cc.name)}${cc.note ? `<span class="cc-note">${escapeHtml(cc.note)}</span>` : ""}</span>
-          <span class="num" data-label="Budget">${fmtMkr(fy.budget)}</span>
-          <span class="num" data-label="FY2026 Total">${fmtMkr(fy.total)}</span>
-          <span class="variance-cell ${cls}" data-label="Variance">
+          <span class="num" data-label="${t("col_budget")}">${fmtMkr(fy.budget)}</span>
+          <span class="num" data-label="${t("col_fy_total")}">${fmtMkr(fy.total)}</span>
+          <span class="variance-cell ${cls}" data-label="${t("col_variance")}">
             ${fmtMkrSigned(fy.variance)}
             <span class="variance-pill ${cls}">${pct > 0 ? "+" : ""}${pct.toFixed(1)}%</span>
           </span>
@@ -111,16 +111,16 @@ function renderTable() {
       `;
     }
 
-    const t = companyFySummary();
-    const totalCls = varianceClass(t.variance, t.budget);
-    const totalPct = t.budget ? (t.variance / t.budget) * 100 : 0;
+    const ft = companyFySummary();
+    const totalCls = varianceClass(ft.variance, ft.budget);
+    const totalPct = ft.budget ? (ft.variance / ft.budget) * 100 : 0;
     html += `
       <div class="budget-row total">
-        <span class="cc-name">Total</span>
-        <span class="num" data-label="Budget">${fmtMkr(t.budget)}</span>
-        <span class="num" data-label="FY2026 Total">${fmtMkr(t.total)}</span>
-        <span class="variance-cell ${totalCls}" data-label="Variance">
-          ${fmtMkrSigned(t.variance)}
+        <span class="cc-name">${t("col_total")}</span>
+        <span class="num" data-label="${t("col_budget")}">${fmtMkr(ft.budget)}</span>
+        <span class="num" data-label="${t("col_fy_total")}">${fmtMkr(ft.total)}</span>
+        <span class="variance-cell ${totalCls}" data-label="${t("col_variance")}">
+          ${fmtMkrSigned(ft.variance)}
           <span class="variance-pill ${totalCls}">${totalPct > 0 ? "+" : ""}${totalPct.toFixed(1)}%</span>
         </span>
       </div>
@@ -129,8 +129,8 @@ function renderTable() {
   } else {
     let html = `
       <div class="budget-row header rolling">
-        <span class="cc-name">Reporting Line</span>
-        <span class="num">Rolling 12 Total</span>
+        <span class="cc-name">${t("col_reporting_line")}</span>
+        <span class="num">${t("col_rolling_12")}</span>
       </div>
     `;
 
@@ -139,16 +139,16 @@ function renderTable() {
       html += `
         <div class="budget-row rolling">
           <span class="cc-name">${escapeHtml(cc.name)}${cc.note ? `<span class="cc-note">${escapeHtml(cc.note)}</span>` : ""}</span>
-          <span class="num" data-label="Rolling 12 Total">${fmtMkr(r.total)}</span>
+          <span class="num" data-label="${t("col_rolling_12")}">${fmtMkr(r.total)}</span>
         </div>
       `;
     }
 
-    const t = companyRollingSummary();
+    const rt = companyRollingSummary();
     html += `
       <div class="budget-row total rolling">
-        <span class="cc-name">Total</span>
-        <span class="num" data-label="Rolling 12 Total">${fmtMkr(t.total)}</span>
+        <span class="cc-name">${t("col_total")}</span>
+        <span class="num" data-label="${t("col_rolling_12")}">${fmtMkr(rt.total)}</span>
       </div>
     `;
     table.innerHTML = html;
@@ -168,12 +168,12 @@ function renderChart() {
   });
 
   document.getElementById("chartTitle").textContent =
-    currentLens === "fy" ? "Spend — Budget vs Actual vs Forecast (FY2026)" : "Spend — Rolling 12 Months (Actual + Forecast)";
+    currentLens === "fy" ? t("chart_title_fy") : t("chart_title_rolling");
 
   const ctx = document.getElementById("trendChart");
   const datasets = [
     {
-      label: "Budget",
+      label: t("chart_series_budget"),
       data: budgetSeries,
       borderColor: colors.budget,
       borderDash: [4, 4],
@@ -183,7 +183,7 @@ function renderChart() {
       spanGaps: false,
     },
     {
-      label: "Actual",
+      label: t("chart_series_actual"),
       data: actualSeries,
       borderColor: colors.actual,
       backgroundColor: "transparent",
@@ -191,7 +191,7 @@ function renderChart() {
       pointRadius: 3,
     },
     {
-      label: "Forecast",
+      label: t("chart_series_forecast"),
       data: forecastSeries,
       borderColor: colors.forecast,
       borderDash: [6, 3],
@@ -223,14 +223,14 @@ function renderChart() {
 function onboardCardHtml() {
   return `
     <div class="onboard-card">
-      <button class="onboard-close" id="onboardClose" type="button" title="Dismiss">✕</button>
-      <h2>How this works</h2>
-      <p>Your budget and forecast are <strong>built from drivers</strong> — your people and known costs — not typed in cell by cell. Change a driver once and every number here updates. You never re-key figures like in a spreadsheet.</p>
+      <button class="onboard-close" id="onboardClose" type="button" title="${t("onboard_dismiss")}">✕</button>
+      <h2>${t("onboard_h2")}</h2>
+      <p>${t("onboard_intro")}</p>
       <div class="onboard-tabs">
-        <div><strong>Overview</strong> the whole picture — budget vs. actual vs. forecast.</div>
-        <div><strong>Monthly</strong> the same numbers, month by month.</div>
-        <div><strong>Planning</strong> where you edit the drivers — headcount &amp; costs.</div>
-        <div><strong>Assumptions</strong> set pay rates once; they flow everywhere.</div>
+        <div><strong>${t("nav_overview")}</strong> ${t("onboard_overview")}</div>
+        <div><strong>${t("nav_monthly")}</strong> ${t("onboard_monthly")}</div>
+        <div><strong>${t("nav_planning")}</strong> ${t("onboard_planning")}</div>
+        <div><strong>${t("nav_assumptions")}</strong> ${t("onboard_assumptions")}</div>
       </div>
     </div>`;
 }
@@ -240,7 +240,7 @@ function renderOnboard() {
   if (!slot) return;
 
   if (localStorage.getItem("almgren-onboard-dismissed") === "true") {
-    slot.innerHTML = `<button class="onboard-link" id="onboardOpen" type="button">How this works ▾</button>`;
+    slot.innerHTML = `<button class="onboard-link" id="onboardOpen" type="button">${t("onboard_reopen")}</button>`;
     document.getElementById("onboardOpen").addEventListener("click", () => {
       localStorage.removeItem("almgren-onboard-dismissed");
       renderOnboard();
@@ -277,17 +277,17 @@ function renderRoleBreakdown() {
   const rows = roleFyTotals();
 
   if (rows.length === 0) {
-    el.innerHTML = `<p class="empty-hint">No headcount yet — add some on the Planning page.</p>`;
+    el.innerHTML = `<p class="empty-hint">${t("no_headcount_hint")}</p>`;
     return;
   }
 
   const total = rows.reduce((s, r) => s + r.cost, 0);
-  let html = `<div class="rb-row rb-head"><span>Role</span><span class="num">Headcount</span><span class="num">FY people cost</span><span class="num">Share</span></div>`;
+  let html = `<div class="rb-row rb-head"><span>${t("col_role")}</span><span class="num">${t("col_headcount")}</span><span class="num">${t("col_fy_people_cost")}</span><span class="num">${t("col_share")}</span></div>`;
   rows.forEach((r) => {
     const pct = total ? (r.cost / total) * 100 : 0;
     html += `<div class="rb-row"><span>${escapeHtml(r.label)}</span><span class="num">${r.count}</span><span class="num">${fmtMkr(r.cost)}</span><span class="num">${pct.toFixed(0)}%</span></div>`;
   });
-  html += `<div class="rb-row rb-total"><span>Total people cost</span><span class="num"></span><span class="num">${fmtMkr(total)}</span><span class="num">100%</span></div>`;
+  html += `<div class="rb-row rb-total"><span>${t("total_people_cost")}</span><span class="num"></span><span class="num">${fmtMkr(total)}</span><span class="num">100%</span></div>`;
   el.innerHTML = html;
 }
 
@@ -307,7 +307,7 @@ function renderScenarioDetail(s, currentByName) {
         <span class="num ${cls}">${scen != null && cur != null ? fmtMkrSigned(d) : ""}</span>
       </div>`;
   });
-  return `<div class="scen-detail-head"><span>Reporting line</span><span class="num">Scenario</span><span class="num">Current</span><span class="num">Δ</span></div>${rows}`;
+  return `<div class="scen-detail-head"><span>${t("col_reporting_line")}</span><span class="num">${t("col_scenario")}</span><span class="num">${t("col_current")}</span><span class="num">Δ</span></div>${rows}`;
 }
 
 function renderScenarios() {
@@ -318,14 +318,14 @@ function renderScenarios() {
 
   let html = `
     <div class="scenario-row current">
-      <span>Current plan (live)</span>
+      <span>${t("scenario_current_plan")}</span>
       <span class="num">${fmtMkr(currentTotal)}</span>
       <span class="num"></span>
       <span></span>
     </div>`;
 
   if (SCENARIOS.length === 0) {
-    html += `<p class="empty-hint">No saved scenarios yet — snapshot the current plan to start comparing.</p>`;
+    html += `<p class="empty-hint">${t("no_scenarios_hint")}</p>`;
   } else {
     SCENARIOS.forEach((s) => {
       const delta = s.fyTotal - currentTotal;
@@ -335,7 +335,7 @@ function renderScenarios() {
           <span>${escapeHtml(s.name)} <span class="scenario-caret">▾</span></span>
           <span class="num">${fmtMkr(s.fyTotal)}</span>
           <span class="num ${cls}">${fmtMkrSigned(delta)}</span>
-          <button class="row-remove" data-delscen="${s.id}" title="Delete scenario">✕</button>
+          <button class="row-remove" data-delscen="${s.id}" title="${t("delete_scenario_title")}">✕</button>
         </div>
         <div class="scenario-detail" data-detailscen="${s.id}" hidden>
           ${renderScenarioDetail(s, currentByName)}
@@ -348,7 +348,7 @@ function renderScenarios() {
 
 function initScenarios() {
   document.getElementById("saveScenarioBtn").addEventListener("click", async () => {
-    const name = prompt("Name this scenario (e.g. Base, Hiring freeze):");
+    const name = prompt(t("prompt_scenario_name"));
     if (!name || !name.trim()) return;
     const s = await dbSaveScenario(name.trim());
     if (!s) return;
@@ -361,7 +361,7 @@ function initScenarios() {
     if (delBtn) {
       const id = delBtn.dataset.delscen;
       const s = SCENARIOS.find((x) => x.id === id);
-      if (!confirm(`Delete scenario "${s ? s.name : ""}"?`)) return;
+      if (!confirm(t("confirm_delete_scenario", s ? s.name : ""))) return;
       if (!(await dbDeleteScenario(id))) return;
       const idx = SCENARIOS.findIndex((x) => x.id === id);
       if (idx > -1) SCENARIOS.splice(idx, 1);
@@ -424,8 +424,8 @@ function renderForecastPnl() {
   panel.innerHTML = `
     <div class="bv-row">
       <div>
-        <h2 class="bv-title">Projected FY2026 result <span class="pnl-src">— revenue plan vs full-year cost</span></h2>
-        <p class="table-hint"><strong class="${cls}">${fmtMkrSigned(result)}</strong> = ${fmtMkr(revenue)} planned revenue − ${fmtMkr(cost)} cost (booked + forecast) · ${margin}% margin${hasPlan ? "" : ` · using a flat target ÷ 12 — set a monthly profile on <a href="assumptions.html">Assumptions</a>`}</p>
+        <h2 class="bv-title">${t("forecast_pnl_title")} <span class="pnl-src">${t("forecast_pnl_sub")}</span></h2>
+        <p class="table-hint">${t("forecast_pnl_body", `<strong class="${cls}">${fmtMkrSigned(result)}</strong>`, fmtMkr(revenue), fmtMkr(cost), margin)}${hasPlan ? "" : ` · ${t("forecast_pnl_flat_note")}`}</p>
       </div>
     </div>`;
 }
@@ -438,39 +438,39 @@ function renderBudgetVersion() {
   if (!panel) return;
   const v = latestBudgetVersion();
   const drift = budgetDrift();
-  const lockBtn = `<button class="add-cc-btn" id="lockBudgetBtn" type="button">${v ? "Lock current as new version" : "Lock current budget"}</button>`;
+  const lockBtn = `<button class="add-cc-btn" id="lockBudgetBtn" type="button">${v ? t("lock_new_version") : t("lock_current_budget")}</button>`;
 
   if (!v) {
     panel.innerHTML = `
       <div class="bv-row">
         <div>
-          <h2 class="bv-title">Budget version</h2>
-          <p class="table-hint">No approved budget locked yet — "variance vs budget" is measured against the live, editable number. Lock it to freeze a baseline.</p>
+          <h2 class="bv-title">${t("budget_version_title")}</h2>
+          <p class="table-hint">${t("budget_version_none")}</p>
         </div>
         ${lockBtn}
       </div>`;
   } else {
     const dateStr = new Date(v.lockedAt).toLocaleDateString("sv-SE");
     const driftHtml = drift == null
-      ? `<span class="bv-clean">✓ matches the live budget</span>`
-      : `<span class="bv-drift ${drift > 0 ? "over" : "under"}">${fmtMkrSigned(drift)} drift from live budget</span>`;
+      ? `<span class="bv-clean">${t("budget_version_clean")}</span>`
+      : `<span class="bv-drift ${drift > 0 ? "over" : "under"}">${t("budget_version_drift", fmtMkrSigned(drift))}</span>`;
     panel.innerHTML = `
       <div class="bv-row">
         <div>
-          <h2 class="bv-title">Budget version <span class="pnl-src">— locked ${dateStr}</span></h2>
-          <p class="table-hint"><strong>${escapeHtml(v.name)}</strong>: ${fmtMkr(v.total)} approved. ${driftHtml}</p>
+          <h2 class="bv-title">${t("budget_version_title")} <span class="pnl-src">${t("budget_version_locked", dateStr)}</span></h2>
+          <p class="table-hint">${t("budget_version_approved", `<strong>${escapeHtml(v.name)}</strong>`, fmtMkr(v.total))} ${driftHtml}</p>
         </div>
         ${lockBtn}
       </div>`;
   }
 
   document.getElementById("lockBudgetBtn").addEventListener("click", async () => {
-    const suggested = `FY2026 Budget${BUDGET_VERSIONS.length ? " v" + (BUDGET_VERSIONS.length + 1) : ""}`;
-    const name = prompt("Name this locked budget version:", suggested);
+    const suggested = `${t("suggested_fy_budget")}${BUDGET_VERSIONS.length ? " v" + (BUDGET_VERSIONS.length + 1) : ""}`;
+    const name = prompt(t("prompt_lock_version"), suggested);
     if (!name || !name.trim()) return;
-    if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast("Sign in to lock a real budget version."); return; }
+    if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast(t("toast_signin_lock")); return; }
     const version = await dbLockBudgetVersion(name.trim());
-    if (version) { showToast(`Locked "${version.name}".`); renderBudgetVersion(); }
+    if (version) { showToast(t("toast_locked", version.name)); renderBudgetVersion(); }
   });
 }
 
@@ -499,7 +499,7 @@ window.refreshAfterPeriodChange = renderAll;
 function initPrint() {
   const orgName = (USER_ORGS.find((o) => o.id === CURRENT_ORG_ID) || {}).name || "";
   const ph = document.getElementById("printHeader");
-  if (ph) ph.textContent = `${orgName} — Budget & Forecast FY2026 — printed ${new Date().toLocaleDateString("sv-SE")}`;
+  if (ph) ph.textContent = t("print_header", orgName, new Date().toLocaleDateString("sv-SE"));
   document.getElementById("printBtn").addEventListener("click", () => window.print());
 }
 
@@ -530,7 +530,7 @@ function renderSignals() {
     signals.push({
       abs: Math.abs(fy.variance),
       over: fy.variance > 0,
-      html: `<strong>${escapeHtml(cc.name)}</strong> is tracking <strong>${fmtMkrSigned(fy.variance)}</strong> ${fy.variance > 0 ? "over" : "under"} budget (${pct > 0 ? "+" : ""}${pct.toFixed(1)}%)${cc.note ? ` <span class="signal-note">— ${escapeHtml(cc.note)}</span>` : ""}`,
+      html: `${t("signal_tracking", escapeHtml(cc.name), fmtMkrSigned(fy.variance), fy.variance > 0 ? t("signal_over") : t("signal_under"), `${pct > 0 ? "+" : ""}${pct.toFixed(1)}%`)}${cc.note ? ` <span class="signal-note">— ${escapeHtml(cc.note)}</span>` : ""}`,
     });
   });
 
@@ -581,12 +581,12 @@ function renderReforecast() {
       <div>
         <strong>${escapeHtml(it.cc.name)}</strong>
         ${it.hasOverride
-          ? `<span class="rf-badge">using run-rate override (${fmtSek(it.runRate)}/mo) for its remaining months</span>`
-          : `<span class="rf-detail">recent actuals run ~${fmtSek(it.runRate)}/mo vs the plan's ${fmtSek(it.planForecast)}/mo (${it.pct.toFixed(0)}% off)</span>`}
+          ? `<span class="rf-badge">${t("rf_override_badge", fmtSek(it.runRate))}</span>`
+          : `<span class="rf-detail">${t("rf_detail", fmtSek(it.runRate), fmtSek(it.planForecast), it.pct.toFixed(0))}</span>`}
       </div>
       ${it.hasOverride
-        ? `<button class="add-cc-btn" data-revert type="button">Revert to plan</button>`
-        : `<button class="add-cc-btn" data-apply type="button">Apply run-rate to remaining months</button>`}
+        ? `<button class="add-cc-btn" data-revert type="button">${t("rf_revert")}</button>`
+        : `<button class="add-cc-btn" data-apply type="button">${t("rf_apply")}</button>`}
     </div>`).join("");
   panel.hidden = false;
 }
@@ -599,13 +599,13 @@ function initReforecast() {
     if (!row) return;
     const cc = COST_CENTERS.find((c) => c.id === row.dataset.cc);
     if (!cc) return;
-    if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast("Sign in to apply a real re-forecast."); return; }
+    if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast(t("toast_signin_reforecast")); return; }
     if (e.target.dataset.apply !== undefined) {
       const rr = await dbApplyRunRate(cc);
-      if (rr != null) { showToast(`Applied run-rate to ${cc.name}'s remaining months.`); renderAll(); }
+      if (rr != null) { showToast(t("toast_applied_runrate", cc.name)); renderAll(); }
     } else if (e.target.dataset.revert !== undefined) {
       const ok = await dbClearOverrides(cc);
-      if (ok) { showToast(`Reverted ${cc.name} to the driver-based plan.`); renderAll(); }
+      if (ok) { showToast(t("toast_reverted", cc.name)); renderAll(); }
     }
   });
 }
@@ -627,7 +627,7 @@ async function renderFortnoxPnl() {
   }
   if (!recon) { panel.hidden = true; return; }
   body.innerHTML = pnlTable(recon) +
-    `<p class="fn-recon-note">Full-year actuals synced from Fortnox — ties out to your Resultatrapport.${recon.vouchers ? ` Read from ${Number(recon.vouchers).toLocaleString("sv-SE")} vouchers.` : ""}</p>`;
+    `<p class="fn-recon-note">${t("fortnox_pnl_note", recon.vouchers ? Number(recon.vouchers).toLocaleString("sv-SE") : null)}</p>`;
   panel.hidden = false;
 }
 

@@ -9,21 +9,21 @@ function summaryHtml(cc, i) {
   const pct = fy.budget ? (fy.variance / fy.budget) * 100 : 0;
   if (!fullyLoadedView) {
     return `
-      <span>FY2026 total: <strong>${fmtMkr(fy.total)}</strong></span>
-      <span class="variance ${cls}">vs budget: <strong>${fmtMkrSigned(fy.variance)} (${pct > 0 ? "+" : ""}${pct.toFixed(1)}%)</strong></span>
-      <button class="bridge-toggle" data-bridge="${i}" type="button">Why? ▾</button>
+      <span>${t("fy_total_label", fmtMkr(fy.total))}</span>
+      <span class="variance ${cls}">${t("vs_budget_label", `${fmtMkrSigned(fy.variance)} (${pct > 0 ? "+" : ""}${pct.toFixed(1)}%)`)}</span>
+      <button class="bridge-toggle" data-bridge="${i}" type="button">${t("why_btn")}</button>
     `;
   }
   if (cc.isShared) {
-    return `<span>FY2026 total: <strong>${fmtMkr(fy.total)}</strong></span><span class="alloc-out">→ allocated to the other cost centres</span>`;
+    return `<span>${t("fy_total_label", fmtMkr(fy.total))}</span><span class="alloc-out">${t("alloc_out")}</span>`;
   }
   const loaded = fullyLoadedTotal(cc);
   const share = allocatedShare(cc);
   return `
-    <span>Direct: <strong>${fmtMkr(fy.total)}</strong></span>
-    <span class="alloc-plus">+ ${fmtMkr(share)} allocated</span>
-    <span>= Fully-loaded: <strong>${fmtMkr(loaded)}</strong></span>
-    <button class="bridge-toggle" data-bridge="${i}" type="button">Why? ▾</button>
+    <span>${t("direct_label", fmtMkr(fy.total))}</span>
+    <span class="alloc-plus">${t("alloc_plus", fmtMkr(share))}</span>
+    <span>${t("fully_loaded_label", fmtMkr(loaded))}</span>
+    <button class="bridge-toggle" data-bridge="${i}" type="button">${t("why_btn")}</button>
   `;
 }
 
@@ -48,7 +48,7 @@ function renderHeadcountRow(h, hc) {
       <td class="computed rate-cell">${fmtSek(rate)}</td>
       <td><select data-field="startMonth">${monthOptionsHtml(h.startMonth)}</select></td>
       <td><select data-field="endMonth">${monthOptionsHtml(h.endMonth)}</select></td>
-      <td><button class="row-remove" data-hc="${hc}" title="Remove line">✕</button></td>
+      <td><button class="row-remove" data-hc="${hc}" title="${t("remove_line_title")}">✕</button></td>
     </tr>
   `;
 }
@@ -59,7 +59,7 @@ function renderOneOffRow(o, oi) {
       <td><input type="text" data-ofield="label" value="${escapeHtml(o.label)}"></td>
       <td><input type="number" data-ofield="amount" value="${o.amount}" step="10000"></td>
       <td><select data-ofield="month">${monthOptionsHtml(o.month)}</select></td>
-      <td><button class="row-remove" data-removeoneoff="${oi}" title="Remove">✕</button></td>
+      <td><button class="row-remove" data-removeoneoff="${oi}" title="${t("remove_title")}">✕</button></td>
     </tr>
   `;
 }
@@ -72,7 +72,7 @@ function renderRecurringRow(r, ri) {
       <td><select data-rfield="startMonth">${monthOptionsHtml(r.startMonth)}</select></td>
       <td><select data-rfield="endMonth">${monthOptionsHtml(r.endMonth)}</select></td>
       <td><input type="number" data-rfield="escalationPct" value="${r.escalationPct}" step="0.5"></td>
-      <td><button class="row-remove" data-removerecurring="${ri}" title="Remove">✕</button></td>
+      <td><button class="row-remove" data-removerecurring="${ri}" title="${t("remove_title")}">✕</button></td>
     </tr>
   `;
 }
@@ -87,69 +87,69 @@ function renderCcBlock(i) {
   return `
     <div class="cc-block" data-cc="${i}">
       <div class="cc-header">
-        <input class="cc-name-input" data-ccfield="name" value="${escapeHtml(cc.name)}" aria-label="Reporting line name">
+        <input class="cc-name-input" data-ccfield="name" value="${escapeHtml(cc.name)}" aria-label="${t("reporting_line_name_label")}">
         <div class="cc-header-right">
-          <label class="budget-field">Annual budget (FY2026)
+          <label class="budget-field">${t("annual_budget_label")}
             <input type="number" data-ccfield="annualBudget" value="${cc.annualBudget}" step="10000">
           </label>
-          <label class="shared-toggle" title="Shared/corporate costs (rent for the whole building, group IT…) can be optionally allocated to the other reporting lines instead of sitting on their own line.">
+          <label class="shared-toggle" title="${t("shared_toggle_title")}">
             <input type="checkbox" data-ccfield="isShared" ${cc.isShared ? "checked" : ""}>
-            Shared / corporate
+            ${t("shared_corporate_label")}
           </label>
-          <button class="cc-delete" data-deletecc="${i}" type="button" title="Delete this reporting line">Delete</button>
+          <button class="cc-delete" data-deletecc="${i}" type="button" title="${t("delete_line_title")}">${t("common_delete")}</button>
         </div>
       </div>
-      <p class="cc-actual">Actuals booked through <strong>${monthLabel(CLOSE_MONTH)}</strong> — months after that are forecast.</p>
-      ${cc.isShared ? `<p class="shared-note">Shared reporting line — with <strong>Fully-loaded view</strong> on, its total is allocated to the others below (by headcount) instead of shown here.</p>` : ""}
+      <p class="cc-actual">${t("cc_actual_note", monthLabel(CLOSE_MONTH))}</p>
+      ${cc.isShared ? `<p class="shared-note">${t("shared_note")}</p>` : ""}
 
       <div class="driver-table-wrap">
         <table class="driver-table">
           <thead>
             <tr>
-              <th>Role / line</th>
-              <th>Count</th>
-              <th>Cost/head (mo)</th>
-              <th>Active from</th>
-              <th>Active until</th>
+              <th>${t("col_role_line")}</th>
+              <th>${t("col_count")}</th>
+              <th>${t("col_cost_head")}</th>
+              <th>${t("col_active_from")}</th>
+              <th>${t("col_active_until")}</th>
               <th></th>
             </tr>
           </thead>
           <tbody>${headcountRows}</tbody>
         </table>
       </div>
-      <button class="add-headcount" data-add="${i}">+ Add line</button>
-      <p class="line-hint">Negative count models a leaver. Set "active until" to the month someone leaves or a contract ends. Pay rates come from the <a href="assumptions.html">Assumptions page</a>.</p>
+      <button class="add-headcount" data-add="${i}">${t("add_line_btn")}</button>
+      <p class="line-hint">${t("headcount_hint")}</p>
 
       <div class="oneoffs-section">
-        <h3>One-off costs</h3>
+        <h3>${t("oneoffs_h3")}</h3>
         <div class="driver-table-wrap">
           <table class="driver-table oneoffs-table">
             <thead>
-              <tr><th>Description</th><th>Amount (SEK)</th><th>Month</th><th></th></tr>
+              <tr><th>${t("col_description")}</th><th>${t("col_amount_sek")}</th><th>${t("col_month")}</th><th></th></tr>
             </thead>
             <tbody>${oneOffRows}</tbody>
           </table>
         </div>
-        <button class="add-headcount" data-addoneoff="${i}">+ Add one-off cost</button>
+        <button class="add-headcount" data-addoneoff="${i}">${t("add_oneoff_btn")}</button>
       </div>
 
       <div class="recurring-section">
-        <h3>Recurring costs</h3>
-        <p class="line-hint">Rent, subscriptions, leases, materials — a named cost active over a start–end range, with an optional annual increase (e.g. 3%/yr rent escalation).</p>
+        <h3>${t("recurring_h3")}</h3>
+        <p class="line-hint">${t("recurring_hint")}</p>
         <div class="driver-table-wrap">
           <table class="driver-table recurring-table">
             <thead>
-              <tr><th>Description</th><th>Amount (SEK/mo)</th><th>Active from</th><th>Active until</th><th>Escalation (%/yr)</th><th></th></tr>
+              <tr><th>${t("col_description")}</th><th>${t("col_amount_sek_mo")}</th><th>${t("col_active_from")}</th><th>${t("col_active_until")}</th><th>${t("col_escalation")}</th><th></th></tr>
             </thead>
             <tbody>${recurringRows}</tbody>
           </table>
         </div>
-        <button class="add-headcount" data-addrecurring="${i}">+ Add recurring cost</button>
+        <button class="add-headcount" data-addrecurring="${i}">${t("add_recurring_btn")}</button>
       </div>
 
       <div class="cc-note-row">
-        <label>Comment / variance note <span class="cc-note-hint">— shows on the Overview &amp; board pack</span>
-          <input type="text" data-ccfield="note" value="${escapeHtml(cc.note || "")}" placeholder="e.g. DevOps hire delayed to Q4 — under budget">
+        <label>${t("comment_note_label")} <span class="cc-note-hint">${t("comment_note_hint")}</span>
+          <input type="text" data-ccfield="note" value="${escapeHtml(cc.note || "")}" placeholder="${t("comment_note_placeholder")}">
         </label>
       </div>
 
@@ -165,23 +165,23 @@ function renderCcBlock(i) {
 function bridgeHtml(cc) {
   const b = fyComposition(cc);
   const rows = [
-    ["Booked actuals", b.actual],
-    ["Re-forecast override (remaining months)", b.overridden],
-    ["Headcount (remaining months)", b.headcount],
-    ["One-off costs (remaining months)", b.oneOff],
-    ["Recurring costs (remaining months)", b.recurring],
+    [t("bridge_booked_actuals"), b.actual],
+    [t("bridge_override"), b.overridden],
+    [t("bridge_headcount"), b.headcount],
+    [t("bridge_oneoff"), b.oneOff],
+    [t("bridge_recurring"), b.recurring],
   ].filter(([, v]) => v !== 0); // skip zero rows (e.g. no override applied) — no noise
   return `
-    <p class="bridge-hint">What this cost centre's FY total is actually made of.</p>
+    <p class="bridge-hint">${t("bridge_hint")}</p>
     ${rows.map(([label, v]) => `<div class="bridge-row"><span>${label}</span><span class="num">${fmtMkr(v)}</span></div>`).join("")}
-    <div class="bridge-row bridge-total"><span>= FY2026 total</span><span class="num">${fmtMkr(b.total)}</span></div>
+    <div class="bridge-row bridge-total"><span>${t("bridge_total_label")}</span><span class="num">${fmtMkr(b.total)}</span></div>
   `;
 }
 
 function buildPlanningGrid() {
   if (COST_CENTERS.length === 0) {
     document.getElementById("ccBlocks").innerHTML =
-      `<p class="empty-hint">No reporting lines yet — click "+ Add reporting line" above to create your first one.</p>`;
+      `<p class="empty-hint">${t("no_reporting_lines_hint")}</p>`;
     return;
   }
   document.getElementById("ccBlocks").innerHTML = COST_CENTERS.map((cc, i) => renderCcBlock(i)).join("");
@@ -318,7 +318,7 @@ function initPlanningGrid() {
     if (deleteCcBtn) {
       const ccIndex = Number(deleteCcBtn.dataset.deletecc);
       const cc = COST_CENTERS[ccIndex];
-      if (!confirm(`Delete the reporting line "${cc.name}" and everything in it (headcount, one-offs, actuals)? This can't be undone.`)) return;
+      if (!confirm(t("confirm_delete_line", cc.name))) return;
       const ok = await dbDeleteCostCenter(cc.id);
       if (!ok) return;
       COST_CENTERS.splice(ccIndex, 1);
@@ -334,7 +334,7 @@ function initPlanningGrid() {
       const hcIndex = Number(removeBtn.dataset.hc);
       const line = COST_CENTERS[ccIndex].headcount[hcIndex];
       const role = getRole(line.roleId);
-      if (!confirm(`Remove this "${role ? role.label : "line"}" headcount line? This can't be undone.`)) return;
+      if (!confirm(t("confirm_remove_headcount", role ? role.label : t("fallback_line")))) return;
       COST_CENTERS[ccIndex].headcount.splice(hcIndex, 1);
       rebuildCcBlock(ccIndex);
       dbDeleteHeadcount(line.id);
@@ -346,7 +346,7 @@ function initPlanningGrid() {
       const ccIndex = Number(block.dataset.cc);
       const oIndex = Number(removeBtn.dataset.removeoneoff);
       const o = COST_CENTERS[ccIndex].oneOffs[oIndex];
-      if (!confirm(`Remove the one-off cost "${o.label}"? This can't be undone.`)) return;
+      if (!confirm(t("confirm_remove_oneoff", o.label))) return;
       COST_CENTERS[ccIndex].oneOffs.splice(oIndex, 1);
       rebuildCcBlock(ccIndex);
       dbDeleteOneOff(o.id);
@@ -358,7 +358,7 @@ function initPlanningGrid() {
       const ccIndex = Number(block.dataset.cc);
       const rIndex = Number(removeBtn.dataset.removerecurring);
       const r = COST_CENTERS[ccIndex].recurringCosts[rIndex];
-      if (!confirm(`Remove the recurring cost "${r.label}"? This can't be undone.`)) return;
+      if (!confirm(t("confirm_remove_recurring", r.label))) return;
       COST_CENTERS[ccIndex].recurringCosts.splice(rIndex, 1);
       rebuildCcBlock(ccIndex);
       dbDeleteRecurringCost(r.id);
@@ -368,7 +368,7 @@ function initPlanningGrid() {
     const addBtn = e.target.closest(".add-headcount[data-add]");
     if (addBtn) {
       if (ROLE_CATALOG.length === 0) {
-        alert("Add at least one role on the Assumptions page first — headcount lines reference a role.");
+        alert(t("alert_add_role_first"));
         return;
       }
       const ccIndex = Number(addBtn.dataset.add);
@@ -392,7 +392,7 @@ function initPlanningGrid() {
     const addOneOffBtn = e.target.closest("[data-addoneoff]");
     if (addOneOffBtn) {
       const ccIndex = Number(addOneOffBtn.dataset.addoneoff);
-      const o = { label: "New one-off cost", amount: 50000, month: Math.min(CLOSE_MONTH + 1, TIMELINE_LENGTH) };
+      const o = { label: t("new_oneoff_label"), amount: 50000, month: Math.min(CLOSE_MONTH + 1, TIMELINE_LENGTH) };
       const id = await dbInsertOneOff(COST_CENTERS[ccIndex].id, o);
       if (!id) return;
       o.id = id;
@@ -407,7 +407,7 @@ function initPlanningGrid() {
     const addRecurringBtn = e.target.closest("[data-addrecurring]");
     if (addRecurringBtn) {
       const ccIndex = Number(addRecurringBtn.dataset.addrecurring);
-      const r = { label: "New recurring cost", amount: 10000, startMonth: Math.min(CLOSE_MONTH + 1, TIMELINE_LENGTH), endMonth: TIMELINE_LENGTH, escalationPct: 0 };
+      const r = { label: t("new_recurring_label"), amount: 10000, startMonth: Math.min(CLOSE_MONTH + 1, TIMELINE_LENGTH), endMonth: TIMELINE_LENGTH, escalationPct: 0 };
       const id = await dbInsertRecurringCost(COST_CENTERS[ccIndex].id, r);
       if (!id) return;
       r.id = id;

@@ -40,8 +40,8 @@ function monthCell(value, isActual, isDivider, ccId, month, isOverridden, isSmoo
   const cls = (isActual ? "" : "mt-forecast") + (isDivider ? " mt-divider" : "") + (isOverridden ? " mt-override" : "") + (isSmoothed ? " mt-smoothed" : "");
   // A booked-but-empty cell (actual = 0, not smoothed) reads as "nothing booked" — show a dash.
   const display = isActual && !isSmoothed && value === 0 ? "–" : fmtCell(value);
-  const title = isOverridden ? ` title="Using a re-forecast run-rate override, not the driver plan"`
-    : isSmoothed ? ` title="Smoothed — the period average, not the raw booked figure. Click to see the real month."` : "";
+  const title = isOverridden ? ` title="${t("drill_override_title")}"`
+    : isSmoothed ? ` title="${t("drill_smoothed_title")}"` : "";
   return `<td class="num ${cls}${drill}"${title}>${display}</td>`;
 }
 
@@ -69,15 +69,15 @@ function renderMonthlyGrid() {
   const isFy = currentLens === "fy";
 
   // Header
-  let html = `<table class="monthly-table"><thead><tr><th class="mt-name">Reporting Line</th>`;
+  let html = `<table class="monthly-table"><thead><tr><th class="mt-name">${t("col_reporting_line")}</th>`;
   months.forEach((m) => {
     const forecast = m > CLOSE_MONTH;
     const divider = m === CLOSE_MONTH + 1;
     html += `<th class="num ${forecast ? "mt-forecast" : ""} ${divider ? "mt-divider" : ""}">${monthLabel(m)}</th>`;
   });
   html += isFy
-    ? `<th class="num mt-summary">FY Total</th><th class="num mt-summary">Budget</th><th class="num mt-summary">Variance</th>`
-    : `<th class="num mt-summary">12-mo Total</th>`;
+    ? `<th class="num mt-summary">${t("col_fy_total_short")}</th><th class="num mt-summary">${t("col_budget")}</th><th class="num mt-summary">${t("col_variance")}</th>`
+    : `<th class="num mt-summary">${t("col_12mo_total")}</th>`;
   html += `</tr></thead><tbody>`;
 
   // One row per reporting line
@@ -111,18 +111,18 @@ function renderMonthlyGrid() {
     for (let m = 1; m <= CLOSE_MONTH; m++) vals.push(companyMonthAmount(m));
     smoothedTotal = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
   }
-  html += `<tr class="mt-total"><td class="mt-name">Total</td>`;
+  html += `<tr class="mt-total"><td class="mt-name">${t("col_total")}</td>`;
   months.forEach((m) => {
     const isActualM = m <= CLOSE_MONTH;
     const shown = isActualM && smoothedTotal != null ? smoothedTotal : companyMonthAmount(m);
     html += monthCell(shown, isActualM, m === CLOSE_MONTH + 1, null, m, false, isActualM && smoothedTotal != null);
   });
   if (isFy) {
-    const t = companyFySummary();
-    const cls = varianceClass(t.variance, t.budget);
-    html += `<td class="num mt-summary">${fmtCell(t.total)}</td>`;
-    html += `<td class="num mt-summary">${fmtCell(t.budget)}</td>`;
-    html += `<td class="num mt-summary ${cls}">${fmtMkrSigned(t.variance)}</td>`;
+    const ft = companyFySummary();
+    const cls = varianceClass(ft.variance, ft.budget);
+    html += `<td class="num mt-summary">${fmtCell(ft.total)}</td>`;
+    html += `<td class="num mt-summary">${fmtCell(ft.budget)}</td>`;
+    html += `<td class="num mt-summary ${cls}">${fmtMkrSigned(ft.variance)}</td>`;
   } else {
     html += `<td class="num mt-summary">${fmtCell(companyRollingSummary().total)}</td>`;
   }
@@ -144,7 +144,7 @@ function buildExportCsv() {
   const orgName = (USER_ORGS.find((o) => o.id === CURRENT_ORG_ID) || {}).name || "";
   lines.push(`${orgName} — Monthly P&L (SEK); exported ${new Date().toLocaleDateString("sv-SE")}`);
   lines.push(
-    ["Reporting Line", ...months.map(monthLabel), ...(isFy ? ["FY Total", "Budget", "Variance"] : ["12-mo Total"])].join(";")
+    [t("col_reporting_line"), ...months.map(monthLabel), ...(isFy ? [t("col_fy_total_short"), t("col_budget"), t("col_variance")] : [t("col_12mo_total")])].join(";")
   );
 
   COST_CENTERS.forEach((cc) => {
@@ -160,12 +160,12 @@ function buildExportCsv() {
 
   const totalCells = months.map((m) => num(companyMonthAmount(m)));
   if (isFy) {
-    const t = companyFySummary();
-    totalCells.push(num(t.total), num(t.budget), num(t.variance));
+    const ft = companyFySummary();
+    totalCells.push(num(ft.total), num(ft.budget), num(ft.variance));
   } else {
     totalCells.push(num(companyRollingSummary().total));
   }
-  lines.push(["Total", ...totalCells].join(";"));
+  lines.push([t("col_total"), ...totalCells].join(";"));
 
   return "﻿" + lines.join("\r\n"); // BOM so Excel reads åäö correctly
 }
@@ -212,16 +212,16 @@ async function showDrill(ccId, month) {
         <h3>${cc ? escapeHtml(cc.name) : ""} — ${monthLabel(month)}</h3>
         <button class="drill-close" type="button">✕</button>
       </div>
-      <p class="drill-sub">Booked actuals by account — straight from your ledger.</p>
-      ${rows.length === 0 ? `<p class="drill-empty">No transactions behind this cell${cc ? "" : ""} — run a sync to populate drill data.</p>` : `
+      <p class="drill-sub">${t("drill_sub")}</p>
+      ${rows.length === 0 ? `<p class="drill-empty">${t("drill_empty")}</p>` : `
       <div class="drill-rows">
         ${rows.map((r) => `
           <div class="drill-row">
             <span><span class="fn-cc-code">${r.account}</span> ${escapeHtml(r.account_name || "")}</span>
-            <span class="drill-n">${r.tx_count} tx</span>
+            <span class="drill-n">${t("drill_tx", r.tx_count)}</span>
             <span class="num">${fmtSek(Number(r.amount))}</span>
           </div>`).join("")}
-        <div class="drill-row drill-total"><span>Total</span><span></span><span class="num">${fmtSek(total)}</span></div>
+        <div class="drill-row drill-total"><span>${t("col_total")}</span><span></span><span class="num">${fmtSek(total)}</span></div>
       </div>`}
     </div>`;
   document.body.appendChild(el);
@@ -255,9 +255,9 @@ function initImport() {
       return;
     }
     parsed = parseActualsCsv(textArea.value);
-    let msg = `<strong>${parsed.rows.length}</strong> value(s) ready to import.`;
-    if (parsed.unmatched.length) msg += ` <span class="import-warn">Unmatched reporting lines (skipped): ${parsed.unmatched.map(escapeHtml).join(", ")}.</span>`;
-    if (parsed.skipped) msg += ` ${parsed.skipped} row(s) skipped.`;
+    let msg = t("import_ready", parsed.rows.length);
+    if (parsed.unmatched.length) msg += ` <span class="import-warn">${t("import_unmatched", parsed.unmatched.map(escapeHtml).join(", "))}</span>`;
+    if (parsed.skipped) msg += ` ${t("import_skipped", parsed.skipped)}`;
     preview.innerHTML = msg;
     doBtn.disabled = parsed.rows.length === 0;
   }

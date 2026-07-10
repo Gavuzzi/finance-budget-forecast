@@ -931,6 +931,19 @@ td.mt-drill:hover { background: rgba(77,124,199,0.12); border-radius: 4px; }
 
 .theme-toggle:hover { border-color: var(--accent); }
 
+.lang-toggle {
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+.lang-toggle:hover { border-color: var(--accent); }
+
 .app-main {
   flex: 1;
   min-width: 0;

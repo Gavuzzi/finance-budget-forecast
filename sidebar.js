@@ -8,11 +8,11 @@
 //   window.refreshAfterPeriodChange — fired after the actuals-through month changes (pages re-render)
 
 const NAV = [
-  { id: "overview", label: "Overview", href: "app.html" },
-  { id: "monthly", label: "Monthly", href: "monthly.html" },
-  { id: "planning", label: "Planning", href: "planning.html" },
-  { id: "cashflow", label: "Cash Flow", href: "cashflow.html" },
-  { id: "assumptions", label: "Assumptions", href: "assumptions.html" },
+  { id: "overview", href: "app.html" },
+  { id: "monthly", href: "monthly.html" },
+  { id: "planning", href: "planning.html" },
+  { id: "cashflow", href: "cashflow.html" },
+  { id: "assumptions", href: "assumptions.html" },
 ];
 
 function currentPageId() {
@@ -31,7 +31,7 @@ function getTheme() {
 function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
   const btn = document.getElementById("themeToggle");
-  if (btn) btn.textContent = theme === "light" ? "☀️ Light" : "🌙 Dark";
+  if (btn) btn.textContent = theme === "light" ? t("theme_light") : t("theme_dark");
   localStorage.setItem("almgren-budget-theme", theme);
   if (typeof window.onThemeChanged === "function") window.onThemeChanged();
 }
@@ -44,27 +44,27 @@ function syncBadgeHtml() {
   if (!SYNC_STATUS || !SYNC_STATUS.last_synced_at) return "";
   const when = new Date(SYNC_STATUS.last_synced_at).toLocaleString("sv-SE");
   if (SYNC_STATUS.last_sync_error) {
-    return `<a class="sync-badge error" href="monthly.html" title="Last sync FAILED (${when}): ${escapeHtml(SYNC_STATUS.last_sync_error)} — numbers may be out of date"><span class="sync-dot"></span>Sync failing — check Monthly</a>`;
+    return `<a class="sync-badge error" href="monthly.html" title="${escapeHtml(SYNC_STATUS.last_sync_error)}"><span class="sync-dot"></span>${t("sync_error")}</a>`;
   }
   const ageH = (Date.now() - new Date(SYNC_STATUS.last_synced_at).getTime()) / 3600000;
   if (ageH >= 48) {
-    return `<a class="sync-badge stale" href="monthly.html" title="Last synced ${when} — the nightly sync hasn't run since; numbers may be out of date"><span class="sync-dot"></span>Data ${Math.floor(ageH / 24)} days old</a>`;
+    return `<a class="sync-badge stale" href="monthly.html" title="${when}"><span class="sync-dot"></span>${t("sync_stale", Math.floor(ageH / 24))}</a>`;
   }
-  const label = ageH < 1 ? "just now" : ageH < 24 ? `${Math.round(ageH)}h ago` : "yesterday";
-  return `<span class="sync-badge fresh" title="Fortnox data last synced ${when}"><span class="sync-dot"></span>Synced ${label}</span>`;
+  const label = ageH < 1 ? t("sync_just_now") : ageH < 24 ? t("sync_hours_ago", Math.round(ageH)) : t("sync_yesterday");
+  return `<span class="sync-badge fresh" title="${when}"><span class="sync-dot"></span>${t("sync_fresh", label)}</span>`;
 }
 
 function sidebarHtml() {
   const active = currentPageId();
   const nav = NAV.map(
-    (n) => `<a class="nav-item ${n.id === active ? "active" : ""}" href="${n.href}">${n.label}</a>`
+    (n) => `<a class="nav-item ${n.id === active ? "active" : ""}" href="${n.href}">${t("nav_" + n.id)}</a>`
   ).join("");
 
   // "Auto" = the sync decides (only ever fully-elapsed months — Fathom convention).
   // Picking a month is a manual override the sync will never touch.
   const monthOptions = [
-    `<option value="auto"${!CLOSE_MONTH_MANUAL ? " selected" : ""}>Auto (${CLOSE_MONTH ? monthLabel(CLOSE_MONTH) : "none yet"})</option>`,
-    `<option value="0"${CLOSE_MONTH_MANUAL && CLOSE_MONTH === 0 ? " selected" : ""}>None yet</option>`,
+    `<option value="auto"${!CLOSE_MONTH_MANUAL ? " selected" : ""}>${t("period_auto", CLOSE_MONTH ? monthLabel(CLOSE_MONTH) : t("period_none_yet"))}</option>`,
+    `<option value="0"${CLOSE_MONTH_MANUAL && CLOSE_MONTH === 0 ? " selected" : ""}>${t("period_none_yet")}</option>`,
   ]
     .concat(
       Array.from({ length: TIMELINE_LENGTH }, (_, i) => i + 1).map(
@@ -78,30 +78,35 @@ function sidebarHtml() {
       ${USER_ORGS.length > 1
         ? `<select class="org-switcher" id="orgSwitcher">${USER_ORGS.map((o) => `<option value="${o.id}" ${o.id === CURRENT_ORG_ID ? "selected" : ""}>${escapeHtml(o.name)}</option>`).join("")}</select>`
         : `<span class="sb-name">${escapeHtml((USER_ORGS[0] && USER_ORGS[0].name) || "—")}</span>`}
-      <span class="sb-sub">FP&amp;A Planning</span>
+      <span class="sb-sub">${t("brand_sub")}</span>
     </div>
-    <button class="new-org-btn" id="newOrgBtn" type="button">+ New organization</button>
+    <button class="new-org-btn" id="newOrgBtn" type="button">${t("new_org_btn")}</button>
     <nav class="sidebar-nav">${nav}</nav>
     <div class="sidebar-footer">
       ${syncBadgeHtml()}
       <div class="period-box">
-        <label class="period-label" for="closeMonthSelect">Actuals booked through</label>
+        <label class="period-label" for="closeMonthSelect">${t("period_label")}</label>
         <select class="period-select" id="closeMonthSelect">${monthOptions}</select>
       </div>
       <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle light/dark theme"></button>
-      <button class="logout-btn" id="logoutBtn" type="button">Sign out</button>
+      <button class="lang-toggle" id="langToggle" type="button">${t("lang_toggle")}</button>
+      <button class="logout-btn" id="logoutBtn" type="button">${t("sign_out")}</button>
     </div>
   `;
 }
 
 function renderSidebar() {
   document.getElementById("sidebar").innerHTML = sidebarHtml();
-  document.getElementById("themeToggle").textContent = getTheme() === "light" ? "☀️ Light" : "🌙 Dark";
+  document.getElementById("themeToggle").textContent = getTheme() === "light" ? t("theme_light") : t("theme_dark");
+
+  document.getElementById("langToggle").addEventListener("click", () => {
+    setLang(getLang() === "sv" ? "en" : "sv");
+  });
 
   // Reflect the live tenant in the tab title so multiple orgs/tabs are distinguishable
   // (the static <title> is only a pre-load fallback).
   const activeOrg = USER_ORGS.find((o) => o.id === CURRENT_ORG_ID) || USER_ORGS[0];
-  const pageLabel = (NAV.find((n) => n.id === currentPageId()) || {}).label || "";
+  const pageLabel = t("nav_" + currentPageId());
   if (activeOrg && activeOrg.name) document.title = `${pageLabel} · ${activeOrg.name}`;
 
   document.getElementById("themeToggle").addEventListener("click", () => {

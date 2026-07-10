@@ -31,35 +31,35 @@ function renderCashStats() {
   const endBalance = rows[rows.length - 1].balance;
   const cls = endBalance < 0 ? "over" : "";
   const runway = projection.runway;
-  const runwayLabel = runway == null ? "Cash-positive" : `${runway} mo${runway === 1 ? "" : "s"}`;
+  const runwayLabel = runway == null ? t("runway_cash_positive") : t("runway_months", runway);
   const runwayCls = runway != null && runway <= 3 ? "over" : "";
   const runwaySub = runway == null
-    ? `holds beyond ${RUNWAY_HORIZON_MONTHS - cashFlowMonthIndex(new Date().toISOString().slice(0, 10)) + 1} months at current plan`
-    : "until balance would cross zero, at current plan";
+    ? t("runway_holds", RUNWAY_HORIZON_MONTHS - cashFlowMonthIndex(new Date().toISOString().slice(0, 10)) + 1)
+    : t("runway_crosses");
 
   row.innerHTML = `
     <div class="stat-card">
-      <span class="stat-label">Bank Balance</span>
+      <span class="stat-label">${t("stat_bank_balance")}</span>
       <span class="stat-value">${fmtMkr(CASH_POSITION.bankBalance)}</span>
-      <span class="stat-sub">as of ${fmtDate(CASH_POSITION.asOf.slice(0, 10))}</span>
+      <span class="stat-sub">${t("stat_as_of", fmtDate(CASH_POSITION.asOf.slice(0, 10)))}</span>
     </div>
     <div class="stat-card">
-      <span class="stat-label">Open Receivables (AR)</span>
+      <span class="stat-label">${t("stat_open_ar")}</span>
       <span class="stat-value">${fmtMkr(totalAr)}</span>
-      <span class="stat-sub">${OPEN_INVOICES.filter((i) => i.kind === "customer").length} unpaid customer invoices</span>
+      <span class="stat-sub">${t("stat_unpaid_customer", OPEN_INVOICES.filter((i) => i.kind === "customer").length)}</span>
     </div>
     <div class="stat-card">
-      <span class="stat-label">Open Payables (AP)</span>
+      <span class="stat-label">${t("stat_open_ap")}</span>
       <span class="stat-value">${fmtMkr(totalAp)}</span>
-      <span class="stat-sub">${OPEN_INVOICES.filter((i) => i.kind === "supplier").length} unpaid supplier invoices</span>
+      <span class="stat-sub">${t("stat_unpaid_supplier", OPEN_INVOICES.filter((i) => i.kind === "supplier").length)}</span>
     </div>
     <div class="stat-card highlight">
-      <span class="stat-label">Projected Balance</span>
+      <span class="stat-label">${t("stat_projected_balance")}</span>
       <span class="stat-value ${cls}">${fmtMkr(endBalance)}</span>
-      <span class="stat-sub ${cls}">in ${CASHFLOW_MONTHS_AHEAD} months, incl. estimates</span>
+      <span class="stat-sub ${cls}">${t("stat_projected_sub", CASHFLOW_MONTHS_AHEAD)}</span>
     </div>
     <div class="stat-card highlight">
-      <span class="stat-label" title="Estimated from the driver forecast (salaries, recurring, one-offs) and the monthly revenue plan — not a hard figure">Runway</span>
+      <span class="stat-label" title="${t("runway_title")}">${t("runway_label")}</span>
       <span class="stat-value ${runwayCls}">${runwayLabel}</span>
       <span class="stat-sub ${runwayCls}">${runwaySub}</span>
     </div>
@@ -79,7 +79,7 @@ function renderCashChart() {
     data: {
       labels,
       datasets: [{
-        label: "Bank Balance",
+        label: t("chart_series_bank_balance"),
         data: balanceSeries,
         borderColor: colors.actual,
         backgroundColor: "transparent",
@@ -106,13 +106,13 @@ function renderCashChart() {
 function renderCashTable() {
   const rows = cashFlowProjection(CASHFLOW_MONTHS_AHEAD).rows;
   let html = `<table class="monthly-table"><thead><tr>
-    <th class="mt-name">Month</th>
-    <th class="num" title="Hard figures from unpaid Fortnox invoices">Inflow</th>
-    <th class="num" title="Hard figures from unpaid Fortnox invoices">Outflow</th>
-    <th class="num" title="Estimated from the driver forecast (salaries, recurring costs, one-offs) netted against the monthly revenue plan (or a flat target ÷ 12 when no plan is set) — not a hard Fortnox figure">Operating (est.)</th>
-    <th class="num" title="Estimated from tracked VAT/payroll-tax account balances + Skatteverket deadline rules — not a hard Fortnox figure">Tax/VAT (est.)</th>
-    <th class="num">Net</th>
-    <th class="num mt-summary">Running Balance</th>
+    <th class="mt-name">${t("col_month")}</th>
+    <th class="num" title="${t("hard_figure_title")}">${t("col_inflow")}</th>
+    <th class="num" title="${t("hard_figure_title")}">${t("col_outflow")}</th>
+    <th class="num" title="${t("operating_est_title")}">${t("operating_est_col")}</th>
+    <th class="num" title="${t("tax_vat_title")}">${t("tax_vat_col")}</th>
+    <th class="num">${t("col_net")}</th>
+    <th class="num mt-summary">${t("col_running_balance")}</th>
   </tr></thead><tbody>`;
   rows.forEach((r) => {
     const netCls = r.net > 0 ? "under" : r.net < 0 ? "over" : "";
@@ -137,20 +137,20 @@ function renderOpenInvoices() {
   const panel = document.getElementById("openInvoicesPanel");
   const container = document.getElementById("openInvoicesTable");
   if (OPEN_INVOICES.length === 0) {
-    container.innerHTML = `<p class="table-hint">No unpaid invoices on file — either your books are current, or this org hasn't synced open invoices yet.</p>`;
+    container.innerHTML = `<p class="table-hint">${t("no_invoices_hint")}</p>`;
     return;
   }
   let html = `<table class="monthly-table"><thead><tr>
-    <th class="mt-name">Due</th>
-    <th class="mt-name">Type</th>
-    <th class="mt-name">Counterparty</th>
-    <th class="mt-name">Description</th>
-    <th class="num">Amount</th>
+    <th class="mt-name">${t("col_due")}</th>
+    <th class="mt-name">${t("col_type")}</th>
+    <th class="mt-name">${t("col_counterparty")}</th>
+    <th class="mt-name">${t("col_description")}</th>
+    <th class="num">${t("col_amount")}</th>
   </tr></thead><tbody>`;
   OPEN_INVOICES.forEach((inv) => {
     html += `<tr>
       <td class="mt-name">${fmtDate(inv.dueDate)}</td>
-      <td class="mt-name">${inv.kind === "customer" ? "AR (in)" : "AP (out)"}</td>
+      <td class="mt-name">${inv.kind === "customer" ? t("ar_in") : t("ap_out")}</td>
       <td class="mt-name">${escapeHtml(inv.counterparty || "—")}</td>
       <td class="mt-name">${escapeHtml(inv.description || "")}</td>
       <td class="num">${fmtSek(inv.amount)}</td>
@@ -163,9 +163,9 @@ function renderOpenInvoices() {
 function emptyCashflowHtml() {
   return `
     <div class="empty-state">
-      <h2>No cash data yet</h2>
-      <p>Bank balance and open invoices come in automatically with your Fortnox sync.</p>
-      <a class="empty-cta" href="monthly.html">Connect / sync Fortnox →</a>
+      <h2>${t("no_cash_data_h2")}</h2>
+      <p>${t("no_cash_data_p")}</p>
+      <a class="empty-cta" href="monthly.html">${t("connect_sync_fortnox")}</a>
     </div>`;
 }
 

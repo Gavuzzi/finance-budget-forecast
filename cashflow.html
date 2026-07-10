@@ -15,8 +15,8 @@
     <main class="app-main">
       <header class="page-head">
         <div class="page-head-text">
-          <h1>Cash Flow</h1>
-          <p class="page-sub">Will there be money in the bank — projected from your bank balance, open invoices, and an estimated operating + tax/VAT forecast</p>
+          <h1 data-i18n="cashflow_h1">Cash Flow</h1>
+          <p class="page-sub" data-i18n="cashflow_subtitle">Will there be money in the bank — projected from your bank balance, open invoices, and an estimated operating + tax/VAT forecast</p>
         </div>
       </header>
 
@@ -26,20 +26,20 @@
 
       <section class="main-row single">
         <div class="panel chart-panel">
-          <h2>Projected Bank Balance</h2>
+          <h2 data-i18n="projected_balance_h2">Projected Bank Balance</h2>
           <canvas id="cashChart"></canvas>
         </div>
       </section>
 
       <section class="panel table-panel">
-        <h2>Monthly Projection</h2>
-        <p class="table-hint">Running balance = today's bank balance, walked forward by open invoices (hard Fortnox figures) plus two <strong>estimated</strong> columns, kept separate so a model estimate is never blended into a hard figure: <strong>Operating</strong> — the same driver forecast behind Overview/Monthly (salaries, recurring costs, one-offs) netted against your monthly revenue plan (Assumptions → Revenue Plan; a flat target ÷ 12 when no plan is set); and <strong>Tax/VAT</strong> — projected from tracked account balances onto Skatteverket's standard deadlines (12th of the month, 17th in January/August, for turnover ≤40M SEK), appearing once the relevant month's actuals have synced. Adjust the account ranges or VAT frequency on <a href="assumptions.html">Assumptions</a> if it looks off for your chart of accounts. <strong>Runway</strong> above is the same operating estimate walked forward until the balance would cross zero — planned revenue, not booked orders, so treat it as a rough signal, not a forecast to plan payroll against.</p>
+        <h2 data-i18n="monthly_projection_h2">Monthly Projection</h2>
+        <p class="table-hint" data-i18n-html="cashflow_table_hint">Running balance = today's bank balance, walked forward by open invoices (hard Fortnox figures) plus two <strong>estimated</strong> columns, kept separate so a model estimate is never blended into a hard figure: <strong>Operating</strong> — the same driver forecast behind Overview/Monthly (salaries, recurring costs, one-offs) netted against your monthly revenue plan (Assumptions → Revenue Plan; a flat target ÷ 12 when no plan is set); and <strong>Tax/VAT</strong> — projected from tracked account balances onto Skatteverket's standard deadlines (12th of the month, 17th in January/August, for turnover ≤40M SEK), appearing once the relevant month's actuals have synced. Adjust the account ranges or VAT frequency on <a href="assumptions.html">Assumptions</a> if it looks off for your chart of accounts. <strong>Runway</strong> above is the same operating estimate walked forward until the balance would cross zero — planned revenue, not booked orders, so treat it as a rough signal, not a forecast to plan payroll against.</p>
         <div id="cashTable"></div>
       </section>
 
       <section class="panel table-panel" id="openInvoicesPanel">
-        <h2>Open Invoices</h2>
-        <p class="table-hint">Unpaid customer (money coming in) and supplier (money going out) invoices from Fortnox, by due date.</p>
+        <h2 data-i18n="open_invoices_h2">Open Invoices</h2>
+        <p class="table-hint" data-i18n="open_invoices_hint">Unpaid customer (money coming in) and supplier (money going out) invoices from Fortnox, by due date.</p>
         <div id="openInvoicesTable"></div>
       </section>
     </main>
@@ -47,6 +47,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="lib.js"></script>
+  <script src="i18n.js"></script>
   <script src="data.js"></script>
   <script src="sidebar.js"></script>
   <script src="cashflow.js"></script>

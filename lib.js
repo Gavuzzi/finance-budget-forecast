@@ -66,7 +66,7 @@ function showDemoBanner() {
   const el = document.createElement("div");
   el.id = "demoBanner";
   el.className = "demo-banner";
-  el.innerHTML = `<span class="demo-dot"></span> <strong>Demo</strong> — sample data, nothing you change is saved. <button type="button" id="demoExit">Sign in ↗</button>`;
+  el.innerHTML = `<span class="demo-dot"></span> <strong>Demo</strong> — ${t("demo_banner")} <button type="button" id="demoExit">${t("demo_banner_signin")}</button>`;
   document.body.appendChild(el);
   document.getElementById("demoExit").addEventListener("click", () => {
     sessionStorage.removeItem("demoMode");
@@ -107,16 +107,16 @@ function renderLogin(onSuccess) {
   overlay.innerHTML = `
     <div class="login-card">
       <div class="login-brand"><span class="sb-name">FP&amp;A</span> <span class="login-fpa">Planning</span></div>
-      <p class="login-tagline">Budget, forecast, and track spend for growing companies — driver-based, so one change flows through every number instead of breaking a spreadsheet.</p>
-      <button type="button" class="login-demo" id="demoBtn">Explore the live demo →</button>
-      <p class="login-demo-sub">Full app, a sample company, no sign-up.</p>
+      <p class="login-tagline">${t("login_tagline")}</p>
+      <button type="button" class="login-demo" id="demoBtn">${t("login_demo_btn")}</button>
+      <p class="login-demo-sub">${t("login_demo_sub")}</p>
       <details class="login-signin">
-        <summary>Sign in to your workspace</summary>
+        <summary>${t("login_signin_summary")}</summary>
         <form id="loginForm">
-          <label>Email <input type="email" id="loginEmail" required autocomplete="username"></label>
-          <label>Password <input type="password" id="loginPassword" required autocomplete="current-password"></label>
-          <button type="submit">Sign in</button>
-          <button type="button" class="login-forgot" id="forgotBtn">Forgot password?</button>
+          <label>${t("login_email")} <input type="email" id="loginEmail" required autocomplete="username"></label>
+          <label>${t("login_password")} <input type="password" id="loginPassword" required autocomplete="current-password"></label>
+          <button type="submit">${t("login_submit")}</button>
+          <button type="button" class="login-forgot" id="forgotBtn">${t("login_forgot")}</button>
           <p class="login-error" id="loginError"></p>
         </form>
       </details>
@@ -134,7 +134,7 @@ function renderLogin(onSuccess) {
     const password = document.getElementById("loginPassword").value;
     const errEl = document.getElementById("loginError");
     errEl.classList.remove("error");
-    errEl.textContent = "Signing in…";
+    errEl.textContent = t("login_signing_in");
     const { error } = await sb.auth.signInWithPassword({ email, password });
     if (error) {
       errEl.textContent = error.message;
@@ -150,11 +150,11 @@ function renderLogin(onSuccess) {
     const errEl = document.getElementById("loginError");
     errEl.classList.remove("error");
     if (!email) {
-      errEl.textContent = "Enter your email first, then click “Forgot password?”";
+      errEl.textContent = t("login_forgot_empty");
       errEl.classList.add("error");
       return;
     }
-    errEl.textContent = "Sending reset link…";
+    errEl.textContent = t("login_forgot_sending");
     const { error } = await sb.auth.resetPasswordForEmail(email, {
       redirectTo: location.origin + location.pathname,
     });
@@ -163,7 +163,7 @@ function renderLogin(onSuccess) {
       errEl.classList.add("error");
       return;
     }
-    errEl.textContent = "Reset link sent — check your email.";
+    errEl.textContent = t("login_forgot_sent");
   });
 }
 
