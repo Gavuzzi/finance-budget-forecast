@@ -95,8 +95,9 @@ en: {
   cost_by_role_h2: "Cost by Role",
   cost_by_role_hint: "The same people cost, sliced by role instead of reporting line — total across the org this fiscal year.",
   scenarios_h2: "Scenarios",
-  scenarios_hint: "Snapshot the current plan's full-year total, then compare alternatives against the live plan. (Change drivers on Planning between snapshots.)",
+  scenarios_hint: "Snapshot the current plan's full-year trajectory, then compare alternatives against the live plan. (Change drivers on Planning between snapshots.)",
   save_scenario_btn: "+ Save current as scenario",
+  scenario_chart_h3: "Trajectory — month by month",
 
   // ---- script.js (Overview logic) ----
   stat_annual_budget: "Annual Budget (FY2026)",
@@ -477,8 +478,9 @@ sv: {
   cost_by_role_h2: "Kostnad per roll",
   cost_by_role_hint: "Samma personalkostnad, uppdelad per roll istället för redovisningslinje — totalt för hela organisationen detta räkenskapsår.",
   scenarios_h2: "Scenarier",
-  scenarios_hint: "Ta en ögonblicksbild av den aktuella planens helårstotal och jämför sedan alternativ mot den aktuella planen. (Ändra drivare på Planering mellan ögonblicksbilder.)",
+  scenarios_hint: "Ta en ögonblicksbild av den aktuella planens helårsförlopp och jämför sedan alternativ mot den aktuella planen. (Ändra drivare på Planering mellan ögonblicksbilder.)",
   save_scenario_btn: "+ Spara aktuell som scenario",
+  scenario_chart_h3: "Förlopp — månad för månad",
 
   // ---- script.js (Overview logic) ----
   stat_annual_budget: "Årsbudget (FY2026)",

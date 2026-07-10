@@ -487,7 +487,11 @@ async function loadData(orgId) {
   // is run — so load them tolerantly; the app works either way.
   SCENARIOS.length = 0;
   const scenRes = await sb.from("scenarios").select("*").eq("org_id", CURRENT_ORG_ID).order("created_at");
-  if (!scenRes.error) scenRes.data.forEach((s) => SCENARIOS.push({ id: s.id, name: s.name, fyTotal: Number(s.fy_total), breakdown: (s.snapshot && s.snapshot.breakdown) || [] }));
+  if (!scenRes.error) scenRes.data.forEach((s) => SCENARIOS.push({
+    id: s.id, name: s.name, fyTotal: Number(s.fy_total),
+    breakdown: (s.snapshot && s.snapshot.breakdown) || [],
+    monthly: (s.snapshot && Array.isArray(s.snapshot.monthly) && s.snapshot.monthly.length === FY_MONTHS) ? s.snapshot.monthly.map(Number) : [],
+  }));
 
   // Budget versions — likewise optional/tolerant (table may not exist yet on an older DB).
   BUDGET_VERSIONS.length = 0;
@@ -575,9 +579,17 @@ function loadPreviewData() {
   const itCc = COST_CENTERS.find((c) => c.name === "IT");
   if (itCc) itCc.note = t("demo_it_note");
 
+  // Monthly trajectories are illustrative fixed demo fixtures (not derived
+  // from the engine, unlike everything else in this function) — chosen so
+  // "Hiring freeze" tracks Base exactly through month 8 then visibly dips for
+  // months 9-12, right where Base has the September hire + one-off, so the
+  // trajectory chart demonstrates its whole point (see the shape of the
+  // divergence, not just the FY delta) without needing real data.
   SCENARIOS.push(
-    { id: "s1", name: "Base", fyTotal: 41800000, breakdown: [{ name: "Production", total: 28600000 }, { name: "R&D", total: 9300000 }, { name: "IT", total: 3900000 }] },
-    { id: "s2", name: "Hiring freeze", fyTotal: 39500000, breakdown: [{ name: "Production", total: 27000000 }, { name: "R&D", total: 8600000 }, { name: "IT", total: 3900000 }] },
+    { id: "s1", name: "Base", fyTotal: 41800000, breakdown: [{ name: "Production", total: 28600000 }, { name: "R&D", total: 9300000 }, { name: "IT", total: 3900000 }],
+      monthly: [3300000, 3300000, 3300000, 3300000, 3300000, 3300000, 3400000, 3400000, 4100000, 3700000, 3700000, 3700000] },
+    { id: "s2", name: "Hiring freeze", fyTotal: 39500000, breakdown: [{ name: "Production", total: 27000000 }, { name: "R&D", total: 8600000 }, { name: "IT", total: 3900000 }],
+      monthly: [3300000, 3300000, 3300000, 3300000, 3300000, 3300000, 3400000, 3400000, 3200000, 3200000, 3200000, 3300000] },
   );
 
   BUDGET_VERSIONS.length = 0;
@@ -919,12 +931,17 @@ function parseActualsCsv(text) {
 
 async function dbSaveScenario(name) {
   const breakdown = COST_CENTERS.map((cc) => ({ name: cc.name, total: fySummary(cc).total }));
+  // Month-by-month trajectory (steal: Causal) — frozen at save time, same as
+  // fyTotal/breakdown, so a later CLOSE_MONTH advance or driver edit doesn't
+  // retroactively change what a saved scenario says it was.
+  const monthly = [];
+  for (let m = 1; m <= FY_MONTHS; m++) monthly.push(companyMonthAmount(m));
   const fyTotal = companyFySummary().total;
   const { data, error } = await sb.from("scenarios")
-    .insert({ org_id: CURRENT_ORG_ID, name, fy_total: fyTotal, snapshot: { breakdown } })
+    .insert({ org_id: CURRENT_ORG_ID, name, fy_total: fyTotal, snapshot: { breakdown, monthly } })
     .select().single();
   if (error) { flagWriteError(error); return null; }
-  return { id: data.id, name: data.name, fyTotal: Number(data.fy_total), breakdown };
+  return { id: data.id, name: data.name, fyTotal: Number(data.fy_total), breakdown, monthly };
 }
 
 async function dbDeleteScenario(id) {

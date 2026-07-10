@@ -1,5 +1,13 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* The [hidden] attribute is UA-origin display:none, which any author rule of
+   equal specificity (e.g. .panel{display:flex}) silently wins against per the
+   cascade's origin ordering — every el.hidden=true toggle in the app (panels,
+   empty states) would render as an empty box instead of actually hiding
+   without this. Found via the scenario trajectory chart wrap staying visible
+   with 0 scenarios; !important makes `hidden` unconditionally win everywhere. */
+[hidden] { display: none !important; }
+
 /* Login gate */
 .login-overlay {
   position: fixed;
@@ -1179,6 +1187,10 @@ html[data-theme="light"] .panel {
   min-height: 0;
   max-height: 100%;
 }
+
+.scenario-chart-wrap { height: 280px; display: flex; flex-direction: column; margin: 4px 0 18px; }
+.scenario-chart-wrap h3 { font-size: 0.78rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.03em; margin: 0 0 10px; font-weight: 600; }
+.scenario-chart-wrap canvas { flex: 1; min-height: 0; max-height: 100%; }
 
 /* Budget table */
 

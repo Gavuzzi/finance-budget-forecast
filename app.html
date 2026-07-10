@@ -77,6 +77,10 @@
         <h2 data-i18n="scenarios_h2">Scenarios</h2>
         <p class="table-hint" data-i18n="scenarios_hint">Snapshot the current plan's full-year total, then compare alternatives against the live plan. (Change drivers on Planning between snapshots.)</p>
         <button class="add-cc-btn" id="saveScenarioBtn" type="button" data-i18n="save_scenario_btn">+ Save current as scenario</button>
+        <div class="scenario-chart-wrap" id="scenarioChartWrap" hidden>
+          <h3 data-i18n="scenario_chart_h3">Trajectory — month by month</h3>
+          <canvas id="scenarioChart"></canvas>
+        </div>
         <div class="scenario-list" id="scenarioList"></div>
       </section>
     </main>

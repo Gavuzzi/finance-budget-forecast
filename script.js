@@ -1,10 +1,16 @@
 let trendChart;
+let scenarioChart;
 let currentLens = "fy"; // "fy" | "rolling"
 
 const THEME_COLORS = {
   dark: { text: "#93a1b8", grid: "#28344a", budget: "#7aa3e0", actual: "#5cb88a", forecast: "#d9a647" },
   light: { text: "#647189", grid: "#dde4ee", budget: "#3461a8", actual: "#2f9e6a", forecast: "#b6841f" },
 };
+
+// Fixed palette for scenario lines (cycled if there are more scenarios than colors) —
+// deliberately distinct from THEME_COLORS.budget/actual/forecast so the "Current
+// plan" line (which reuses colors.actual) never collides with a scenario line.
+const SCENARIO_PALETTE = ["#d9a647", "#c86bd6", "#5aa8d9", "#e07a5f", "#8fbf5f"];
 
 function companyMonthlyBudget(month) {
   if (month < 1 || month > FY_MONTHS) return null;
@@ -344,6 +350,62 @@ function renderScenarios() {
   }
 
   listEl.innerHTML = html;
+  renderScenarioChart();
+}
+
+// Scenario trajectories (steal: Causal): a saved scenario stores one FY total,
+// which hides WHEN two plans diverge — a hiring freeze from month 9 and a 3%
+// mid-year price cut can land on the same annual delta but tell very
+// different stories. Plot each saved scenario's frozen monthly snapshot
+// against the live current-plan trajectory so the shape is visible, not just
+// the number.
+function renderScenarioChart() {
+  const wrap = document.getElementById("scenarioChartWrap");
+  if (!wrap) return;
+  const withMonthly = SCENARIOS.filter((s) => Array.isArray(s.monthly) && s.monthly.length === FY_MONTHS);
+  if (withMonthly.length === 0) { wrap.hidden = true; return; }
+  wrap.hidden = false;
+
+  const colors = THEME_COLORS[getTheme()];
+  const months = [];
+  for (let m = 1; m <= FY_MONTHS; m++) months.push(m);
+  const labels = months.map(monthLabel);
+
+  const datasets = [
+    {
+      label: t("scenario_current_plan"),
+      data: months.map((m) => companyMonthAmount(m)),
+      borderColor: colors.actual,
+      backgroundColor: "transparent",
+      borderWidth: 2,
+      tension: 0.2,
+      pointRadius: 2,
+    },
+    ...withMonthly.map((s, i) => ({
+      label: s.name,
+      data: s.monthly,
+      borderColor: SCENARIO_PALETTE[i % SCENARIO_PALETTE.length],
+      backgroundColor: "transparent",
+      borderDash: [5, 3],
+      tension: 0.2,
+      pointRadius: 2,
+    })),
+  ];
+
+  if (scenarioChart) scenarioChart.destroy();
+  scenarioChart = new Chart(document.getElementById("scenarioChart"), {
+    type: "line",
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: colors.text } } },
+      scales: {
+        x: { ticks: { color: colors.text }, grid: { color: colors.grid } },
+        y: { ticks: { color: colors.text, callback: (v) => fmtMkr(v) }, grid: { color: colors.grid } },
+      },
+    },
+  });
 }
 
 function initScenarios() {
@@ -491,6 +553,11 @@ window.onThemeChanged = () => {
     trendChart.destroy();
     trendChart = null;
     renderChart();
+  }
+  if (scenarioChart) {
+    scenarioChart.destroy();
+    scenarioChart = null;
+    renderScenarioChart();
   }
 };
 window.refreshAfterPeriodChange = renderAll;
