@@ -29,7 +29,12 @@ function lensMonthRange() {
   return months;
 }
 
+// Hero + compact stats (TEARDOWN C6): the hero answers the page's one
+// question — "are we on plan?" — as a verdict, not just a signed number.
+// The projected-FY-result line (revenue plan − cost) lives inside the hero
+// as a subline instead of being its own stacked panel.
 function renderStats() {
+  const hero = document.getElementById("heroCard");
   const statsRow = document.getElementById("statsRow");
 
   if (currentLens === "fy") {
@@ -38,6 +43,35 @@ function renderStats() {
     for (let m = 1; m <= CLOSE_MONTH; m++) bookedActual += companyMonthAmount(m);
     const pct = fy.budget ? (fy.variance / fy.budget) * 100 : 0;
     const cls = varianceClass(fy.variance, fy.budget);
+    const onPlan = Math.abs(pct) <= 1;
+    const verdict = onPlan ? t("verdict_on_plan")
+      : fy.variance > 0 ? t("verdict_over_budget") : t("verdict_under_budget");
+    // "On plan" is good news — green, not the amber the tiny raw variance
+    // would get from varianceClass (amber reads as a warning; TEARDOWN C4).
+    const verdictCls = onPlan ? "under" : cls;
+
+    const revenue = revenuePlanFyTotal();
+    let projHtml = "";
+    if (revenue) {
+      const result = revenue - fy.total;
+      const margin = Math.round((result / revenue) * 100);
+      const rcls = result >= 0 ? "under" : "over";
+      const hasPlan = Array.isArray(ASSUMPTIONS.revenuePlan) && ASSUMPTIONS.revenuePlan.some((v) => v > 0);
+      projHtml = `<p class="hero-sub"><strong>${t("forecast_pnl_title")}:</strong> ${t("forecast_pnl_body", `<strong class="${rcls}">${fmtMkrSigned(result)}</strong>`, fmtMkr(revenue), fmtMkr(fy.total), margin)}${hasPlan ? "" : ` · ${t("forecast_pnl_flat_note")}`}</p>`;
+    }
+
+    hero.innerHTML = `
+      <div class="hero-main">
+        <div>
+          <span class="stat-label">${t("stat_variance_vs_budget")}</span>
+          <span class="hero-verdict ${verdictCls}">${verdict}</span>
+        </div>
+        <div class="hero-amount">
+          <span class="stat-value ${cls}">${fmtMkrSigned(fy.variance)}</span>
+          <span class="variance-pill ${cls}">${pct > 0 ? "+" : ""}${pct.toFixed(1)}%</span>
+        </div>
+      </div>
+      ${projHtml}`;
 
     statsRow.innerHTML = `
       <div class="stat-card">
@@ -53,31 +87,33 @@ function renderStats() {
         <span class="stat-label">${t("stat_fy_total")}</span>
         <span class="stat-value">${fmtMkr(fy.total)}</span>
       </div>
-      <div class="stat-card highlight">
-        <span class="stat-label">${t("stat_variance_vs_budget")}</span>
-        <span class="stat-value ${cls}">${fmtMkrSigned(fy.variance)}</span>
-        <span class="stat-sub ${cls}">${pct > 0 ? "+" : ""}${pct.toFixed(1)}%</span>
-      </div>
     `;
   } else {
     const { start, end } = rollingWindow();
     const rolling = companyRollingSummary();
     const monthsBeyondBudget = lensMonthRange().filter((m) => m > FY_MONTHS).length;
 
+    hero.innerHTML = `
+      <div class="hero-main">
+        <div>
+          <span class="stat-label">${t("stat_rolling_12")}</span>
+          <span class="hero-verdict">${fmtMkr(rolling.total)}</span>
+        </div>
+        <div class="hero-amount">
+          <span class="stat-sub">${monthLabel(start)} – ${monthLabel(end)}</span>
+        </div>
+      </div>`;
+
     statsRow.innerHTML = `
       <div class="stat-card">
-        <span class="stat-label">${t("stat_rolling_12")}</span>
-        <span class="stat-value">${fmtMkr(rolling.total)}</span>
+        <span class="stat-label">${t("stat_avg_monthly")}</span>
+        <span class="stat-value">${fmtMkr(rolling.total / 12)}</span>
       </div>
       <div class="stat-card">
         <span class="stat-label">${t("stat_window")}</span>
         <span class="stat-value small">${monthLabel(start)} – ${monthLabel(end)}</span>
       </div>
       <div class="stat-card">
-        <span class="stat-label">${t("stat_avg_monthly")}</span>
-        <span class="stat-value">${fmtMkr(rolling.total / 12)}</span>
-      </div>
-      <div class="stat-card highlight">
         <span class="stat-label">${t("stat_months_without_budget")}</span>
         <span class="stat-value">${monthsBeyondBudget}</span>
         <span class="stat-sub">${t("stat_budget_not_set")}</span>
@@ -364,6 +400,10 @@ function renderScenarioChart() {
   if (!wrap) return;
   const withMonthly = SCENARIOS.filter((s) => Array.isArray(s.monthly) && s.monthly.length === FY_MONTHS);
   if (withMonthly.length === 0) { wrap.hidden = true; return; }
+  // Inside a closed <details> the canvas has zero size and Chart.js renders
+  // blank — skip; the details' toggle listener re-renders on first open.
+  const host = document.getElementById("scenariosDetails");
+  if (host && !host.open) return;
   wrap.hidden = false;
 
   const colors = THEME_COLORS[getTheme()];
@@ -409,6 +449,9 @@ function renderScenarioChart() {
 }
 
 function initScenarios() {
+  const host = document.getElementById("scenariosDetails");
+  if (host) host.addEventListener("toggle", () => { if (host.open) renderScenarioChart(); });
+
   document.getElementById("saveScenarioBtn").addEventListener("click", async () => {
     const name = prompt(t("prompt_scenario_name"));
     if (!name || !name.trim()) return;
@@ -440,7 +483,7 @@ function initScenarios() {
 }
 
 function renderAll() {
-  const sections = document.querySelectorAll(".lens-controls, .stats-row, .main-row, .table-panel, .role-breakdown-panel, .scenarios-panel, .signals-panel, .fortnox-pnl-panel, .budget-version-panel, .forecast-pnl-panel, .reforecast-panel");
+  const sections = document.querySelectorAll(".lens-controls, .hero-card, .stats-row, .main-row, .table-panel, .this-month-panel, .collapse-panel");
   let empty = document.getElementById("emptyState");
 
   if (COST_CENTERS.length === 0) {
@@ -464,32 +507,14 @@ function renderAll() {
   renderScenarios();
   renderSignals();
   renderBudgetVersion();
-  renderForecastPnl();
   renderReforecast();
-}
 
-// The forward answer to "will we make money this year": the revenue plan
-// (Assumptions) minus the full-year cost picture (booked actuals through the
-// close month + driver forecast after). Hidden until a revenue target or
-// monthly plan exists — no invented numbers.
-function renderForecastPnl() {
-  const panel = document.getElementById("forecastPnlPanel");
-  if (!panel) return;
-  const revenue = revenuePlanFyTotal();
-  if (!revenue) { panel.hidden = true; return; }
-  const cost = companyFySummary().total;
-  const result = revenue - cost;
-  const margin = Math.round((result / revenue) * 100);
-  const cls = result >= 0 ? "under" : "over";
-  const hasPlan = Array.isArray(ASSUMPTIONS.revenuePlan) && ASSUMPTIONS.revenuePlan.some((v) => v > 0);
-  panel.hidden = false;
-  panel.innerHTML = `
-    <div class="bv-row">
-      <div>
-        <h2 class="bv-title">${t("forecast_pnl_title")} <span class="pnl-src">${t("forecast_pnl_sub")}</span></h2>
-        <p class="table-hint">${t("forecast_pnl_body", `<strong class="${cls}">${fmtMkrSigned(result)}</strong>`, fmtMkr(revenue), fmtMkr(cost), margin)}${hasPlan ? "" : ` · ${t("forecast_pnl_flat_note")}`}</p>
-      </div>
-    </div>`;
+  // The "This month" wrapper holds both loop blocks; hide it only when
+  // neither has anything to say (e.g. no closed month yet).
+  const wrap = document.getElementById("thisMonthPanel");
+  const sig = document.getElementById("signalsPanel");
+  const rf = document.getElementById("reforecastPanel");
+  if (wrap && sig && rf) wrap.hidden = sig.hidden && rf.hidden;
 }
 
 // Steal-list (Abacum): budgets are locked/versioned, not just a live editable
@@ -502,13 +527,19 @@ function renderBudgetVersion() {
   const drift = budgetDrift();
   const lockBtn = `<button class="add-cc-btn" id="lockBudgetBtn" type="button">${v ? t("lock_new_version") : t("lock_current_budget")}</button>`;
 
+  // Status chip lives in the collapsed <summary> so the drift/✓ verdict is
+  // visible without expanding — collapsed must never mean hidden information.
+  const status = document.getElementById("bvStatus");
+  if (status) {
+    status.innerHTML = !v ? ""
+      : drift == null ? `<span class="bv-clean">${t("budget_version_clean")}</span>`
+      : `<span class="bv-drift ${drift > 0 ? "over" : "under"}">${t("budget_version_drift", fmtMkrSigned(drift))}</span>`;
+  }
+
   if (!v) {
     panel.innerHTML = `
       <div class="bv-row">
-        <div>
-          <h2 class="bv-title">${t("budget_version_title")}</h2>
-          <p class="table-hint">${t("budget_version_none")}</p>
-        </div>
+        <p class="table-hint">${t("budget_version_none")}</p>
         ${lockBtn}
       </div>`;
   } else {
@@ -518,10 +549,7 @@ function renderBudgetVersion() {
       : `<span class="bv-drift ${drift > 0 ? "over" : "under"}">${t("budget_version_drift", fmtMkrSigned(drift))}</span>`;
     panel.innerHTML = `
       <div class="bv-row">
-        <div>
-          <h2 class="bv-title">${t("budget_version_title")} <span class="pnl-src">${t("budget_version_locked", dateStr)}</span></h2>
-          <p class="table-hint">${t("budget_version_approved", `<strong>${escapeHtml(v.name)}</strong>`, fmtMkr(v.total))} ${driftHtml}</p>
-        </div>
+        <p class="table-hint">${t("budget_version_approved", `<strong>${escapeHtml(v.name)}</strong>`, fmtMkr(v.total))} <span class="pnl-src">${t("budget_version_locked", dateStr)}</span> ${driftHtml}</p>
         ${lockBtn}
       </div>`;
   }
@@ -537,7 +565,11 @@ function renderBudgetVersion() {
 }
 
 function initLensControls() {
+  // Dev hook: ?preview&lens=rolling renders the rolling lens for headless
+  // screenshot verification (the toggle needs a click otherwise).
+  if (new URLSearchParams(location.search).get("lens") === "rolling") currentLens = "rolling";
   document.querySelectorAll(".lens-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.lens === currentLens);
     btn.addEventListener("click", () => {
       currentLens = btn.dataset.lens;
       document.querySelectorAll(".lens-btn").forEach((b) => b.classList.toggle("active", b === btn));
@@ -571,14 +603,20 @@ function initPrint() {
 }
 
 // Force a clean light palette (and re-render the chart light) for printing,
-// then restore the user's theme afterward.
+// then restore the user's theme afterward. Collapsed sections are opened for
+// the print (a board pack shouldn't have hidden content) and restored after.
 let _printPrevTheme = null;
+let _printClosedDetails = [];
 window.addEventListener("beforeprint", () => {
   _printPrevTheme = getTheme();
   if (_printPrevTheme !== "light") applyTheme("light");
+  _printClosedDetails = [...document.querySelectorAll("details.collapse-panel:not([open])")];
+  _printClosedDetails.forEach((d) => (d.open = true));
 });
 window.addEventListener("afterprint", () => {
   if (_printPrevTheme && _printPrevTheme !== "light") applyTheme(_printPrevTheme);
+  _printClosedDetails.forEach((d) => (d.open = false));
+  _printClosedDetails = [];
 });
 
 // Signals — proactively surface what's off, so the controller doesn't have to

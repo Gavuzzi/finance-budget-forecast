@@ -16,7 +16,7 @@
       <header class="page-head">
         <div class="page-head-text">
           <h1 data-i18n="overview_h1">Overview</h1>
-          <p class="page-sub" data-i18n="overview_subtitle">Budget &amp; Forecast — FY2026</p>
+          <p class="page-sub" data-i18n="overview_subtitle">Are we on plan? Budget vs actual vs forecast — FY2026</p>
         </div>
         <button class="print-btn print-hide" id="printBtn" type="button" data-i18n="print_btn">Print / Save as PDF</button>
       </header>
@@ -32,26 +32,22 @@
         </div>
       </section>
 
-      <section class="stats-row" id="statsRow"></section>
+      <!-- Hero: the one number this page exists to answer (TEARDOWN C6) -->
+      <section class="panel hero-card" id="heroCard"></section>
 
-      <section class="panel budget-version-panel" id="budgetVersionPanel"></section>
+      <section class="stats-row stats-compact" id="statsRow"></section>
 
-      <section class="panel forecast-pnl-panel" id="forecastPnlPanel" hidden></section>
-
-      <section class="panel signals-panel" id="signalsPanel" hidden>
-        <h2 data-i18n-html="signals_h2">Signals <span class="pnl-src">— what needs your attention</span></h2>
-        <div id="signalsList"></div>
-      </section>
-
-      <section class="panel reforecast-panel" id="reforecastPanel" hidden>
-        <h2 data-i18n-html="reforecast_h2">Re-forecast <span class="pnl-src">— update the plan to match recent reality</span></h2>
-        <p class="table-hint" data-i18n="reforecast_hint">Never automatic — nothing changes until you click Apply, and it's always reversible.</p>
-        <div id="reforecastList"></div>
-      </section>
-
-      <section class="panel fortnox-pnl-panel" id="fortnoxPnl" hidden>
-        <h2 data-i18n-html="fortnox_pnl_h2">Actuals P&amp;L <span class="pnl-src">— from Fortnox</span></h2>
-        <div id="fortnoxPnlBody"></div>
+      <!-- The loop, front and center: signals + review + re-forecast (TEARDOWN C6) -->
+      <section class="panel this-month-panel" id="thisMonthPanel" hidden>
+        <h2 data-i18n-html="this_month_h2">This month <span class="pnl-src">— what needs your attention</span></h2>
+        <div id="signalsPanel" hidden>
+          <div id="signalsList"></div>
+        </div>
+        <div id="reforecastPanel" class="reforecast-block" hidden>
+          <h3 data-i18n-html="reforecast_h2">Re-forecast <span class="pnl-src">— update the plan to match recent reality</span></h3>
+          <p class="table-hint" data-i18n="reforecast_hint">Never automatic — nothing changes until you click Apply, and it's always reversible.</p>
+          <div id="reforecastList"></div>
+        </div>
       </section>
 
       <section class="main-row single">
@@ -67,14 +63,25 @@
         <div class="budget-table" id="budgetTable"></div>
       </section>
 
-      <section class="panel role-breakdown-panel">
-        <h2 data-i18n="cost_by_role_h2">Cost by Role</h2>
+      <!-- Demoted to collapsed sections (TEARDOWN C6): one click away, not shouting -->
+      <details class="panel collapse-panel" id="fortnoxPnl" hidden>
+        <summary><h2 data-i18n-html="fortnox_pnl_h2">Actuals P&amp;L <span class="pnl-src">— from Fortnox</span></h2></summary>
+        <div id="fortnoxPnlBody"></div>
+      </details>
+
+      <details class="panel collapse-panel" id="budgetVersionDetails">
+        <summary><h2><span data-i18n="budget_version_title">Budget version</span> <span class="bv-status" id="bvStatus"></span></h2></summary>
+        <div id="budgetVersionPanel"></div>
+      </details>
+
+      <details class="panel collapse-panel">
+        <summary><h2 data-i18n="cost_by_role_h2">Cost by Role</h2></summary>
         <p class="table-hint" data-i18n="cost_by_role_hint">The same people cost, sliced by role instead of reporting line — total across the org this fiscal year.</p>
         <div id="roleBreakdown"></div>
-      </section>
+      </details>
 
-      <section class="panel scenarios-panel">
-        <h2 data-i18n="scenarios_h2">Scenarios</h2>
+      <details class="panel collapse-panel" id="scenariosDetails">
+        <summary><h2 data-i18n="scenarios_h2">Scenarios</h2></summary>
         <p class="table-hint" data-i18n="scenarios_hint">Snapshot the current plan's full-year total, then compare alternatives against the live plan. (Change drivers on Planning between snapshots.)</p>
         <button class="add-cc-btn" id="saveScenarioBtn" type="button" data-i18n="save_scenario_btn">+ Save current as scenario</button>
         <div class="scenario-chart-wrap" id="scenarioChartWrap" hidden>
@@ -82,7 +89,7 @@
           <canvas id="scenarioChart"></canvas>
         </div>
         <div class="scenario-list" id="scenarioList"></div>
-      </section>
+      </details>
     </main>
   </div>
 

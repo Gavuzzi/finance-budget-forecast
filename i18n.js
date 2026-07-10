@@ -51,7 +51,7 @@ en: {
   // ---- sidebar / nav ----
   nav_overview: "Overview", nav_monthly: "Monthly", nav_planning: "Planning",
   nav_cashflow: "Cash Flow", nav_assumptions: "Assumptions",
-  brand_sub: "FP&A Planning",
+  brand_sub: "Budget & Forecast",
   new_org_btn: "+ New organization",
   period_label: "Actuals booked through",
   period_auto: (m) => `Auto (${m})`,
@@ -84,10 +84,13 @@ en: {
 
   // ---- overview (app.html) ----
   overview_h1: "Overview",
-  overview_subtitle: "Budget & Forecast — FY2026",
+  overview_subtitle: "Are we on plan? Budget vs actual vs forecast — FY2026",
+  this_month_h2: `This month <span class="pnl-src">— what needs your attention</span>`,
+  verdict_on_plan: "On plan ✓",
+  verdict_over_budget: "Over budget",
+  verdict_under_budget: "Under budget",
   print_btn: "Print / Save as PDF",
   lens_fy: "This Fiscal Year", lens_rolling: "Rolling 12 Months",
-  signals_h2: `Signals <span class="pnl-src">— what needs your attention</span>`,
   reforecast_h2: `Re-forecast <span class="pnl-src">— update the plan to match recent reality</span>`,
   reforecast_hint: "Never automatic — nothing changes until you click Apply, and it's always reversible.",
   fortnox_pnl_h2: `Actuals P&amp;L <span class="pnl-src">— from Fortnox</span>`,
@@ -134,7 +137,6 @@ en: {
   prompt_scenario_name: "Name this scenario (e.g. Base, Hiring freeze):",
   confirm_delete_scenario: (name) => `Delete scenario "${name}"?`,
   forecast_pnl_title: "Projected FY2026 result",
-  forecast_pnl_sub: "— revenue plan vs full-year cost",
   forecast_pnl_body: (result, revenue, cost, margin) =>
     `${result} = ${revenue} planned revenue − ${cost} cost (booked + forecast) · ${margin}% margin`,
   forecast_pnl_flat_note: `using a flat target ÷ 12 — set a monthly profile on <a href="assumptions.html">Assumptions</a>`,
@@ -534,10 +536,13 @@ sv: {
 
   // ---- overview (app.html) ----
   overview_h1: "Översikt",
-  overview_subtitle: "Budget & Prognos — FY2026",
+  overview_subtitle: "Ligger vi enligt plan? Budget mot utfall mot prognos — FY2026",
+  this_month_h2: `Denna månad <span class="pnl-src">— vad som behöver din uppmärksamhet</span>`,
+  verdict_on_plan: "Enligt plan ✓",
+  verdict_over_budget: "Över budget",
+  verdict_under_budget: "Under budget",
   print_btn: "Skriv ut / Spara som PDF",
   lens_fy: "Innevarande räkenskapsår", lens_rolling: "Rullande 12 månader",
-  signals_h2: `Signaler <span class="pnl-src">— vad som behöver din uppmärksamhet</span>`,
   reforecast_h2: `Ny prognos <span class="pnl-src">— uppdatera planen efter senaste utfallet</span>`,
   reforecast_hint: "Aldrig automatiskt — inget ändras förrän du klickar Använd, och det går alltid att ångra.",
   fortnox_pnl_h2: `Utfall resultaträkning <span class="pnl-src">— från Fortnox</span>`,
@@ -584,7 +589,6 @@ sv: {
   prompt_scenario_name: "Namnge detta scenario (t.ex. Bas, Anställningsstopp):",
   confirm_delete_scenario: (name) => `Ta bort scenariot "${name}"?`,
   forecast_pnl_title: "Prognostiserat resultat FY2026",
-  forecast_pnl_sub: "— intäktsplan vs helårskostnad",
   forecast_pnl_body: (result, revenue, cost, margin) =>
     `${result} = ${revenue} planerad intäkt − ${cost} kostnad (bokfört + prognos) · ${margin}% marginal`,
   forecast_pnl_flat_note: `använder ett platt mål ÷ 12 — sätt en månadsprofil under <a href="assumptions.html">Antaganden</a>`,

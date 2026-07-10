@@ -310,11 +310,27 @@ repaint, so we never restyle twice.
   hero variance number + one chart + "this month" action block, rest demoted). Verification note: quotes
   are from marketing/review sites fetched 2026-07-10, not hands-on product use — conventions are
   triangulated across 5 sources rather than single-sourced to compensate.
-- [ ] `[B]` **2. Information architecture restructure (1–2 days)** — Overview becomes: one hero row
-  (the number that matters + variance), one chart, one **"This month"** action block (Signals + review
-  ritual + Re-forecast — the loop, front and center since it's our differentiator), everything else
-  demoted to collapsed sections or moved to its own page. Plain-language pass on nav/headings (what a
-  Swedish SME owner says, not what a CFO says). No engine changes — presentation layer only, tests stay green.
+- [x] `[B]` **2. Information architecture restructure** *(done 2026-07-10)* — Overview went from ~11
+  equal-weight stacked sections to a ranked page (per C6): **hero card** answering the page's question
+  as a verdict ("On plan ✓" / "Over budget" — green/red words, not just a signed number; the tiny-variance
+  amber from varianceClass deliberately NOT used for the verdict since amber reads as a warning, per C4)
+  with the projected-FY-result line folded in as a subline (its standalone panel deleted); **3 compact
+  supporting stats**; **one "This month" block** merging Signals + review ritual + Re-forecast (the loop,
+  front and center per C6, hidden only when neither has content); the chart; the reporting-lines table;
+  and **four `<details>` collapsed sections** (Actuals P&L, Budget version, Cost by Role, Scenarios) —
+  native disclosure elements, no JS state, styled as panels with carets. Collapsed ≠ hidden information:
+  the budget-version drift/✓ verdict renders inside the closed summary. Scenario trajectory chart guards
+  against zero-size canvas inside a closed details and re-renders on first expand (toggle listener);
+  print opens all details before rendering and restores after (a board pack shouldn't have hidden
+  content). C9: sidebar brand tag "FP&A Planning" → "Budget & Forecast" (jargon; sv was already plain);
+  C8: Overview subtitle is now the question itself ("Are we on plan? …" / "Ligger vi enligt plan? …").
+  Two real bugs caught by screenshot: `.stats-compact` lost to the base `.stats-row` 4-col rule on
+  source order (equal specificity — fixed by compounding the selector), and the on-plan verdict rendered
+  amber. New `?preview&lens=rolling` dev hook added (headless can't click the lens toggle). **Verified:**
+  dark/light/Swedish/empty-org/rolling/expanded-details all screenshotted; rolling-lens numbers
+  hand-computed from the fixtures (39,1 mkr total = 19 967 436 + 6×3 185 790; avg 3,3; 6 months w/o
+  budget) and matched exactly; 34 engine tests green; zero data.js changes. NOT verified hands-on: the
+  print-opens-details path (code-reviewed only — in TESTING.md).
 - [ ] `[B]` **3. Visual reskin (~1 day)** — light theme becomes the DEFAULT (dark stays as toggle),
   palette/typography/spacing copied from the convention sheet. Re-shoot all landing-page screenshots after.
 - [ ] `[B]` **4. First-run experience (~1 day)** — a signed-in first-time user should reach "I see my

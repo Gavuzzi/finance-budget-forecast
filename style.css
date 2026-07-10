@@ -886,18 +886,66 @@ td.mt-drill:hover { background: rgba(77,124,199,0.12); border-radius: 4px; }
 .pnl-src { font-weight: 400; color: var(--text-dim); font-size: 0.9rem; }
 
 /* Budget versioning */
-.budget-version-panel { padding: 16px 20px; }
 .bv-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
-.bv-title { font-size: 1rem; margin: 0 0 4px; }
 .bv-clean { color: var(--green, #3fb27f); font-weight: 600; }
 .bv-drift { font-weight: 600; }
 .bv-drift.over { color: var(--red); }
 .bv-drift.under { color: var(--accent-soft); }
 
-/* Projected-result figure (Overview) + revenue-plan drift (Assumptions):
+/* Projected-result figure (hero subline) + revenue-plan drift (Assumptions):
    green = making money / plan above target, red = the opposite. */
-.forecast-pnl-panel strong.over, #revPlanTotal .over { color: var(--red); }
-.forecast-pnl-panel strong.under, #revPlanTotal .under { color: var(--green); }
+.hero-sub strong.over, #revPlanTotal .over { color: var(--red); }
+.hero-sub strong.under, #revPlanTotal .under { color: var(--green); }
+
+/* Hero card (TEARDOWN C6): the page's one answer, visually dominant */
+.hero-card { padding: 20px 24px; }
+.hero-main { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+.hero-verdict {
+  display: block;
+  font-family: 'Fraunces', serif;
+  font-size: 2.4rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+.hero-verdict.over { color: var(--red); }
+.hero-verdict.under { color: var(--green); }
+.hero-verdict.neutral { color: var(--amber); }
+.hero-amount { display: flex; align-items: baseline; gap: 12px; }
+.hero-amount .stat-value { font-size: 1.6rem; }
+.hero-sub { margin: 12px 0 0; padding-top: 12px; border-top: 1px solid var(--panel-border); font-size: 0.9rem; color: var(--text-dim); }
+
+/* Compact stats row under the hero: 3 supporting numbers, quieter.
+   (.stats-row.stats-compact beats the base .stats-row 4-col rule that sits
+   later in this file — equal-specificity source order bit us once.) */
+.stats-row.stats-compact { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.stats-row.stats-compact .stat-value { font-size: 1.5rem; }
+
+/* "This month" — the loop block (signals + review + re-forecast) */
+.this-month-panel .reforecast-block { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--panel-border); }
+.this-month-panel .reforecast-block h3 { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; margin: 0 0 4px; font-weight: 600; }
+
+/* Collapsed secondary sections (TEARDOWN C6) */
+details.collapse-panel { padding: 0; }
+details.collapse-panel > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+details.collapse-panel > summary::-webkit-details-marker { display: none; }
+details.collapse-panel > summary::before {
+  content: "▸";
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  transition: transform 0.15s ease;
+}
+details.collapse-panel[open] > summary::before { transform: rotate(90deg); }
+details.collapse-panel > summary h2 { margin: 0; }
+details.collapse-panel > *:not(summary) { margin-left: 24px; margin-right: 24px; }
+details.collapse-panel > *:last-child:not(summary) { margin-bottom: 20px; }
+.bv-status { margin-left: 4px; font-size: 0.85rem; text-transform: none; letter-spacing: 0; }
 
 /* Re-forecast suggestions */
 .rf-row {
