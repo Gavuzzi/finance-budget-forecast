@@ -908,6 +908,22 @@ td.mt-drill:hover { background: rgba(77,124,199,0.12); border-radius: 4px; }
 .signal-dot.over { background: var(--red); box-shadow: 0 0 0 4px rgba(224,90,90,0.15); }
 .signal-dot.under { background: var(--green, #3fb27f); box-shadow: 0 0 0 4px rgba(63,178,127,0.15); }
 .signal-note { color: var(--text-dim); font-style: italic; }
+.signal-text { flex: 1 1 auto; }
+.signal-row.reviewed { opacity: 0.55; }
+.signal-review-btn {
+  flex: 0 0 auto;
+  background: none;
+  border: 1px solid var(--panel-border);
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  padding: 3px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.signal-review-btn:hover { border-color: var(--accent-soft); color: var(--text); }
+.signal-row.reviewed .signal-review-btn { color: var(--green, #3fb27f); border-color: var(--green, #3fb27f); }
+.signal-empty { padding: 10px 0; font-size: 0.92rem; color: var(--green, #3fb27f); font-weight: 600; }
 .fortnox-pnl-panel .fn-recon-table { max-width: 480px; }
 .fn-recon-warn { color: var(--red); }
 .fn-margin { font-size: 0.72rem; font-weight: 600; color: var(--green, #3fb27f); background: rgba(63,178,127,0.12); padding: 1px 7px; border-radius: 999px; margin-left: 8px; }

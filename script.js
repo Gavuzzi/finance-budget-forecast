@@ -516,11 +516,18 @@ window.addEventListener("afterprint", () => {
 
 // Signals — proactively surface what's off, so the controller doesn't have to
 // hunt through tables (the pattern every winning FP&A tool shares).
+// Month-end review ritual: turns this panel into a checkable close checklist
+// instead of a wall of variance text. Reviewed state is per (reporting line,
+// CLOSE_MONTH) — purely a habit-tracking checkbox, never fed back into any
+// calculation. Two positive-reinforcement states (all reviewed / nothing to
+// flag) replace the old behavior of just hiding the panel when there's
+// nothing to complain about — the goal is a monthly habit, not a nag list.
 function renderSignals() {
   const panel = document.getElementById("signalsPanel");
   const list = document.getElementById("signalsList");
   if (!panel || !list) return;
 
+  const monthLbl = monthLabel(CLOSE_MONTH);
   const signals = [];
   COST_CENTERS.forEach((cc) => {
     const fy = fySummary(cc);
@@ -528,18 +535,49 @@ function renderSignals() {
     const pct = (fy.variance / fy.budget) * 100;
     if (Math.abs(pct) < 3) return; // within tolerance — no noise
     signals.push({
+      id: cc.id,
       abs: Math.abs(fy.variance),
       over: fy.variance > 0,
       html: `${t("signal_tracking", escapeHtml(cc.name), fmtMkrSigned(fy.variance), fy.variance > 0 ? t("signal_over") : t("signal_under"), `${pct > 0 ? "+" : ""}${pct.toFixed(1)}%`)}${cc.note ? ` <span class="signal-note">— ${escapeHtml(cc.note)}</span>` : ""}`,
     });
   });
 
-  if (signals.length === 0) { panel.hidden = true; return; }
+  if (CLOSE_MONTH < 1) { panel.hidden = true; return; } // no closed month yet — nothing to review
+
+  if (signals.length === 0) {
+    list.innerHTML = `<div class="signal-empty">${t("signals_nothing_to_flag", monthLbl)}</div>`;
+    panel.hidden = false;
+    return;
+  }
+
   signals.sort((a, b) => b.abs - a.abs);
-  list.innerHTML = signals.slice(0, 5).map((s) =>
-    `<div class="signal-row"><span class="signal-dot ${s.over ? "over" : "under"}"></span><span>${s.html}</span></div>`
-  ).join("");
+  const shown = signals.slice(0, 5);
+  const isReviewed = (s) => SIGNAL_REVIEWS.has(s.id + ":" + CLOSE_MONTH);
+  const allReviewed = shown.every(isReviewed);
+
+  list.innerHTML = shown.map((s) => {
+    const reviewed = isReviewed(s);
+    return `<div class="signal-row ${reviewed ? "reviewed" : ""}">
+      <span class="signal-dot ${s.over ? "over" : "under"}"></span>
+      <span class="signal-text">${s.html}</span>
+      <button class="signal-review-btn" type="button" data-cc="${s.id}" data-mark="${!reviewed}">${reviewed ? t("signal_unmark") : t("signal_mark_reviewed")}</button>
+    </div>`;
+  }).join("") + (allReviewed ? `<div class="signal-empty">${t("signals_all_reviewed", monthLbl)}</div>` : "");
   panel.hidden = false;
+}
+
+function initSignals() {
+  const list = document.getElementById("signalsList");
+  if (!list) return;
+  list.addEventListener("click", async (e) => {
+    const btn = e.target.closest(".signal-review-btn");
+    if (!btn) return;
+    if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast(t("toast_signin_review")); return; }
+    const ccId = btn.dataset.cc;
+    const mark = btn.dataset.mark === "true";
+    const ok = mark ? await dbMarkReviewed(ccId, CLOSE_MONTH) : await dbUnmarkReviewed(ccId, CLOSE_MONTH);
+    if (ok) renderSignals();
+  });
 }
 
 // Re-forecast: when a cost centre's recent actuals meaningfully diverge from
@@ -635,6 +673,7 @@ window.initPage = () => {
   initLensControls();
   initScenarios();
   initReforecast();
+  initSignals();
   initPrint();
   renderOnboard();
   renderAll();

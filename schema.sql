@@ -244,6 +244,23 @@ alter table tax_liability_monthly enable row level security;
 drop policy if exists tax_liability_monthly_read on tax_liability_monthly;
 create policy tax_liability_monthly_read on tax_liability_monthly for select using (is_org_member(org_id));
 
+-- Month-end review ritual: a user-checkable "reviewed" mark per (org, line,
+-- month), turning the existing Signals panel into a guided monthly close
+-- checklist. Purely additive bookkeeping — never affects any calculation,
+-- fully reversible (delete the row to unmark).
+create table if not exists signal_reviews (
+  org_id            uuid not null references organizations(id) on delete cascade,
+  reporting_line_id uuid not null references reporting_lines(id) on delete cascade,
+  month             smallint not null,
+  reviewed_at       timestamptz not null default now(),
+  primary key (org_id, reporting_line_id, month)
+);
+alter table signal_reviews enable row level security;
+drop policy if exists signal_reviews_read on signal_reviews;
+drop policy if exists signal_reviews_write on signal_reviews;
+create policy signal_reviews_read on signal_reviews for select using (is_org_member(org_id));
+create policy signal_reviews_write on signal_reviews for all using (can_edit_org(org_id)) with check (can_edit_org(org_id));
+
 -- ---------------------------------------------------------------------------
 -- Row-Level Security: a user can touch a row only if they're a member of its org.
 -- Enabled on EVERY table. The anon key is safe in the browser only because of this.

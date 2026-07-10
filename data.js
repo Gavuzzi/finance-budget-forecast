@@ -43,6 +43,9 @@ let SCENARIOS = [];
 // Freshness of the Fortnox connection, for the sidebar badge — null for orgs
 // that aren't connected (manual/CSV orgs get no badge, no nagging).
 let SYNC_STATUS = null; // { connected, last_synced_at, last_sync_error }
+// Month-end review ritual: set of "reportingLineId:month" keys the user has
+// checked off. Purely a UI checklist — never read by any engine calculation.
+let SIGNAL_REVIEWS = new Set();
 const ORG_STORAGE_KEY = "almgren-current-org";
 const ROLE_CATALOG = [];
 const ASSUMPTIONS = {
@@ -509,6 +512,11 @@ async function loadData(orgId) {
   TAX_LIABILITY = { vat: new Map(), payroll: new Map() };
   const taxRes = await sb.from("tax_liability_monthly").select("*").eq("org_id", CURRENT_ORG_ID);
   if (!taxRes.error) taxRes.data.forEach((r) => TAX_LIABILITY[r.kind === "vat" ? "vat" : "payroll"].set(r.month, Number(r.balance)));
+
+  // Month-end review checkmarks — tolerant load (table may not exist yet on an older DB).
+  SIGNAL_REVIEWS = new Set();
+  const srRes = await sb.from("signal_reviews").select("reporting_line_id, month").eq("org_id", CURRENT_ORG_ID);
+  if (!srRes.error) srRes.data.forEach((r) => SIGNAL_REVIEWS.add(r.reporting_line_id + ":" + r.month));
 }
 
 // ---- Preview mode ----------------------------------------------------------
@@ -582,6 +590,10 @@ function loadPreviewData() {
 
   // Badge demo: synced a few hours ago, healthy.
   SYNC_STATUS = { connected: true, last_synced_at: new Date(Date.now() - 3 * 3600000).toISOString(), last_sync_error: null };
+
+  // Review ritual demo: IT already reviewed this close (matches its note above),
+  // Production/R&D left unmarked so the screenshot shows both states.
+  SIGNAL_REVIEWS = new Set(["c3:6"]);
 
   CASH_POSITION = { bankBalance: 6200000, asOf: "2026-07-07T05:00:00Z" };
   OPEN_INVOICES.length = 0;
@@ -744,6 +756,24 @@ async function dbDeleteCostCenter(id) {
 async function dbSetCostCenterNote(cc) {
   const { error } = await sb.from("reporting_lines").update({ note: cc.note || null }).eq("id", cc.id);
   if (error) flagWriteError(error);
+}
+
+// Month-end review ritual: mark/unmark a signal as reviewed. Optimistic on the
+// in-memory Set so the checkbox responds instantly; reverted on write failure.
+async function dbMarkReviewed(reportingLineId, month) {
+  SIGNAL_REVIEWS.add(reportingLineId + ":" + month);
+  const { error } = await sb.from("signal_reviews")
+    .upsert({ org_id: CURRENT_ORG_ID, reporting_line_id: reportingLineId, month }, { onConflict: "org_id,reporting_line_id,month" });
+  if (error) { SIGNAL_REVIEWS.delete(reportingLineId + ":" + month); flagWriteError(error); return false; }
+  return true;
+}
+
+async function dbUnmarkReviewed(reportingLineId, month) {
+  SIGNAL_REVIEWS.delete(reportingLineId + ":" + month);
+  const { error } = await sb.from("signal_reviews").delete()
+    .eq("org_id", CURRENT_ORG_ID).eq("reporting_line_id", reportingLineId).eq("month", month);
+  if (error) { SIGNAL_REVIEWS.add(reportingLineId + ":" + month); flagWriteError(error); return false; }
+  return true;
 }
 
 async function dbSetCostCenterShared(cc) {
