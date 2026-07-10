@@ -44,6 +44,7 @@ function translateStaticHtml() {
   document.querySelectorAll("[data-i18n-html]").forEach((el) => { el.innerHTML = t(el.dataset.i18nHtml); });
   document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => { el.placeholder = t(el.dataset.i18nPlaceholder); });
   document.querySelectorAll("[data-i18n-alt]").forEach((el) => { el.alt = t(el.dataset.i18nAlt); });
+  document.querySelectorAll("[data-i18n-title]").forEach((el) => { el.title = t(el.dataset.i18nTitle); });
 }
 
 const STRINGS = {
@@ -172,8 +173,9 @@ en: {
   monthly_h1: "Monthly",
   monthly_subtitle: "Month-by-month P&amp;L — actual + forecast",
   smooth_toggle: "Spread lumpy actuals",
-  smooth_hint: "(period average, for trend reading — doesn't change totals)",
-  monthly_figures_hint: `Figures in <span id="unitLabel">mkr</span>. <span class="mt-legend-actual">Solid</span> columns are booked actuals; <span class="mt-legend-forecast">lighter</span> columns are forecast. The accent line marks where actuals end.`,
+  smooth_hint: "Period average, for trend reading — doesn't change totals",
+  monthly_grid_h2: "Month by month",
+  monthly_figures_hint: `Figures in <span id="unitLabel">mkr</span>. <span class="mt-legend-actual">Solid</span> = booked actuals, <span class="mt-legend-forecast">lighter</span> = forecast.`,
   export_excel_btn: "⬇ Export (Excel)",
   import_csv_btn: "Import actuals (CSV)",
   import_help: `One value per row: <code>Reporting Line; Month (1–24); Amount</code>, separated by <code>;</code>, comma, or tab. A header row is fine. Upload a file or paste below — reporting lines match by name.`,
@@ -627,8 +629,9 @@ sv: {
   monthly_h1: "Månadsvis",
   monthly_subtitle: "Resultaträkning månad för månad — utfall + prognos",
   smooth_toggle: "Jämna ut ojämnt utfall",
-  smooth_hint: "(periodgenomsnitt, för att läsa trend — ändrar inte totalsummor)",
-  monthly_figures_hint: `Belopp i <span id="unitLabel">mkr</span>. <span class="mt-legend-actual">Heldragna</span> kolumner är bokfört utfall; <span class="mt-legend-forecast">ljusare</span> kolumner är prognos. Accentlinjen visar var utfallet slutar.`,
+  smooth_hint: "Periodgenomsnitt, för att läsa trend — ändrar inte totalsummor",
+  monthly_grid_h2: "Månad för månad",
+  monthly_figures_hint: `Belopp i <span id="unitLabel">mkr</span>. <span class="mt-legend-actual">Heldragna</span> = bokfört utfall, <span class="mt-legend-forecast">ljusare</span> = prognos.`,
   export_excel_btn: "⬇ Exportera (Excel)",
   import_csv_btn: "Importera utfall (CSV)",
   import_help: `Ett värde per rad: <code>Redovisningslinje; Månad (1–24); Belopp</code>, separerat med <code>;</code>, komma eller tab. En rubrikrad är okej. Ladda upp en fil eller klistra in nedan — redovisningslinjer matchas på namn.`,

@@ -1244,6 +1244,38 @@ html[data-theme="light"] .panel {
   font-weight: 600;
 }
 
+/* Panel header: title on the left, grouped actions on the right (TEARDOWN C18
+   — a toolbar is a grouped cluster, never buttons floating between blocks). */
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.panel-head h2 { margin-bottom: 0; }
+.panel-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* A quiet caption under a panel title — the compact form of what used to be a
+   paragraph of hint text (TEARDOWN C13/C14: show, don't explain). */
+.panel-legend { color: var(--text-dim); font-size: 0.82rem; margin: -6px 0 14px; }
+
+/* Secondary/toolbar button: quiet, for actions that aren't the page's primary
+   verb. The big filled --accent button stays reserved for the main action. */
+.btn-secondary {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-secondary:hover { border-color: var(--accent); }
+
 .chart-panel { height: 340px; }
 
 .chart-panel canvas {

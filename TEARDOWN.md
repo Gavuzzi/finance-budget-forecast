@@ -4,6 +4,14 @@
 If a proposed change can't point at who we're copying, we don't make it. Evidence is quoted; where a
 line is my inference rather than direct evidence, it's marked **[inference]**.
 
+> **Update 2026-07-10 (round 2): now grounded in real product screenshots, not just marketing copy.**
+> The original C1–C12 below were extracted from marketing sites + reviews (a real limitation Felix
+> rightly called out — "did we copy them or is this just how it looks?"). Round 2 pulled the *actual
+> product screens* — Runway's Exec Dashboard, variance table, and month-end-close view, and Fathom's
+> dashboards — as image files and studied the layouts directly. Findings are **C13–C18** at the bottom
+> and are the highest-confidence conventions in this doc. They point at one dominant gap: our app
+> explains where theirs show.
+
 Products studied: **Runway** (runway.com — the most design-praised tool in the category),
 **Fathom** (fathomhq.com — SMB/accountant reporting, closest to our buyer), **Abacum** (abacum.ai —
 mid-market FP&A, 4.8/5 on G2), **Causal** (scenario UX legacy — the standalone product is gone:
@@ -121,6 +129,48 @@ tier (Runway, Abacum both do it) — it's a service feature, not an embarrassmen
 **C12 — Fast beats fancy.** Runway praised as "blazing fast"; our static vanilla app already is.
 No framework migration for looks (confirms the existing "Explicitly NOT now" call). Polish within
 the current architecture.
+
+## C13–C18 — from the real product screens (round 2, highest confidence)
+
+**C13 — The UI SHOWS; it does not EXPLAIN. This is the single biggest gap.** Across Runway's Exec
+Dashboard, variance table, and month-end view, and Fathom's dashboards, there is **not one sentence
+of instructional prose** — no "this is how this works", no "negative count models a leaver", no
+paragraph under a panel telling you what the panel does. Labels, numbers, and charts only. Our app,
+by contrast, embeds a manual inline: `.table-hint`, `.integ-sub`, the Planning helper paragraphs,
+the Cash Flow methodology essay. **Applied:** delete instructional prose wherever the UI is
+self-evident; where a genuine caveat must survive (e.g. "estimate, not a hard figure"), make it a
+short caption or a hover/info affordance, never a paragraph. A confused first-time user is a
+navigation/labelling problem, not a "add more explanatory text" problem.
+
+**C14 — Section headers are UNDERSTATED; the data is the hero.** Fathom's section titles ("Cost of
+Sales", "Top 10 Expenses") are small, light-gray, quiet. Runway's are modest bold. Neither uses a
+big heavy heading that competes with the numbers. Our `.table-hint`-laden panels with prominent
+`h2`s invert this. **Applied:** section titles go quiet (smaller, `--text-dim`, uppercase-tracked or
+light weight); the figures get the visual weight.
+
+**C15 — KPI tiles carry a number AND a sparkline, not just a number.** Runway's top strip: ARR /
+Cash / Average ACV / Runway, each a tile with the big value top-right and a mini area chart filling
+the tile. Ours are label + number only. **Applied [inference on effort]:** add a small inline
+sparkline to the Overview supporting-stat tiles where a series exists (trend to date). Nice-to-have,
+higher effort — do after the density/sectioning wins land.
+
+**C16 — Variance is ONE colored number, not two stacked encodings.** Runway's variance table shows a
+single `5%` (green) or `14%` (red) — that's it. Ours double-encodes: signed `+0,6 mkr` *plus* a
+`+2.1%` pill *plus* a background color. **Applied:** collapse to the cleaner single indicator (a
+colored signed value, or a colored %, not both-plus-a-pill); keep the absolute figure available but
+stop stacking three redundant signals in one cell.
+
+**C17 — Tables are borderless and quiet, with optional in-cell magnitude bars.** Fathom's "Top 10
+Expenses" uses a faint in-cell bar to show relative size, subtle row separation, no gridlines, right-
+aligned tabular numbers. No heavy borders anywhere. **Applied:** drop heavy table chrome; right-align
++ tabular-nums everywhere (some already done); consider a faint in-cell bar on the reporting-lines
+and role-breakdown tables to show magnitude at a glance.
+
+**C18 — A toolbar is a grouped control cluster, never naked buttons floating between blocks.** Every
+action in the real screens sits in a header row or a defined control strip. Our Monthly page has
+Export/Import buttons orphaned in mid-page whitespace (Felix's specific complaint), and the grid
+below them has no header of its own. **Applied:** group page actions into the relevant card's header
+or a defined toolbar; every data block gets a titled container.
 
 ## What we deliberately do NOT copy
 - **Fortnox green** as accent — would read as a Fortnox clone (C3).

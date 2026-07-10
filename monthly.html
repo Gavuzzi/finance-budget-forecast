@@ -24,19 +24,23 @@
           <button class="lens-btn active" data-lens="fy" type="button" data-i18n="lens_fy">This Fiscal Year</button>
           <button class="lens-btn" data-lens="rolling" type="button" data-i18n="lens_rolling">Rolling 12 Months</button>
         </div>
-        <label class="smooth-toggle">
+        <label class="smooth-toggle" data-i18n-title="smooth_hint" title="Period average, for trend reading — doesn't change totals">
           <input type="checkbox" id="smoothToggle">
-          <span data-i18n="smooth_toggle">Spread lumpy actuals</span> <span class="smooth-hint" data-i18n="smooth_hint">(period average, for trend reading — doesn't change totals)</span>
+          <span data-i18n="smooth_toggle">Spread lumpy actuals</span>
         </label>
       </section>
 
-      <p class="table-hint" data-i18n-html="monthly_figures_hint">Figures in <span id="unitLabel">mkr</span>. <span class="mt-legend-actual">Solid</span> columns are booked actuals; <span class="mt-legend-forecast">lighter</span> columns are forecast. The accent line marks where actuals end.</p>
-
       <div id="integrationPanel"></div>
 
-      <div class="actuals-import">
-        <button class="add-cc-btn" id="exportBtn" type="button" data-i18n="export_excel_btn">⬇ Export (Excel)</button>
-        <button class="add-cc-btn" id="importActualsBtn" type="button" data-i18n="import_csv_btn">Import actuals (CSV)</button>
+      <section class="panel">
+        <div class="panel-head">
+          <h2 data-i18n="monthly_grid_h2">Month by month</h2>
+          <div class="panel-actions">
+            <button class="btn-secondary" id="exportBtn" type="button" data-i18n="export_excel_btn">⬇ Export (Excel)</button>
+            <button class="btn-secondary" id="importActualsBtn" type="button" data-i18n="import_csv_btn">Import actuals (CSV)</button>
+          </div>
+        </div>
+        <p class="panel-legend" data-i18n-html="monthly_figures_hint">Figures in <span id="unitLabel">mkr</span>. <span class="mt-legend-actual">Solid</span> = booked actuals, <span class="mt-legend-forecast">lighter</span> = forecast.</p>
         <div class="import-panel" id="importPanel" hidden>
           <p class="import-help" data-i18n-html="import_help">One value per row: <code>Reporting Line; Month (1–24); Amount</code>, separated by <code>;</code>, comma, or tab. A header row is fine. Upload a file or paste below — reporting lines match by name.</p>
           <input type="file" id="csvFile" accept=".csv,.txt,text/csv">
@@ -44,9 +48,6 @@
           <div class="import-preview" id="importPreview"></div>
           <button class="add-cc-btn" id="doImportBtn" type="button" disabled data-i18n="import_btn">Import</button>
         </div>
-      </div>
-
-      <section class="panel">
         <div class="monthly-wrap">
           <div id="monthlyGrid"></div>
         </div>
