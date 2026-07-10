@@ -39,6 +39,7 @@ function t(key, ...args) {
 // already been parsed into the DOM (script tags sit at the bottom of every
 // page here), so there's nothing to wait for.
 function translateStaticHtml() {
+  document.documentElement.lang = getLang(); // screen readers / browser features rely on this, not just visible text
   document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(el.dataset.i18n); });
   document.querySelectorAll("[data-i18n-html]").forEach((el) => { el.innerHTML = t(el.dataset.i18nHtml); });
   document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => { el.placeholder = t(el.dataset.i18nPlaceholder); });
@@ -397,6 +398,33 @@ en: {
   fn_fallback_line: "line",
   fn_connected_redirect: "Fortnox connected. Hit “Sync now” to pull your actuals.",
   fn_failed_redirect: "Fortnox connection failed. Please try again.",
+
+  // ---- data.js ----
+  save_failed: (msg) => `Save failed — ${msg}`,
+  toast_signin_export: "Sign in to export your own workspace.",
+  toast_export_done: "Export downloaded — everything this organization stores, as JSON.",
+  toast_signin_create_org: "Sign in to create your own workspace.",
+  prompt_new_org_name: "Name the new organization:",
+  toast_signin_save_data: "Sign in to save your own data.",
+  loading_btn: "<strong>Loading…</strong>",
+  preset_manufacturer_label: "Manufacturer",
+  preset_manufacturer_hint: "Departments as cost centres — typically maps by Fortnox kostnadsställe.",
+  preset_consultancy_label: "Consultancy / agency",
+  preset_consultancy_hint: "People-heavy, engagement-based — typically maps by Fortnox PROJECT, not cost centre.",
+  preset_retail_label: "Retail / e-commerce",
+  preset_retail_hint: "COGS-heavy, thin cost-centre use — typically maps by BAS account groups instead.",
+  preset_service_label: "Small service business",
+  preset_service_hint: "Often books with no cost-centre or project tags at all — map by BAS account ranges instead.",
+  empty_org_h2: "Let's set up this organization",
+  empty_org_p: "There are no reporting lines here yet. Two quick steps and the forecast comes to life:",
+  empty_org_step1: `Add your <strong>roles</strong> and their salaries on the <a href="assumptions.html">Assumptions</a> page.`,
+  empty_org_step2: `Add <strong>reporting lines</strong> and their headcount on the <a href="planning.html">Planning</a> page.`,
+  empty_org_cta: "Start on Assumptions →",
+  empty_org_preset_lead: "Or start from what's closest to your business — a working example you edit from there:",
+  err_no_org_linked: "No organization is linked to your login.",
+  new_role_label: "New role",
+  new_reporting_line_name: "New reporting line",
+  demo_it_note: "DevOps contractor hire delayed to Q4 — running under budget.",
 },
 sv: {
   nav_overview: "Översikt", nav_monthly: "Månadsvis", nav_planning: "Planering",
@@ -747,6 +775,33 @@ sv: {
   fn_fallback_line: "linje",
   fn_connected_redirect: "Fortnox anslutet. Klicka på ”Synka nu” för att hämta ditt utfall.",
   fn_failed_redirect: "Fortnox-anslutningen misslyckades. Försök igen.",
+
+  // ---- data.js ----
+  save_failed: (msg) => `Sparning misslyckades — ${msg}`,
+  toast_signin_export: "Logga in för att exportera din egen arbetsyta.",
+  toast_export_done: "Export nedladdad — allt denna organisation lagrar, som JSON.",
+  toast_signin_create_org: "Logga in för att skapa din egen arbetsyta.",
+  prompt_new_org_name: "Namnge den nya organisationen:",
+  toast_signin_save_data: "Logga in för att spara din egen data.",
+  loading_btn: "<strong>Laddar…</strong>",
+  preset_manufacturer_label: "Tillverkare",
+  preset_manufacturer_hint: "Avdelningar som kostnadsställen — matchas oftast via Fortnox kostnadsställe.",
+  preset_consultancy_label: "Konsultbolag / byrå",
+  preset_consultancy_hint: "Personaltungt, uppdragsbaserat — matchas oftast via Fortnox PROJEKT, inte kostnadsställe.",
+  preset_retail_label: "Detaljhandel / e-handel",
+  preset_retail_hint: "Varukostnadstungt, lite användning av kostnadsställen — matchas oftast via BAS-kontogrupper istället.",
+  preset_service_label: "Litet tjänsteföretag",
+  preset_service_hint: "Bokförs ofta helt utan kostnadsställe- eller projekttaggar — matcha via BAS-kontointervall istället.",
+  empty_org_h2: "Låt oss sätta upp denna organisation",
+  empty_org_p: "Det finns inga redovisningslinjer här ännu. Två snabba steg så väcks prognosen till liv:",
+  empty_org_step1: `Lägg till dina <strong>roller</strong> och deras löner på <a href="assumptions.html">Antaganden</a>-sidan.`,
+  empty_org_step2: `Lägg till <strong>redovisningslinjer</strong> och deras bemanning på <a href="planning.html">Planerings</a>-sidan.`,
+  empty_org_cta: "Börja med Antaganden →",
+  empty_org_preset_lead: "Eller börja med det som ligger närmast din verksamhet — ett fungerande exempel du redigerar därifrån:",
+  err_no_org_linked: "Ingen organisation är kopplad till ditt konto.",
+  new_role_label: "Ny roll",
+  new_reporting_line_name: "Ny redovisningslinje",
+  demo_it_note: "DevOps-konsultanställning försenad till Q4 — under budget.",
 },
 };
 

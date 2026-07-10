@@ -378,7 +378,7 @@ async function loadData(orgId) {
   const orgsRes = await sb.from("organizations").select("*").order("name");
   if (orgsRes.error) throw new Error(orgsRes.error.message);
   USER_ORGS = orgsRes.data;
-  if (USER_ORGS.length === 0) throw new Error("No organization is linked to your login.");
+  if (USER_ORGS.length === 0) throw new Error(t("err_no_org_linked"));
 
   // Pick the active org: explicit arg → saved choice → first available.
   const saved = orgId || localStorage.getItem(ORG_STORAGE_KEY);
@@ -565,7 +565,7 @@ function loadPreviewData() {
   );
 
   const itCc = COST_CENTERS.find((c) => c.name === "IT");
-  if (itCc) itCc.note = "DevOps contractor hire delayed to Q4 — running under budget.";
+  if (itCc) itCc.note = t("demo_it_note");
 
   SCENARIOS.push(
     { id: "s1", name: "Base", fyTotal: 41800000, breakdown: [{ name: "Production", total: 28600000 }, { name: "R&D", total: 9300000 }, { name: "IT", total: 3900000 }] },
@@ -625,7 +625,7 @@ function showToast(message, kind = "info") {
 
 function flagWriteError(error) {
   console.error("Save failed:", error);
-  showToast("Save failed — " + error.message, "error");
+  showToast(t("save_failed", error.message), "error");
 }
 
 async function dbUpdateAssumptions() {
@@ -651,7 +651,7 @@ const EXPORT_TABLES = [
 ];
 
 async function exportAllData() {
-  if (DEMO_MODE) { showToast("Sign in to export your own workspace."); return; }
+  if (DEMO_MODE) { showToast(t("toast_signin_export")); return; }
   const org = USER_ORGS.find((o) => o.id === CURRENT_ORG_ID) || {};
   const out = {
     exported_at: new Date().toISOString(),
@@ -660,10 +660,10 @@ async function exportAllData() {
     note: "Every table stored for this organization. Excluded: OAuth tokens/state (secrets, not business data).",
     tables: {},
   };
-  for (const t of EXPORT_TABLES) {
-    const { data, error } = await sb.from(t).select("*").eq("org_id", CURRENT_ORG_ID);
+  for (const tbl of EXPORT_TABLES) {
+    const { data, error } = await sb.from(tbl).select("*").eq("org_id", CURRENT_ORG_ID);
     // Tolerant per-table: a missing/newer table shouldn't sink the whole export.
-    out.tables[t] = error ? { export_error: error.message } : data;
+    out.tables[tbl] = error ? { export_error: error.message } : data;
   }
   const stRes = await sb.from("integration_status")
     .select("connected, tenant_name, last_synced_at, last_sync_error, last_reconciliation, last_reporting_lines, last_projects")
@@ -676,7 +676,7 @@ async function exportAllData() {
   a.download = `fpa-export-${(org.name || "org").replace(/[^\w-]+/g, "-").toLowerCase()}-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   URL.revokeObjectURL(a.href);
-  showToast("Export downloaded — everything this organization stores, as JSON.");
+  showToast(t("toast_export_done"));
 }
 
 async function dbUpdateRevenuePlan() {
@@ -706,7 +706,7 @@ async function dbUpdateRole(role) {
 
 async function dbInsertRole() {
   const { data, error } = await sb.from("roles")
-    .insert({ org_id: CURRENT_ORG_ID, label: "New role", base_salary: 35000 })
+    .insert({ org_id: CURRENT_ORG_ID, label: t("new_role_label"), base_salary: 35000 })
     .select().single();
   if (error) { flagWriteError(error); return null; }
   return { id: data.id, label: data.label, baseSalary: Number(data.base_salary) };
@@ -727,7 +727,7 @@ async function dbUpdateCostCenter(cc) {
 
 async function dbInsertCostCenter() {
   const { data, error } = await sb.from("reporting_lines")
-    .insert({ org_id: CURRENT_ORG_ID, name: "New reporting line", annual_budget: 0, other_monthly: 0 })
+    .insert({ org_id: CURRENT_ORG_ID, name: t("new_reporting_line_name"), annual_budget: 0, other_monthly: 0 })
     .select().single();
   if (error) { flagWriteError(error); return null; }
   return { id: data.id, name: data.name, annualBudget: Number(data.annual_budget), otherMonthly: Number(data.other_monthly), isShared: false, headcount: [], oneOffs: [], recurringCosts: [], overrides: {}, actualMonthly: [] };
@@ -922,8 +922,8 @@ async function dbLockBudgetVersion(name) {
 // atomic call that creates the org, your owner membership, and default
 // assumptions. The client can't touch memberships directly (security).
 async function createOrg() {
-  if (DEMO_MODE) { showToast("Sign in to create your own workspace."); return; }
-  const name = prompt("Name the new organization:");
+  if (DEMO_MODE) { showToast(t("toast_signin_create_org")); return; }
+  const name = prompt(t("prompt_new_org_name"));
   if (!name || !name.trim()) return;
 
   const { data, error } = await sb.rpc("create_organization", { org_name: name.trim() });
@@ -978,8 +978,8 @@ function varianceClass(variance, budget) {
 // picking one also sets expectations for the Fortnox mapping step later.
 const BUSINESS_PRESETS = {
   manufacturer: {
-    label: "Manufacturer",
-    hint: "Departments as cost centres — typically maps by Fortnox kostnadsställe.",
+    label: t("preset_manufacturer_label"),
+    hint: t("preset_manufacturer_hint"),
     roles: [["Manager", 55000], ["Specialist", 42000], ["Associate", 33000], ["Support", 30000]],
     costCenters: [
       { name: "Production", budget: 12000000, other: 300000, hc: [["Manager", 1], ["Specialist", 4], ["Associate", 6]] },
@@ -988,8 +988,8 @@ const BUSINESS_PRESETS = {
     ],
   },
   consultancy: {
-    label: "Consultancy / agency",
-    hint: "People-heavy, engagement-based — typically maps by Fortnox PROJECT, not cost centre.",
+    label: t("preset_consultancy_label"),
+    hint: t("preset_consultancy_hint"),
     roles: [["Partner", 75000], ["Senior Consultant", 55000], ["Consultant", 42000], ["Ops & Admin", 33000]],
     costCenters: [
       { name: "Client Delivery", budget: 14000000, other: 100000, hc: [["Senior Consultant", 3], ["Consultant", 5]] },
@@ -998,8 +998,8 @@ const BUSINESS_PRESETS = {
     ],
   },
   retail: {
-    label: "Retail / e-commerce",
-    hint: "COGS-heavy, thin cost-centre use — typically maps by BAS account groups instead.",
+    label: t("preset_retail_label"),
+    hint: t("preset_retail_hint"),
     roles: [["Store/Ops Manager", 45000], ["Warehouse Staff", 32000], ["E-com & Marketing", 38000], ["Support", 29000]],
     costCenters: [
       { name: "COGS & Merchandising", budget: 18000000, other: 400000, hc: [["Store/Ops Manager", 1]] },
@@ -1008,8 +1008,8 @@ const BUSINESS_PRESETS = {
     ],
   },
   service: {
-    label: "Small service business",
-    hint: "Often books with no cost-centre or project tags at all — map by BAS account ranges instead.",
+    label: t("preset_service_label"),
+    hint: t("preset_service_hint"),
     roles: [["Owner/Manager", 45000], ["Staff", 32000]],
     costCenters: [
       { name: "Operations", budget: 4000000, other: 150000, hc: [["Owner/Manager", 1], ["Staff", 3]] },
@@ -1026,14 +1026,14 @@ function emptyOrgHtml() {
      </button>`).join("");
   return `
     <div class="empty-state">
-      <h2>Let's set up this organization</h2>
-      <p>There are no reporting lines here yet. Two quick steps and the forecast comes to life:</p>
+      <h2>${t("empty_org_h2")}</h2>
+      <p>${t("empty_org_p")}</p>
       <ol>
-        <li>Add your <strong>roles</strong> and their salaries on the <a href="assumptions.html">Assumptions</a> page.</li>
-        <li>Add <strong>reporting lines</strong> and their headcount on the <a href="planning.html">Planning</a> page.</li>
+        <li>${t("empty_org_step1")}</li>
+        <li>${t("empty_org_step2")}</li>
       </ol>
-      <a class="empty-cta" href="assumptions.html">Start on Assumptions →</a>
-      <p class="preset-lead">Or start from what's closest to your business — a working example you edit from there:</p>
+      <a class="empty-cta" href="assumptions.html">${t("empty_org_cta")}</a>
+      <p class="preset-lead">${t("empty_org_preset_lead")}</p>
       <div class="preset-grid">${presetButtons}</div>
     </div>`;
 }
@@ -1043,7 +1043,7 @@ function emptyOrgHtml() {
 // from something real (and already-labelled the way their Fortnox books
 // probably look) instead of a blank app or a one-size-fits-all example.
 async function seedPreset(presetKey) {
-  if (DEMO_MODE) { showToast("Sign in to save your own data."); return false; }
+  if (DEMO_MODE) { showToast(t("toast_signin_save_data")); return false; }
   const preset = BUSINESS_PRESETS[presetKey];
   if (!preset) return false;
 
@@ -1093,7 +1093,7 @@ document.addEventListener("click", async (e) => {
   if (!btn) return;
   btn.disabled = true;
   const orig = btn.innerHTML;
-  btn.innerHTML = "<strong>Loading…</strong>";
+  btn.innerHTML = t("loading_btn");
   const ok = await seedPreset(btn.dataset.loadpreset);
   if (ok) location.reload();
   else { btn.disabled = false; btn.innerHTML = orig; }

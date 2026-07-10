@@ -7,11 +7,14 @@ Live: https://gavuzzi.github.io/finance-budget-forecast/ · Supabase project ref
 
 ## File map
 - `lib.js` — Supabase client, auth gate, demo mode (`?preview`), toasts
+- `i18n.js` — bilingual strings (English/Swedish); see "Localization" below. Loads right after `lib.js`, before `data.js`, on every page
 - `data.js` — in-memory model + calculation engine + ALL db reads/writes. UI-agnostic: never put rendering here
-- `sidebar.js` — shared nav, theme toggle, "actuals booked through" selector
+- `sidebar.js` — shared nav, theme + language toggles, "actuals booked through" selector
 - `script.js` (Overview/app.html), `monthly.js`, `planning.js`, `assumptions.js`, `cashflow.js`, `fortnox.js` — per-page rendering only
 - `schema.sql` / `integration-schema.sql` — idempotent DB source of truth (mirror every live DB change here)
 - `supabase/functions/fortnox-sync/index.ts` — the sync Edge Function (self-contained, no imports beyond supabase-js)
+- `tests.html` — 34-assertion engine test suite (see Tools below); loads `lib.js`+`i18n.js`+`data.js` with a stubbed Supabase client
+- `index.html` — the marketing landing page. Separate from the app (no sidebar/data.js), English-only, not yet localized (tracked in ROADMAP)
 - `ROADMAP.md` — backlog + honest verification notes · `TESTING.md` — manual checks collected for Felix
 
 ## Sacred rules (violating these is a bug even if the code works)
@@ -22,6 +25,7 @@ Live: https://gavuzzi.github.io/finance-budget-forecast/ · Supabase project ref
 5. DB entities are `reporting_lines` / `reporting_line_id` / `reporting_line_mappings` (renamed from cost_centers 2026-07). The JS globals (`COST_CENTERS`, `cc`, `ccId`) and CSS classes keep the old internal names — do NOT rename them.
 6. **Estimates stay visually distinct from hard figures** (dim/`mt-forecast` styling + "est." label), never silently blended.
 7. Escape every user- or external-origin string interpolated into HTML with `escapeHtml()` (lib.js). Numbers via fmt helpers and monthLabel() are safe.
+8. **Every user-visible string goes through `t()`** (i18n.js), never a hardcoded literal — except demo/preset **data values** (reporting-line names, role names, invoice counterparty names, scenario names: starter content the user renames, not UI chrome). New HTML pages must load `i18n.js` right after `lib.js`, before `data.js` — a page that skips it will throw on the first `t()` call. `tests.html` needs it too (data.js's top-level `BUSINESS_PRESETS` calls `t()` at parse time). Never name a local variable `t` — it shadows the global translation function; this has caused real bugs (grep `\bt\s*=` before adding one).
 
 ## Tools & workflows
 - SQL against the live DB (no password needed):
@@ -31,7 +35,7 @@ Live: https://gavuzzi.github.io/finance-budget-forecast/ · Supabase project ref
 - Trigger a live sync: POST `https://cgqfiugjsiwlefhguqnc.supabase.co/functions/v1/fortnox-sync` with header `x-cron-key: <value>` where the value comes from `select command from cron.job where jobname='fortnox-nightly-sync'` (it's embedded in that command string).
 - **Visual verification is required for any UI change**: render the page with demo data via headless Chrome, then Read the PNG and actually inspect it:
   `"/c/Program Files/Google/Chrome/Application/chrome.exe" --headless --disable-gpu --no-sandbox --screenshot=<scratchpad>\x.png --window-size=1500,1400 --virtual-time-budget=6000 "file:///C:/Users/felix/dev/finance-budget-forecast/<page>.html?preview"`
-  Append `&theme=light` and re-check when styling changes. Some pages have hash dev-hooks for exact-value checks (`#csvtest`, `#smoothtest`, `#drilltest`, `#alloctest`).
+  Append `&theme=light` and re-check when styling changes; append `&lang=sv` (or `#teamtest`/`#maptest` combined with it) and re-check when touching any string, since Swedish text is often longer and can break layouts English never would (e.g. a long unbroken compound word in a narrow stat-card — happened once, fixed by adding a hyphen). Some pages have hash dev-hooks for exact-value checks (`#csvtest`, `#smoothtest`, `#drilltest`, `#alloctest`, `#teamtest`, `#maptest`).
 - **Numbers must tie out**: hand-compute the expected values from the preview fixtures (loadPreviewData in data.js) BEFORE looking at the screenshot, then confirm they match exactly.
 - **Run the engine tests after ANY change to data.js** (34 assertions over rates, forecasts, the cash walk, Skatteverket due-dates, allocation conservation, CSV parsing, escapeHtml):
   `"/c/Program Files/Google/Chrome/Application/chrome.exe" --headless --disable-gpu --no-sandbox --dump-dom --virtual-time-budget=6000 "file:///C:/Users/felix/dev/finance-budget-forecast/tests.html" | grep -oE "(ALL PASS.*|FAIL.*|✗ [^<]*)"`
