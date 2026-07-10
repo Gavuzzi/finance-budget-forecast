@@ -14,7 +14,7 @@ Live: https://gavuzzi.github.io/finance-budget-forecast/ · Supabase project ref
 - `schema.sql` / `integration-schema.sql` — idempotent DB source of truth (mirror every live DB change here)
 - `supabase/functions/fortnox-sync/index.ts` — the sync Edge Function (self-contained, no imports beyond supabase-js)
 - `tests.html` — 34-assertion engine test suite (see Tools below); loads `lib.js`+`i18n.js`+`data.js` with a stubbed Supabase client
-- `index.html` — the marketing landing page. Separate from the app (no sidebar/data.js), English-only, not yet localized (tracked in ROADMAP)
+- `index.html` — the marketing landing page. Separate from the app (no sidebar/data.js) but loads `i18n.js` for its own `lp_*` strings and a nav language toggle
 - `ROADMAP.md` — backlog + honest verification notes · `TESTING.md` — manual checks collected for Felix
 
 ## Sacred rules (violating these is a bug even if the code works)

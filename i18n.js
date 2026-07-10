@@ -43,6 +43,7 @@ function translateStaticHtml() {
   document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(el.dataset.i18n); });
   document.querySelectorAll("[data-i18n-html]").forEach((el) => { el.innerHTML = t(el.dataset.i18nHtml); });
   document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => { el.placeholder = t(el.dataset.i18nPlaceholder); });
+  document.querySelectorAll("[data-i18n-alt]").forEach((el) => { el.alt = t(el.dataset.i18nAlt); });
 }
 
 const STRINGS = {
@@ -431,6 +432,73 @@ en: {
   new_role_label: "New role",
   new_reporting_line_name: "New reporting line",
   demo_it_note: "DevOps contractor hire delayed to Q4 — running under budget.",
+
+  // ---- landing page (index.html) ----
+  lp_nav_signin: "Sign in",
+  lp_nav_source: "Source",
+  lp_nav_demo: "Live demo →",
+  lp_brand_sub: "Planning",
+  lp_eyebrow: "Financial planning · demonstration project",
+  lp_hero_h1: "Forecasting that doesn't break when one number changes.",
+  lp_hero_lead: `A multi-tenant financial planning app for growing companies. Every figure is built from <strong>drivers</strong> — your people and known costs — so changing one assumption flows through the whole plan instead of shattering a spreadsheet.`,
+  lp_cta_demo: "Explore the live demo →",
+  lp_cta_source: "View the source",
+  lp_cta_note: "No sign-up — opens a full sample company you can click through.",
+  lp_shot_overview_alt: "Overview: annual budget, booked actuals, forecast chart, and per-cost-centre variance",
+
+  lp_problem_h2: "Why not just a spreadsheet?",
+  lp_problem_sub: "Because the tool most SMEs plan with is the one most likely to quietly lie to them.",
+  lp_problem_1_h3: "Spreadsheets rot",
+  lp_problem_1_p: "One moved row or broken reference and the forecast is wrong — with nothing to tell you. The bigger the model, the more places it can silently fail.",
+  lp_problem_2_h3: "Re-keying kills you",
+  lp_problem_2_p: "Change one salary assumption and you're hand-editing twelve months across five tabs. Nobody keeps that consistent for long.",
+  lp_problem_3_h3: "Real tools are heavy",
+  lp_problem_3_p: "Most FP&A platforms take weeks to onboard and a consultant to configure. Overkill for a company that just needs a plan it can trust.",
+
+  lp_loop_kicker: "The loop",
+  lp_loop_h2: "Not a dashboard. A decision system.",
+  lp_loop_sub: `Most tools stop at "here's a number." This one closes the loop back to the plan.`,
+  lp_loop_1: `<strong>Data flows in, nightly.</strong> Fortnox syncs automatically — no CSV, no month-end copy-paste.`,
+  lp_loop_2: `<strong>A deviation gets flagged.</strong> Signals surface the lines drifting from budget, with a monthly review ritual so nothing slips through.`,
+  lp_loop_3: `<strong>A fix gets suggested.</strong> When actuals diverge from plan, Re-forecast proposes the new run-rate — never silently.`,
+  lp_loop_4: `<strong>One click updates the plan.</strong> Apply it and every view recalculates. Change your mind — Revert puts it back exactly as it was.`,
+  lp_shot_loop_alt: "Signals flagging a variance and Re-forecast suggesting a one-click, reversible fix",
+
+  lp_approach_kicker: "The approach",
+  lp_approach_h2: "Drivers, not cells.",
+  lp_approach_p1: `Set your assumptions <strong>once</strong> — employer costs, equipment, overhead — and each role's base salary. The app derives a fully-loaded monthly cost per role, then builds every cost centre up from real headcount lines on a timeline.`,
+  lp_approach_p2: "Change a driver and every month, every view, and the board pack recalculate together. There is no cell to forget.",
+  lp_approach_p3: `<strong>Config, not code:</strong> the same engine renders a manufacturer or a consultancy with zero code changes — just different data. That's what keeps it cheap to fit to each company.`,
+  lp_shot_assumptions_alt: "The rate engine: assumptions and derived loaded cost per role",
+
+  lp_fortnox_kicker: "Connected to your books",
+  lp_fortnox_h2: "Your real actuals, automatically.",
+  lp_fortnox_p1: `Connect <strong>Fortnox</strong> once. Every sync pulls your booked P&amp;L — revenue, COGS, operating, personnel — straight from the ledger and lands it against your plan. No CSV, no re-keying, no month-end copy-paste.`,
+  lp_fortnox_p2: `It reads the whole year in <strong>one call</strong> and <strong>ties out to the öre</strong> against Fortnox's own Resultatrapport — tested at <strong>55,000 vouchers in ~3 seconds</strong>. Any size, any fiscal year, corrections included.`,
+  lp_fortnox_p3: `<strong>That's the real difference from a spreadsheet:</strong> the numbers aren't something you maintain — they arrive, correct.`,
+  lp_shot_fortnox_alt: "Connected to Fortnox — a full P&L reconciled automatically from booked vouchers",
+
+  lp_features_h2: "What it does",
+  lp_features_sub: "A complete planning loop — plan, forecast, track, and report — in one place.",
+  lp_feat_1_h3: "Driver-based buildup", lp_feat_1_p: "Headcount, one-offs, and run-rate costs roll up from the ground truth, not typed totals.",
+  lp_feat_2_h3: "Year budget + rolling 12", lp_feat_2_p: "Plan the fiscal year, then watch a rolling-12-month forecast move as actuals land.",
+  lp_feat_3_h3: "What-if scenarios", lp_feat_3_p: "Snapshot the plan's full trajectory, change drivers, and compare alternatives against the live plan, month by month.",
+  lp_feat_4_h3: "Live actuals from Fortnox", lp_feat_4_p: "Connect once — your booked P&L syncs automatically and ties out; every cost centre shows budget vs actual vs forecast.",
+  lp_feat_5_h3: "Board-pack PDF", lp_feat_5_p: "One click produces a clean, print-ready summary with variance commentary.",
+  lp_feat_6_h3: "Multi-tenant", lp_feat_6_p: "Many companies, one app — each isolated at the database, switchable in a click.",
+
+  lp_hood_h2: "Under the hood",
+  lp_hood_sub: "Boring, legible, and secure by default — on purpose.",
+  lp_hood_1_h: "Row-level security, not UI trust", lp_hood_1_p: "Every query is tenant-scoped in Postgres itself. The public API key is safe in the browser precisely because the database enforces isolation.",
+  lp_hood_2_h: "Roles that mean something", lp_hood_2_p: "Owner / editor / viewer are enforced server-side. Creating an org is an atomic function, so a client can't add itself to data it doesn't own.",
+  lp_hood_3_h: "A shared engine, per-tenant config", lp_hood_3_p: "One JavaScript model computes every number. A customer is pure data + settings — no bespoke code per client.",
+  lp_hood_4_h: "Static, no build step", lp_hood_4_p: "Plain HTML/JS on a CDN-backed Postgres. It deploys as flat files and there's nothing to break in a pipeline.",
+  lp_hood_note: "Supabase (Postgres · Auth · RLS) · vanilla JavaScript · Chart.js · deployed on GitHub Pages.",
+
+  lp_final_h2: "See it for yourself.",
+  lp_final_cta_demo: "Open the live demo →",
+  lp_final_cta_source: "Read the code",
+  lp_footer: `A working demonstration project · built with Supabase + vanilla JS · <a href="https://github.com/Gavuzzi/finance-budget-forecast" target="_blank" rel="noopener">source on GitHub</a>`,
 },
 sv: {
   nav_overview: "Översikt", nav_monthly: "Månadsvis", nav_planning: "Planering",
@@ -814,6 +882,73 @@ sv: {
   new_role_label: "Ny roll",
   new_reporting_line_name: "Ny redovisningslinje",
   demo_it_note: "DevOps-konsultanställning försenad till Q4 — under budget.",
+
+  // ---- landing page (index.html) ----
+  lp_nav_signin: "Logga in",
+  lp_nav_source: "Källkod",
+  lp_nav_demo: "Live-demo →",
+  lp_brand_sub: "Planering",
+  lp_eyebrow: "Budget & prognos · demonstrationsprojekt",
+  lp_hero_h1: "Prognoser som inte går sönder när en enda siffra ändras.",
+  lp_hero_lead: `En budget- och prognosapp för växande företag, med stöd för flera bolag. Varje siffra byggs upp från <strong>drivare</strong> — dina medarbetare och kända kostnader — så att en ändrad förutsättning slår igenom hela planen istället för att förstöra ett kalkylblad.`,
+  lp_cta_demo: "Utforska live-demon →",
+  lp_cta_source: "Visa källkoden",
+  lp_cta_note: "Ingen registrering krävs — öppnar ett komplett exempelbolag du kan klicka runt i.",
+  lp_shot_overview_alt: "Översikt: årsbudget, bokfört utfall, prognosdiagram och avvikelse per redovisningslinje",
+
+  lp_problem_h2: "Varför inte bara ett kalkylblad?",
+  lp_problem_sub: "För att verktyget de flesta SME:er planerar i är det som mest sannolikt ljuger för dem i det tysta.",
+  lp_problem_1_h3: "Kalkylblad ruttnar",
+  lp_problem_1_p: "En flyttad rad eller en trasig referens och prognosen blir fel — utan att något varnar dig. Ju större modellen är, desto fler ställen kan gå sönder i det tysta.",
+  lp_problem_2_h3: "Omskrivning tar död på dig",
+  lp_problem_2_p: "Ändra en löneförutsättning och du sitter och redigerar tolv månader för hand över fem flikar. Ingen håller det konsekvent särskilt länge.",
+  lp_problem_3_h3: "Riktiga verktyg är tunga",
+  lp_problem_3_p: "De flesta FP&A-plattformar tar veckor att komma igång med och kräver en konsult för att konfigurera. Överkurs för ett företag som bara behöver en plan de kan lita på.",
+
+  lp_loop_kicker: "Loopen",
+  lp_loop_h2: "Ingen instrumentpanel. Ett beslutssystem.",
+  lp_loop_sub: `De flesta verktyg stannar vid "här är en siffra". Det här sluter loopen tillbaka till planen.`,
+  lp_loop_1: `<strong>Data flödar in, varje natt.</strong> Fortnox synkas automatiskt — ingen CSV, inget copy-paste vid månadsskiftet.`,
+  lp_loop_2: `<strong>En avvikelse flaggas.</strong> Signaler lyfter fram linjerna som glider från budget, med en månadsvis granskningsrutin så att inget glider igenom.`,
+  lp_loop_3: `<strong>En åtgärd föreslås.</strong> När utfallet avviker från planen föreslår Ny prognos den nya körtakten — aldrig i det tysta.`,
+  lp_loop_4: `<strong>Ett klick uppdaterar planen.</strong> Använd förslaget så räknas varje vy om. Ångra dig — Återställ lägger tillbaka exakt som det var.`,
+  lp_shot_loop_alt: "Signaler som flaggar en avvikelse och Ny prognos som föreslår en återställningsbar åtgärd med ett klick",
+
+  lp_approach_kicker: "Angreppssättet",
+  lp_approach_h2: "Drivare, inte celler.",
+  lp_approach_p1: `Sätt dina förutsättningar <strong>en gång</strong> — arbetsgivaravgifter, utrustning, omkostnader — och varje rolls grundlön. Appen räknar fram en fullt belastad månadskostnad per roll och bygger sedan upp varje redovisningslinje från verklig bemanning på en tidslinje.`,
+  lp_approach_p2: "Ändra en drivare och varje månad, varje vy och styrelsepaketet räknas om tillsammans. Det finns ingen cell att glömma.",
+  lp_approach_p3: `<strong>Konfiguration, inte kod:</strong> samma motor visar en tillverkare eller en konsultverksamhet utan en enda kodändring — bara olika data. Det är det som håller det billigt att anpassa till varje företag.`,
+  lp_shot_assumptions_alt: "Ränte-/kostnadsmotorn: förutsättningar och framräknad belastad kostnad per roll",
+
+  lp_fortnox_kicker: "Kopplad till din bokföring",
+  lp_fortnox_h2: "Ditt verkliga utfall, automatiskt.",
+  lp_fortnox_p1: `Koppla <strong>Fortnox</strong> en gång. Varje synk hämtar ditt bokförda resultat — intäkter, kostnad sålda varor, drift, personal — direkt från huvudboken och ställer det mot din plan. Ingen CSV, ingen omskrivning, inget copy-paste vid månadsskiftet.`,
+  lp_fortnox_p2: `Den läser hela året i <strong>ett anrop</strong> och <strong>stämmer av till öret</strong> mot Fortnox egen resultatrapport — testat på <strong>55 000 verifikat på ~3 sekunder</strong>. Vilken storlek som helst, vilket räkenskapsår som helst, rättelser inkluderade.`,
+  lp_fortnox_p3: `<strong>Det är den verkliga skillnaden mot ett kalkylblad:</strong> siffrorna är inget du underhåller — de anländer, korrekta.`,
+  lp_shot_fortnox_alt: "Kopplad till Fortnox — ett komplett resultat avstämt automatiskt från bokförda verifikat",
+
+  lp_features_h2: "Vad den gör",
+  lp_features_sub: "En komplett planeringsloop — planera, prognostisera, följ upp och rapportera — på ett ställe.",
+  lp_feat_1_h3: "Drivarbaserad uppbyggnad", lp_feat_1_p: "Bemanning, engångskostnader och löpande kostnader byggs upp från grunddata, inte inskrivna totaler.",
+  lp_feat_2_h3: "Årsbudget + rullande 12", lp_feat_2_p: "Planera räkenskapsåret och se sedan en rullande 12-månadersprognos röra sig i takt med att utfall bokförs.",
+  lp_feat_3_h3: "What-if-scenarier", lp_feat_3_p: "Ta en ögonblicksbild av planens hela förlopp, ändra drivare och jämför alternativ mot den aktuella planen, månad för månad.",
+  lp_feat_4_h3: "Live-utfall från Fortnox", lp_feat_4_p: "Koppla en gång — ditt bokförda resultat synkas automatiskt och stämmer av; varje redovisningslinje visar budget mot utfall mot prognos.",
+  lp_feat_5_h3: "Styrelsepaket som PDF", lp_feat_5_p: "Ett klick ger en ren, utskriftsklar sammanställning med avvikelsekommentarer.",
+  lp_feat_6_h3: "Flera bolag", lp_feat_6_p: "Många företag, en app — varje bolag isolerat på databasnivå, växlingsbart med ett klick.",
+
+  lp_hood_h2: "Under huven",
+  lp_hood_sub: "Tråkigt, läsbart och säkert som standard — med avsikt.",
+  lp_hood_1_h: "Radnivåsäkerhet, inte förtroende för gränssnittet", lp_hood_1_p: "Varje fråga är avgränsad per bolag i själva Postgres. Den publika API-nyckeln är säker i webbläsaren just för att databasen upprätthåller isoleringen.",
+  lp_hood_2_h: "Roller som betyder något", lp_hood_2_p: "Ägare / redigerare / läsare upprätthålls på serversidan. Att skapa ett bolag är en atomär funktion, så en klient kan inte lägga till sig själv i data den inte äger.",
+  lp_hood_3_h: "En delad motor, konfiguration per bolag", lp_hood_3_p: "En JavaScript-modell räknar fram varje siffra. En kund är ren data + inställningar — ingen skräddarsydd kod per klient.",
+  lp_hood_4_h: "Statisk, inget byggsteg", lp_hood_4_p: "Vanlig HTML/JS mot en CDN-baserad Postgres. Den driftsätts som platta filer och det finns inget att gå sönder i en pipeline.",
+  lp_hood_note: "Supabase (Postgres · Auth · RLS) · vanilla JavaScript · Chart.js · driftsatt på GitHub Pages.",
+
+  lp_final_h2: "Se själv.",
+  lp_final_cta_demo: "Öppna live-demon →",
+  lp_final_cta_source: "Läs koden",
+  lp_footer: `Ett fungerande demonstrationsprojekt · byggt med Supabase + vanilla JS · <a href="https://github.com/Gavuzzi/finance-budget-forecast" target="_blank" rel="noopener">källkod på GitHub</a>`,
 },
 };
 
