@@ -331,8 +331,29 @@ repaint, so we never restyle twice.
   hand-computed from the fixtures (39,1 mkr total = 19 967 436 + 6×3 185 790; avg 3,3; 6 months w/o
   budget) and matched exactly; 34 engine tests green; zero data.js changes. NOT verified hands-on: the
   print-opens-details path (code-reviewed only — in TESTING.md).
-- [ ] `[B]` **3. Visual reskin (~1 day)** — light theme becomes the DEFAULT (dark stays as toggle),
-  palette/typography/spacing copied from the convention sheet. Re-shoot all landing-page screenshots after.
+- [x] `[B]` **3. Visual reskin** *(done 2026-07-10)* — light is now the default theme app-wide (dark
+  survives as an explicit toggle, one `applyTheme()` fallback flipped in sidebar.js + `getTheme()`'s
+  fallback for consistency); the landing page needed no JS change at all since it reuses `style.css`'s
+  `:root` and picked up light automatically. New palette per C2/C3/C4: warm paper `--bg` (`#f7f4ef`) +
+  white `--panel` (not pure-white-on-pure-white — a two-surface system, cards visibly lifted off the
+  page), warm near-black `--text` (`#2a2521`, never pure black), desaturated slate-blue `--accent`
+  (`#3f6690`, chosen at ~the same luminance as the old `#3461a8` specifically to avoid regressing the
+  pre-existing `color:#0e141f`-on-accent button contrast, which is hardcoded and unowned by this pass),
+  and muted semantic colors (`--green`/`--amber`/`--red`) — an over-budget line reads as information, not
+  a siren. Dark theme's own values are untouched, just moved from being `:root` to an explicit
+  `html[data-theme="dark"]` override. C5: all 11 in-app `font-family: 'Fraunces', serif` declarations
+  swapped to `'Inter', sans-serif` (weight already 700 on every one, so hierarchy didn't need
+  rebalancing); Fraunces now renders only on the landing page hero, which keeps its own personality on
+  purpose. **Screenshot assets regenerated**, not just left stale: `screen-overview.png`,
+  `screen-assumptions.png`, `screen-fortnox.png`, `screen-loop.png` all re-shot against the live
+  light-themed, post-restructure app and re-cropped to their original dimensions (demo-mode toast
+  excluded from each crop) — the landing page's embedded screenshots now match what a visitor actually
+  sees pixel-for-pixel, not a stale dark/old-IA copy. **Verified:** Overview/Monthly/Planning/Cash
+  Flow/Assumptions/login/landing screenshotted in the new light default, Overview re-checked in dark to
+  confirm the toggle still works, Swedish re-checked for text-color legibility, 34 engine tests green
+  (zero data.js touched), shadowing grep clean. NOT checked: a real accessibility contrast-ratio audit
+  (eyeballed via screenshots only) — reasonable given the accent was deliberately kept at the old
+  luminance, but a formal WCAG pass is cheap and worth doing before a real client demo.
 - [ ] `[B]` **4. First-run experience (~1 day)** — a signed-in first-time user should reach "I see my
   numbers" in minutes: preset or Fortnox connect → guided 3-step checklist instead of the current wall.
   Plus a written 7-minute demo script for Felix.

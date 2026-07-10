@@ -25,7 +25,7 @@ function currentPageId() {
 }
 
 function getTheme() {
-  return document.documentElement.getAttribute("data-theme") || "dark";
+  return document.documentElement.getAttribute("data-theme") || "light";
 }
 
 function applyTheme(theme) {
@@ -150,4 +150,4 @@ function renderSidebar() {
 // itself is rendered by the auth bootstrap once data has loaded — it needs
 // CLOSE_MONTH and the rest of the model to be populated first.
 const _themeParam = new URLSearchParams(location.search).get("theme");
-applyTheme(_themeParam === "light" || _themeParam === "dark" ? _themeParam : (localStorage.getItem("almgren-budget-theme") || "dark"));
+applyTheme(_themeParam === "light" || _themeParam === "dark" ? _themeParam : (localStorage.getItem("almgren-budget-theme") || "light"));
