@@ -7,9 +7,8 @@ function roleBreakdown(role) {
   const afterEmployer = Math.round(role.baseSalary * (1 + ASSUMPTIONS.employerContributionPct / 100));
   const afterEquip = afterEmployer + ASSUMPTIONS.equipmentMonthly;
   const loaded = monthlyCostForRole(role.id); // final rounded exactly like the cell
-  return `${fmtSek(role.baseSalary)} base &nbsp;→&nbsp; +${ASSUMPTIONS.employerContributionPct}% employer = ${fmtSek(afterEmployer)} ` +
-    `&nbsp;→&nbsp; +${fmtSek(ASSUMPTIONS.equipmentMonthly)} equipment = ${fmtSek(afterEquip)} ` +
-    `&nbsp;→&nbsp; +${ASSUMPTIONS.otherOverheadPct}% overhead = <strong>${fmtSek(loaded)}</strong>`;
+  return t("role_breakdown", fmtSek(role.baseSalary), ASSUMPTIONS.employerContributionPct, fmtSek(afterEmployer),
+    fmtSek(ASSUMPTIONS.equipmentMonthly), fmtSek(afterEquip), ASSUMPTIONS.otherOverheadPct, fmtSek(loaded));
 }
 
 function renderRoleRow(role) {
@@ -17,8 +16,8 @@ function renderRoleRow(role) {
     <tr data-role="${role.id}">
       <td><input type="text" data-rolefield="label" value="${escapeHtml(role.label)}"></td>
       <td><input type="number" data-rolefield="baseSalary" value="${role.baseSalary}" step="500"></td>
-      <td class="num computed rate-cell" title="Click to see how this is calculated">${fmtSek(monthlyCostForRole(role.id))}</td>
-      <td><button class="row-remove" data-removerole="${role.id}" title="Remove role">✕</button></td>
+      <td class="num computed rate-cell" title="${t("rate_cell_title")}">${fmtSek(monthlyCostForRole(role.id))}</td>
+      <td><button class="row-remove" data-removerole="${role.id}" title="${t("remove_role_title")}">✕</button></td>
     </tr>
     <tr class="role-detail" data-detailfor="${role.id}" hidden>
       <td colspan="4">${roleBreakdown(role)}</td>
@@ -28,7 +27,7 @@ function renderRoleRow(role) {
 
 function renderRoleTableBody() {
   if (ROLE_CATALOG.length === 0) {
-    return `<tr><td colspan="4" class="empty-hint">No roles yet — click "+ Add role" to create your first one.</td></tr>`;
+    return `<tr><td colspan="4" class="empty-hint">${t("no_roles_hint")}</td></tr>`;
   }
   return ROLE_CATALOG.map(renderRoleRow).join("");
 }
@@ -39,17 +38,17 @@ function revPlanTotalHtml() {
   const target = ASSUMPTIONS.revenueBudget || 0;
   if (!hasPlan) {
     return target
-      ? `No monthly plan — forecasts use a flat <strong>${fmtSek(Math.round(target / 12))}</strong>/month (target ÷ 12).`
-      : `No revenue target set — revenue stays hidden from the P&L comparison and forecasts.`;
+      ? t("rev_no_plan_flat", fmtSek(Math.round(target / 12)))
+      : t("rev_no_target");
   }
   const total = plan.reduce((s, v) => s + (Number(v) || 0), 0);
   const diff = total - target;
   // Green when the plan is at/above the target, red below — revenue semantics,
   // the inverse of the cost tables' over/under coloring.
   const drift = Math.abs(diff) < 1000
-    ? `<span class="bv-clean">✓ matches the annual target</span>`
-    : `<span class="${diff > 0 ? "under" : "over"}">${fmtMkrSigned(diff)} vs the ${fmtMkr(target)} target</span>`;
-  return `<strong>Plan total: ${fmtMkr(total)}</strong> ${drift}`;
+    ? `<span class="bv-clean">${t("rev_plan_matches")}</span>`
+    : `<span class="${diff > 0 ? "under" : "over"}">${t("rev_plan_drift", fmtMkrSigned(diff), fmtMkr(target))}</span>`;
+  return `${t("rev_plan_total", fmtMkr(total))} ${drift}`;
 }
 
 function renderRevenueBlock() {
@@ -62,17 +61,17 @@ function renderRevenueBlock() {
     </label>`).join("");
   return `
     <div class="cc-block rate-block revenue-block">
-      <h2>Revenue Plan <span class="pnl-src">— feeds the projected FY result &amp; Cash Flow</span></h2>
-      <p class="rate-hint">An annual target plus an optional month-by-month profile. The target is what actual revenue (synced from Fortnox) is compared against; the monthly plan shapes the forecast — the projected FY result on Overview and the Operating estimate on Cash Flow. No plan = a flat target ÷ 12. Leave the target at 0 to hide revenue entirely.</p>
+      <h2>${t("revenue_plan_h2")}</h2>
+      <p class="rate-hint">${t("revenue_plan_hint")}</p>
       <div class="assumption-fields">
-        <label>Annual revenue target (SEK)
+        <label>${t("annual_revenue_target")}
           <input type="number" data-assumption="revenueBudget" value="${ASSUMPTIONS.revenueBudget}" step="10000">
         </label>
       </div>
       <div class="rev-plan-grid">${cells}</div>
       <div class="rev-plan-actions">
-        <button class="add-headcount" id="revSpreadBtn" type="button">Spread target evenly</button>
-        <button class="add-headcount" id="revClearBtn" type="button"${hasPlan ? "" : " disabled"}>Clear plan (use flat ÷ 12)</button>
+        <button class="add-headcount" id="revSpreadBtn" type="button">${t("spread_target_btn")}</button>
+        <button class="add-headcount" id="revClearBtn" type="button"${hasPlan ? "" : " disabled"}>${t("clear_plan_btn")}</button>
       </div>
       <p class="rate-formula" id="revPlanTotal">${revPlanTotalHtml()}</p>
     </div>
@@ -82,24 +81,24 @@ function renderRevenueBlock() {
 function renderTaxBlock() {
   return `
     <div class="cc-block rate-block tax-block">
-      <h2>Tax &amp; VAT Settings <span class="pnl-src">— feeds the Cash Flow page's estimate</span></h2>
-      <p class="rate-hint">Which BAS accounts hold your VAT and payroll-tax liabilities, and how often you report VAT — used to estimate when those amounts fall due. Defaults match the standard BAS chart of accounts; adjust if your books use different ones. Ranges are wide on purpose: reclassification entries within a range net to zero either way.</p>
+      <h2>${t("tax_vat_h2")}</h2>
+      <p class="rate-hint">${t("tax_vat_hint")}</p>
       <div class="assumption-fields">
-        <label>VAT reporting frequency
+        <label>${t("vat_frequency_label")}
           <select data-taxfield="vatFrequency">
-            <option value="monthly"${ASSUMPTIONS.vatFrequency === "monthly" ? " selected" : ""}>Monthly</option>
-            <option value="quarterly"${ASSUMPTIONS.vatFrequency === "quarterly" ? " selected" : ""}>Quarterly</option>
-            <option value="annual"${ASSUMPTIONS.vatFrequency === "annual" ? " selected" : ""}>Annual</option>
+            <option value="monthly"${ASSUMPTIONS.vatFrequency === "monthly" ? " selected" : ""}>${t("vat_monthly")}</option>
+            <option value="quarterly"${ASSUMPTIONS.vatFrequency === "quarterly" ? " selected" : ""}>${t("vat_quarterly")}</option>
+            <option value="annual"${ASSUMPTIONS.vatFrequency === "annual" ? " selected" : ""}>${t("vat_annual")}</option>
           </select>
         </label>
-        <label>VAT account range
+        <label>${t("vat_account_range")}
           <span class="range-inputs">
             <input type="number" data-taxfield="vatAccountFrom" value="${ASSUMPTIONS.vatAccountFrom}">
             &ndash;
             <input type="number" data-taxfield="vatAccountTo" value="${ASSUMPTIONS.vatAccountTo}">
           </span>
         </label>
-        <label>Payroll-tax account range
+        <label>${t("payroll_account_range")}
           <span class="range-inputs">
             <input type="number" data-taxfield="payrollAccountFrom" value="${ASSUMPTIONS.payrollAccountFrom}">
             &ndash;
@@ -114,16 +113,16 @@ function renderTaxBlock() {
 function renderRateEngineBlock() {
   return `
     <div class="cc-block rate-block">
-      <h2>Rate Assumptions</h2>
-      <p class="rate-hint">Costs are derived from these, not typed. Set the payroll assumptions and each role's base salary once — the loaded monthly cost is calculated, and every reporting line using a role recalculates automatically.</p>
+      <h2>${t("rate_assumptions_h2")}</h2>
+      <p class="rate-hint">${t("rate_assumptions_hint")}</p>
       <div class="assumption-fields">
-        <label>Employer contribution (%)
+        <label>${t("employer_contribution_label")}
           <input type="number" data-assumption="employerContributionPct" value="${ASSUMPTIONS.employerContributionPct}" step="0.01">
         </label>
-        <label>Equipment / tools per head (SEK/mo)
+        <label>${t("equipment_label")}
           <input type="number" data-assumption="equipmentMonthly" value="${ASSUMPTIONS.equipmentMonthly}" step="100">
         </label>
-        <label>Other overhead (%)
+        <label>${t("other_overhead_label")}
           <input type="number" data-assumption="otherOverheadPct" value="${ASSUMPTIONS.otherOverheadPct}" step="0.5">
         </label>
       </div>
@@ -132,16 +131,16 @@ function renderRateEngineBlock() {
         <table class="driver-table role-table">
           <thead>
             <tr>
-              <th>Role</th>
-              <th>Base salary (SEK/mo)</th>
-              <th class="num">Loaded cost (SEK/mo)</th>
+              <th>${t("col_role_th")}</th>
+              <th>${t("col_base_salary")}</th>
+              <th class="num">${t("col_loaded_cost")}</th>
               <th></th>
             </tr>
           </thead>
           <tbody id="roleTableBody">${renderRoleTableBody()}</tbody>
         </table>
       </div>
-      <button class="add-headcount" id="addRoleBtn">+ Add role</button>
+      <button class="add-headcount" id="addRoleBtn">${t("add_role_btn")}</button>
       <p class="form-status" id="roleStatus"></p>
     </div>
   `;
@@ -161,39 +160,41 @@ async function callOrgMembers(payload) {
   return out;
 }
 
-const ROLE_LABEL = { owner: "Owner", editor: "Editor", viewer: "Viewer" };
+function roleLabel(r) {
+  return { owner: t("role_owner"), editor: t("role_editor"), viewer: t("role_viewer") }[r];
+}
 
 function roleSelectHtml(userId, currentRole) {
   return `<select class="team-role-select" data-member="${userId}">
-    ${["owner", "editor", "viewer"].map((r) => `<option value="${r}"${r === currentRole ? " selected" : ""}>${ROLE_LABEL[r]}</option>`).join("")}
+    ${["owner", "editor", "viewer"].map((r) => `<option value="${r}"${r === currentRole ? " selected" : ""}>${roleLabel(r)}</option>`).join("")}
   </select>`;
 }
 
 function teamRowHtml(m, isOwnerView) {
   const manage = isOwnerView && !m.is_you
-    ? `${roleSelectHtml(m.user_id, m.role)} <button class="row-remove" data-removemember="${m.user_id}" title="Remove from this organization">✕</button>`
+    ? `${roleSelectHtml(m.user_id, m.role)} <button class="row-remove" data-removemember="${m.user_id}" title="${t("remove_member_title")}">✕</button>`
     : isOwnerView
       ? roleSelectHtml(m.user_id, m.role) // can change your own role (server blocks removing the last owner)
-      : `<span class="role-pill role-${m.role}">${ROLE_LABEL[m.role]}</span>`;
+      : `<span class="role-pill role-${m.role}">${roleLabel(m.role)}</span>`;
   return `
     <div class="team-row">
-      <span class="team-email">${escapeHtml(m.email)}${m.is_you ? ` <span class="team-you">— you</span>` : ""}</span>
+      <span class="team-email">${escapeHtml(m.email)}${m.is_you ? ` <span class="team-you">${t("team_you")}</span>` : ""}</span>
       <span class="team-manage">${manage}</span>
     </div>`;
 }
 
 function demoTeamHtml() {
   return `
-    <div class="team-row"><span class="team-email">you@example.com <span class="team-you">— you</span></span><span class="role-pill role-owner">Owner</span></div>
-    <div class="team-row"><span class="team-email">colleague@example.com</span><span class="role-pill role-editor">Editor</span></div>
-    <p class="rate-hint" style="margin:10px 0 0;">Sign in to invite real teammates.</p>`;
+    <div class="team-row"><span class="team-email">${t("demo_team_owner_email")} <span class="team-you">${t("team_you")}</span></span><span class="role-pill role-owner">${roleLabel("owner")}</span></div>
+    <div class="team-row"><span class="team-email">${t("demo_team_colleague_email")}</span><span class="role-pill role-editor">${roleLabel("editor")}</span></div>
+    <p class="rate-hint" style="margin:10px 0 0;">${t("demo_team_signin_hint")}</p>`;
 }
 
 function teamInviteFormHtml() {
   return `<div class="team-invite">
-    <input type="email" id="teamInviteEmail" placeholder="teammate@company.com">
-    <select id="teamInviteRole"><option value="editor">Editor</option><option value="viewer">Viewer</option></select>
-    <button class="add-headcount" id="teamInviteBtn" type="button">Invite</button>
+    <input type="email" id="teamInviteEmail" placeholder="${t("invite_email_placeholder")}">
+    <select id="teamInviteRole"><option value="editor">${t("role_editor")}</option><option value="viewer">${t("role_viewer")}</option></select>
+    <button class="add-headcount" id="teamInviteBtn" type="button">${t("invite_btn")}</button>
   </div>`;
 }
 
@@ -228,16 +229,16 @@ async function renderTeamPanel() {
     listEl.innerHTML = members.map((m) => teamRowHtml(m, isOwnerView)).join("");
     formEl.innerHTML = isOwnerView ? teamInviteFormHtml() : "";
   } catch (e) {
-    listEl.innerHTML = `<p class="rate-hint">Couldn't load the team list — ${escapeHtml(e.message)}</p>`;
+    listEl.innerHTML = `<p class="rate-hint">${t("team_load_error", escapeHtml(e.message))}</p>`;
   }
 }
 
 function renderTeamBlock() {
   return `
     <div class="cc-block rate-block team-block">
-      <h2>Team</h2>
-      <p class="rate-hint">Who has access to this organization. Owners can invite people, change roles, and remove access; editors can edit all the data but not manage who's on the team; viewers are read-only.</p>
-      <div id="teamList" class="team-list">Loading…</div>
+      <h2>${t("team_h2")}</h2>
+      <p class="rate-hint">${t("team_hint")}</p>
+      <div id="teamList" class="team-list">${t("common_loading")}</div>
       <div id="teamInviteForm"></div>
       <p class="form-status" id="teamStatus"></p>
     </div>
@@ -247,9 +248,9 @@ function renderTeamBlock() {
 function renderDataBlock() {
   return `
     <div class="cc-block rate-block data-block">
-      <h2>Your Data</h2>
-      <p class="rate-hint">Everything this organization stores — budget drivers, actuals, plans, scenarios, sync configuration — downloadable as one JSON file. Your data is yours: take it to Excel, another tool, or just keep a backup. (OAuth tokens are never included; they aren't readable from the browser at all.)</p>
-      <button class="add-headcount" id="exportAllBtn" type="button">⬇ Export everything (JSON)</button>
+      <h2>${t("your_data_h2")}</h2>
+      <p class="rate-hint">${t("your_data_hint")}</p>
+      <button class="add-headcount" id="exportAllBtn" type="button">${t("export_all_btn")}</button>
     </div>
   `;
 }
@@ -271,10 +272,7 @@ function updateRateFormula() {
     (example * (1 + ASSUMPTIONS.employerContributionPct / 100) + ASSUMPTIONS.equipmentMonthly) *
       (1 + ASSUMPTIONS.otherOverheadPct / 100)
   );
-  el.innerHTML =
-    `<strong>How each cost is derived:</strong> base salary × (1 + ${ASSUMPTIONS.employerContributionPct}% employer) + ` +
-    `${fmtSek(ASSUMPTIONS.equipmentMonthly)} equipment, then × (1 + ${ASSUMPTIONS.otherOverheadPct}% overhead). ` +
-    `So a ${fmtSek(example)} base becomes <strong>${fmtSek(loaded)}/month</strong>.`;
+  el.innerHTML = t("rate_formula", ASSUMPTIONS.employerContributionPct, fmtSek(ASSUMPTIONS.equipmentMonthly), ASSUMPTIONS.otherOverheadPct, fmtSek(example), fmtSek(loaded));
 }
 
 function refreshRoleRatesDisplay() {
@@ -341,10 +339,10 @@ function initAssumptions() {
     if (!sel) return;
     const status = document.getElementById("teamStatus");
     status.classList.remove("error");
-    status.textContent = "Updating…";
+    status.textContent = t("team_updating");
     try {
       await callOrgMembers({ action: "set_role", user_id: sel.dataset.member, role: sel.value });
-      status.textContent = "Role updated.";
+      status.textContent = t("team_role_updated");
       renderTeamPanel();
     } catch (err) {
       status.textContent = err.message;
@@ -365,14 +363,14 @@ function initAssumptions() {
       const status = document.getElementById("teamStatus");
       const email = emailInput.value.trim();
       status.classList.remove("error");
-      if (!email) { status.textContent = "Enter an email first."; status.classList.add("error"); return; }
+      if (!email) { status.textContent = t("team_enter_email"); status.classList.add("error"); return; }
       e.target.disabled = true;
-      e.target.textContent = "Inviting…";
+      e.target.textContent = t("inviting_btn");
       try {
         const out = await callOrgMembers({ action: "invite", email, role: roleSelect.value });
         status.textContent = out.mode === "invited"
-          ? `Invite sent to ${out.email}.`
-          : `${out.email} already has an account — added directly.`;
+          ? t("team_invite_sent", out.email)
+          : t("team_already_added", out.email);
         emailInput.value = "";
         renderTeamPanel();
       } catch (err) {
@@ -380,7 +378,7 @@ function initAssumptions() {
         status.classList.add("error");
       } finally {
         e.target.disabled = false;
-        e.target.textContent = "Invite";
+        e.target.textContent = t("invite_btn");
       }
       return;
     }
@@ -388,13 +386,13 @@ function initAssumptions() {
     const removeMemberBtn = e.target.closest("[data-removemember]");
     if (removeMemberBtn) {
       const row = removeMemberBtn.closest(".team-row");
-      const email = row ? row.querySelector(".team-email").textContent.trim() : "this person";
-      if (!confirm(`Remove ${email} from this organization? They'll lose access immediately.`)) return;
+      const email = row ? row.querySelector(".team-email").textContent.trim() : t("fallback_this_person");
+      if (!confirm(t("confirm_remove_member", email))) return;
       const status = document.getElementById("teamStatus");
       status.classList.remove("error");
       try {
         await callOrgMembers({ action: "remove", user_id: removeMemberBtn.dataset.removemember });
-        status.textContent = "Removed.";
+        status.textContent = t("team_removed");
         renderTeamPanel();
       } catch (err) {
         status.textContent = err.message;
@@ -430,11 +428,11 @@ function initAssumptions() {
       const role = getRole(roleId);
       const status = document.getElementById("roleStatus");
       if (isRoleInUse(roleId)) {
-        status.textContent = "Can't remove — this role is still used by a reporting line on the Planning page.";
+        status.textContent = t("cannot_remove_role_in_use");
         status.classList.add("error");
         return;
       }
-      if (!confirm(`Remove the role "${role.label}"? This can't be undone.`)) return;
+      if (!confirm(t("confirm_remove_role", role.label))) return;
       const ok = await dbDeleteRole(roleId);
       if (!ok) return;
       const idx = ROLE_CATALOG.findIndex((r) => r.id === roleId);

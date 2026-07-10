@@ -48,12 +48,12 @@ async function saveMapping(reportingLineId, code, dimension = "costcenter") {
 
 async function startFortnoxConnect() {
   if (!fortnoxConfigured()) {
-    showToast("Fortnox isn't configured yet — set the Client ID in fortnox.js.", "error");
+    showToast(t("fn_not_configured"), "error");
     return;
   }
   const state = crypto.randomUUID();
   const { error } = await sb.from("oauth_states").insert({ state, org_id: CURRENT_ORG_ID });
-  if (error) { showToast("Couldn't start the connection — " + error.message, "error"); return; }
+  if (error) { showToast(t("fn_connect_failed", error.message), "error"); return; }
 
   const params = new URLSearchParams({
     client_id: FORTNOX_CLIENT_ID,
@@ -68,7 +68,7 @@ async function startFortnoxConnect() {
 }
 
 async function runFortnoxSync(btn) {
-  if (btn) { btn.disabled = true; btn.textContent = "Syncing…"; }
+  if (btn) { btn.disabled = true; btn.textContent = t("fn_syncing_btn"); }
   try {
     const { data: { session } } = await sb.auth.getSession();
     const res = await fetch(`${SUPABASE_URL}/functions/v1/fortnox-sync`, {
@@ -82,20 +82,20 @@ async function runFortnoxSync(btn) {
     });
     const out = await res.json();
     if (!res.ok) throw new Error(out.error || res.statusText);
-    let msg = `Synced — ${out.months_updated} reporting-line-month(s) updated.`;
+    let msg = t("fn_synced_toast", out.months_updated);
     if (out.unmapped_reporting_lines && out.unmapped_reporting_lines.length) {
-      msg += ` Unmapped Fortnox codes: ${out.unmapped_reporting_lines.join(", ")}.`;
+      msg += t("fn_unmapped_codes", out.unmapped_reporting_lines.join(", "));
     }
     showToast(msg);
     lastCostCenters = out.reporting_lines || [];
     lastProjects = out.projects || [];
     renderReconciliation(out);
     const ls = document.getElementById("fnLastSynced");
-    if (ls) ls.textContent = "Last synced: " + new Date().toLocaleString("sv-SE");
+    if (ls) ls.textContent = t("fn_last_synced_prefix") + new Date().toLocaleString("sv-SE");
   } catch (e) {
-    showToast("Sync failed — " + e.message, "error");
+    showToast(t("fn_sync_failed", e.message), "error");
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = "Sync now"; }
+    if (btn) { btn.disabled = false; btn.textContent = t("fn_sync_now_btn"); }
   }
 }
 
@@ -113,22 +113,22 @@ function pnlTable(r) {
   const vsLy = (cur, prev) => {
     if (!py || !prev) return "";
     const pct = ((cur - prev) / Math.abs(prev)) * 100;
-    return ` <span class="pnl-py">${pct >= 0 ? "+" : "−"}${Math.abs(pct).toFixed(0)}% vs LY</span>`;
+    return ` <span class="pnl-py">${pct >= 0 ? "+" : "−"}${Math.abs(pct).toFixed(0)}% ${t("vs_ly_suffix")}</span>`;
   };
   // Revenue budget is a simple typed target (Assumptions page) — no driver
   // engine. Only shown once a target is actually set (0 = hidden, not "0% of nothing").
   const revBudget = (typeof ASSUMPTIONS !== "undefined" && ASSUMPTIONS.revenueBudget) || 0;
   const revVsBudget = revBudget
-    ? ` <span class="pnl-py">${r.revenue >= revBudget ? "+" : "−"}${Math.abs(Math.round(((r.revenue - revBudget) / revBudget) * 100))}% vs budget</span>`
+    ? ` <span class="pnl-py">${r.revenue >= revBudget ? "+" : "−"}${Math.abs(Math.round(((r.revenue - revBudget) / revBudget) * 100))}% ${t("vs_budget_suffix")}</span>`
     : "";
   return `
     <table class="fn-recon-table">
-      <tr><td>Revenue (class 3)</td><td class="num">${fmtKr(r.revenue)}${vsLy(r.revenue, py?.revenue)}${revVsBudget}</td></tr>
-      <tr><td>COGS (class 4)</td><td class="num">${fmtKr(r.cogs)}</td></tr>
-      <tr><td>Operating (class 5–6)</td><td class="num">${fmtKr(r.opex)}</td></tr>
-      <tr><td>Personnel (class 7)</td><td class="num">${fmtKr(r.personnel)}</td></tr>
-      <tr class="fn-recon-total"><td>Total cost</td><td class="num">${fmtKr(r.total_cost)}${vsLy(r.total_cost, py?.total_cost)}</td></tr>
-      <tr class="fn-recon-total"><td>Result <span class="fn-margin">${margin}% margin</span></td><td class="num">${fmtKr(r.result)}${vsLy(r.result, py?.result)}</td></tr>
+      <tr><td>${t("pnl_revenue")}</td><td class="num">${fmtKr(r.revenue)}${vsLy(r.revenue, py?.revenue)}${revVsBudget}</td></tr>
+      <tr><td>${t("pnl_cogs")}</td><td class="num">${fmtKr(r.cogs)}</td></tr>
+      <tr><td>${t("pnl_operating")}</td><td class="num">${fmtKr(r.opex)}</td></tr>
+      <tr><td>${t("pnl_personnel")}</td><td class="num">${fmtKr(r.personnel)}</td></tr>
+      <tr class="fn-recon-total"><td>${t("pnl_total_cost")}</td><td class="num">${fmtKr(r.total_cost)}${vsLy(r.total_cost, py?.total_cost)}</td></tr>
+      <tr class="fn-recon-total"><td>${t("pnl_result")} <span class="fn-margin">${t("pnl_margin", margin)}</span></td><td class="num">${fmtKr(r.result)}${vsLy(r.result, py?.result)}</td></tr>
     </table>`;
 }
 
@@ -139,9 +139,9 @@ function renderReconciliation(out) {
   if (!host || !r) return;
   host.innerHTML = `
     <div class="fn-recon">
-      <h4>P&amp;L from Fortnox <span class="fn-recon-sub">— ties out to your Resultatrapport</span></h4>
+      <h4>${t("fn_pnl_h4")}</h4>
       ${pnlTable(r)}
-      <p class="fn-recon-note">Read from ${r.vouchers} vouchers / ${r.rows} rows in one call.${r.coverage_pct != null ? ` Coverage: <strong>${r.coverage_pct}%</strong> of operating costs assigned.` : ""}${r.unmapped_cost ? ` <span class="fn-recon-warn">Unassigned: ${fmtKr(r.unmapped_cost)} — shown as its own line in the grid.</span>` : " Every krona assigned ✓"}</p>
+      <p class="fn-recon-note">${t("fn_read_from", r.vouchers, r.rows)}${r.coverage_pct != null ? t("fn_coverage", r.coverage_pct) : ""}${r.unmapped_cost ? t("fn_unassigned", fmtKr(r.unmapped_cost)) : t("fn_every_krona")}</p>
     </div>`;
 }
 
@@ -156,13 +156,13 @@ function demoIntegrationHtml() {
   };
   return `
     <div class="integration-card connected">
-      <div class="integ-head"><span class="integ-dot"></span> Connected to Fortnox · Meridian Manufacturing AB <span class="integ-demo-tag">demo</span></div>
-      <p class="integ-sub">What a live connection looks like: your real accounting, reconciled automatically — no CSV, no re-keying. (Sample data.)</p>
+      <div class="integ-head"><span class="integ-dot"></span> ${t("fn_demo_connected", "Meridian Manufacturing AB")} <span class="integ-demo-tag">${t("fn_demo_tag")}</span></div>
+      <p class="integ-sub">${t("fn_demo_sub")}</p>
       <div class="fn-recon">
-        <h4>Actuals from Fortnox — full-year P&amp;L</h4>
+        <h4>${t("fn_demo_pnl_h4")}</h4>
         ${pnlTable(r)}
-        <p class="fn-recon-note">Read from 3 214 vouchers in one call · ties out to Fortnox's Resultatrapport.</p>
-        <div class="fn-cc-maplabel">Cost centres — auto-mapped from your ledger:</div>
+        <p class="fn-recon-note">${t("fn_demo_note")}</p>
+        <div class="fn-cc-maplabel">${t("fn_demo_maplabel")}</div>
         <div class="fn-cc-chips">
           <span class="fn-cc-chip">✓ Production</span>
           <span class="fn-cc-chip">✓ Sales &amp; Marketing</span>
@@ -175,27 +175,27 @@ function demoIntegrationHtml() {
 }
 
 function disconnectedHtml() {
-  const note = fortnoxConfigured() ? "" : `<p class="integ-warn">Not configured yet — add your Client ID in <code>fortnox.js</code>.</p>`;
+  const note = fortnoxConfigured() ? "" : `<p class="integ-warn">${t("fn_not_configured_note")}</p>`;
   return `
     <div class="integration-card">
-      <div class="integ-head"><span class="integ-logo">⇄</span> Connect your accounting</div>
-      <p class="integ-sub">Connect <strong>Fortnox</strong> to import booked actuals automatically instead of uploading CSVs.</p>
-      <button class="integ-btn" id="fnConnectBtn" type="button">Connect Fortnox →</button>
+      <div class="integ-head"><span class="integ-logo">⇄</span> ${t("fn_connect_h4")}</div>
+      <p class="integ-sub">${t("fn_connect_sub")}</p>
+      <button class="integ-btn" id="fnConnectBtn" type="button">${t("fn_connect_btn")}</button>
       ${note}
     </div>`;
 }
 
 function connectedHtml(status) {
-  const last = status.last_synced_at ? new Date(status.last_synced_at).toLocaleString("sv-SE") : "never";
-  const err = status.last_sync_error ? `<p class="integ-warn">Last sync error: ${escapeHtml(status.last_sync_error)}</p>` : "";
+  const last = status.last_synced_at ? new Date(status.last_synced_at).toLocaleString("sv-SE") : t("fn_never");
+  const err = status.last_sync_error ? `<p class="integ-warn">${t("fn_last_sync_error", escapeHtml(status.last_sync_error))}</p>` : "";
   return `
     <div class="integration-card connected">
-      <div class="integ-head"><span class="integ-dot"></span> Connected to Fortnox${status.tenant_name ? " · " + escapeHtml(status.tenant_name) : ""}</div>
-      <p class="integ-sub" id="fnLastSynced">Last synced: ${last}</p>
+      <div class="integ-head"><span class="integ-dot"></span> ${t("fn_connected_to")}${status.tenant_name ? " · " + escapeHtml(status.tenant_name) : ""}</div>
+      <p class="integ-sub" id="fnLastSynced">${t("fn_last_synced_prefix")}${last}</p>
       <div class="integ-actions">
-        <button class="integ-btn" id="fnSyncBtn" type="button">Sync now</button>
-        <button class="integ-link" id="fnMapToggle" type="button">Reporting-line mapping</button>
-        <button class="integ-link" id="fnReconnectBtn" type="button">Switch company</button>
+        <button class="integ-btn" id="fnSyncBtn" type="button">${t("fn_sync_now_btn")}</button>
+        <button class="integ-link" id="fnMapToggle" type="button">${t("reporting_line_mapping_btn")}</button>
+        <button class="integ-link" id="fnReconnectBtn" type="button">${t("fn_switch_company")}</button>
       </div>
       ${err}
       <div id="fnReconciliation"></div>
@@ -214,10 +214,10 @@ function codeRowsHtml(items, dimension) {
           <span class="fn-cc-name">${escapeHtml(it.name)} <span class="fn-cc-code">${escapeHtml(it.code)}</span></span>
           <span class="fn-cc-cost num">${fmtKr(it.cost)}</span>
           ${it.mapped
-            ? `<span class="fn-cc-mapped">✓ mapped</span>`
+            ? `<span class="fn-cc-mapped">${t("fn_mapped_badge")}</span>`
             : `<span class="fn-cc-actions">
-                 <button class="fn-cc-import" type="button">Import</button>
-                 <select class="fn-cc-link"><option value="">Link to…</option>${options}</select>
+                 <button class="fn-cc-import" type="button">${t("fn_import_btn")}</button>
+                 <select class="fn-cc-link"><option value="">${t("fn_link_to")}</option>${options}</select>
                </span>`}
         </div>`).join("")}
     </div>`;
@@ -242,15 +242,15 @@ async function renderMappingEditor(host) {
   const importAllBtn = (items, dim) => {
     const unmapped = items.filter((c) => !c.mapped);
     return unmapped.length >= 2
-      ? `<button class="fn-cc-import fn-import-all" data-importall="${dim}" type="button">Import all ${unmapped.length} as reporting lines</button>`
+      ? `<button class="fn-cc-import fn-import-all" data-importall="${dim}" type="button">${t("fn_import_all_btn", unmapped.length)}</button>`
       : "";
   };
   const ccSection = lastCostCenters.length
-    ? `<p class="integ-map-hint">Your Fortnox <strong>cost centres</strong>. <strong>Import</strong> each as a reporting line, or <strong>link</strong> it to an existing one, then re-sync to pull its actuals in. Nothing is dropped.</p>`
+    ? `<p class="integ-map-hint">${t("fn_cc_hint")}</p>`
       + importAllBtn(lastCostCenters, "costcenter") + codeRowsHtml(lastCostCenters, "costcenter")
-    : `<p class="integ-map-hint">Hit <strong>Sync now</strong> first — then your Fortnox cost centres appear here to map in one click. (No cost centres in your books? Use account ranges below.)</p>`;
+    : `<p class="integ-map-hint">${t("fn_cc_hint_empty")}</p>`;
   const projSection = lastProjects.length
-    ? `<p class="integ-map-hint fn-section-gap"><strong>Projects</strong> — matched before cost centres when a booking carries both.</p>`
+    ? `<p class="integ-map-hint fn-section-gap">${t("fn_proj_hint")}</p>`
       + importAllBtn(lastProjects, "project") + codeRowsHtml(lastProjects, "project")
     : "";
   host.innerHTML = ccSection + projSection
@@ -285,12 +285,12 @@ async function renderAccountRanges(host) {
   if (!el) return;
   const options = COST_CENTERS.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
   el.innerHTML = `
-    <p class="integ-map-hint"><strong>Account ranges</strong> — fallback for bookings without a cost-centre tag: any BAS account in a range lands on the chosen line. (E.g. 4000–4999 → Production.)</p>
+    <p class="integ-map-hint">${t("fn_acct_ranges_hint")}</p>
     ${ranges.map((r) => `
       <div class="fn-cc-row">
         <span class="fn-cc-name">${r.account_from}–${r.account_to} → ${escapeHtml((COST_CENTERS.find((c) => c.id === r.reporting_line_id) || {}).name || "?")}</span>
         <span></span>
-        <button class="integ-link" data-del="${r.id}" type="button">Remove</button>
+        <button class="integ-link" data-del="${r.id}" type="button">${t("fn_remove_btn")}</button>
       </div>`).join("")}
     <div class="fn-acct-add">
       <input type="number" id="fnAcctFrom" placeholder="4000" min="1000" max="9999">
@@ -298,24 +298,24 @@ async function renderAccountRanges(host) {
       <input type="number" id="fnAcctTo" placeholder="4999" min="1000" max="9999">
       <span>→</span>
       <select id="fnAcctCc">${options}</select>
-      <button class="fn-cc-import" id="fnAcctAdd" type="button">Add</button>
+      <button class="fn-cc-import" id="fnAcctAdd" type="button">${t("fn_add_btn")}</button>
     </div>`;
   el.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", async () => {
     await sb.from("reporting_line_mappings").delete().eq("id", b.dataset.del);
-    showToast("Range removed — re-sync to apply.");
+    showToast(t("fn_range_removed"));
     renderAccountRanges(host);
   }));
   el.querySelector("#fnAcctAdd").addEventListener("click", async () => {
     const from = parseInt(el.querySelector("#fnAcctFrom").value, 10);
     const to = parseInt(el.querySelector("#fnAcctTo").value, 10);
     const ccId = el.querySelector("#fnAcctCc").value;
-    if (!from || !to || from > to || !ccId) { showToast("Enter a valid range (from ≤ to).", "error"); return; }
+    if (!from || !to || from > to || !ccId) { showToast(t("fn_range_invalid"), "error"); return; }
     const { error } = await sb.from("reporting_line_mappings").insert({
       org_id: CURRENT_ORG_ID, dimension: "account", external_code: `${from}-${to}`,
       account_from: from, account_to: to, reporting_line_id: ccId,
     });
-    if (error) { showToast("Couldn't add — " + error.message, "error"); return; }
-    showToast("Range added — re-sync to apply.");
+    if (error) { showToast(t("fn_couldnt_add", error.message), "error"); return; }
+    showToast(t("fn_range_added"));
     renderAccountRanges(host);
   });
 }
@@ -332,30 +332,30 @@ async function renderExclusions(host) {
   const el = host.querySelector("#fnExclusions");
   if (!el) return;
   el.innerHTML = `
-    <p class="integ-map-hint"><strong>Sync exclusions</strong> — filter out noise: a correction/adjustment voucher series, or an account used for opening balances. Excluded rows are ignored entirely, everywhere (not just left unmapped).</p>
+    <p class="integ-map-hint">${t("fn_exclusions_hint")}</p>
     ${rows.map((r) => `
       <div class="fn-cc-row">
-        <span class="fn-cc-name">${r.kind === "series" ? "Voucher series" : "Account"} <span class="fn-cc-code">${escapeHtml(r.value)}</span></span>
+        <span class="fn-cc-name">${r.kind === "series" ? t("fn_voucher_series") : t("fn_account")} <span class="fn-cc-code">${escapeHtml(r.value)}</span></span>
         <span></span>
-        <button class="integ-link" data-delexcl="${r.id}" type="button">Remove</button>
+        <button class="integ-link" data-delexcl="${r.id}" type="button">${t("fn_remove_btn")}</button>
       </div>`).join("")}
     <div class="fn-acct-add">
-      <select id="fnExclKind"><option value="series">Voucher series</option><option value="account">Account</option></select>
-      <input type="text" id="fnExclValue" placeholder="e.g. B or 1930" style="width:110px">
-      <button class="fn-cc-import" id="fnExclAdd" type="button">Add</button>
+      <select id="fnExclKind"><option value="series">${t("fn_voucher_series")}</option><option value="account">${t("fn_account")}</option></select>
+      <input type="text" id="fnExclValue" placeholder="${t("fn_excl_placeholder")}" style="width:110px">
+      <button class="fn-cc-import" id="fnExclAdd" type="button">${t("fn_add_btn")}</button>
     </div>`;
   el.querySelectorAll("[data-delexcl]").forEach((b) => b.addEventListener("click", async () => {
     await sb.from("sync_exclusions").delete().eq("id", b.dataset.delexcl);
-    showToast("Exclusion removed — re-sync to apply.");
+    showToast(t("fn_excl_removed"));
     renderExclusions(host);
   }));
   el.querySelector("#fnExclAdd").addEventListener("click", async () => {
     const kind = el.querySelector("#fnExclKind").value;
     const value = el.querySelector("#fnExclValue").value.trim();
-    if (!value) { showToast("Enter a series letter or account number.", "error"); return; }
+    if (!value) { showToast(t("fn_excl_value_required"), "error"); return; }
     const { error } = await sb.from("sync_exclusions").insert({ org_id: CURRENT_ORG_ID, kind, value });
-    if (error) { showToast("Couldn't add — " + error.message, "error"); return; }
-    showToast("Exclusion added — re-sync to apply.");
+    if (error) { showToast(t("fn_couldnt_add", error.message), "error"); return; }
+    showToast(t("fn_excl_added"));
     renderExclusions(host);
   });
 }
@@ -366,7 +366,7 @@ async function importOneQuiet(item, dimension) {
   const { data, error } = await sb.from("reporting_lines")
     .insert({ org_id: CURRENT_ORG_ID, name: item.name, annual_budget: 0, other_monthly: 0 })
     .select().single();
-  if (error) { showToast(`Couldn't create "${item.name}" — ` + error.message, "error"); return false; }
+  if (error) { showToast(t("fn_couldnt_create", item.name, error.message), "error"); return false; }
   COST_CENTERS.push({ id: data.id, name: data.name, annualBudget: 0, otherMonthly: 0, isShared: false, note: "", headcount: [], oneOffs: [], recurringCosts: [], overrides: {}, actualMonthly: [] });
   await saveMapping(data.id, item.code, dimension);
   item.mapped = true;
@@ -374,7 +374,7 @@ async function importOneQuiet(item, dimension) {
 }
 
 async function importCostCenter(item, host, dimension = "costcenter") {
-  if (await importOneQuiet(item, dimension)) showToast(`Imported "${item.name}" and mapped it.`);
+  if (await importOneQuiet(item, dimension)) showToast(t("fn_imported_one", item.name));
   renderMappingEditor(host);
 }
 
@@ -382,21 +382,21 @@ async function importCostCenter(item, host, dimension = "costcenter") {
 // reporting line in one go, instead of one click per code.
 async function importAllUnmapped(dimension, host, btn) {
   const list = (dimension === "project" ? lastProjects : lastCostCenters).filter((c) => !c.mapped);
-  if (btn) { btn.disabled = true; btn.textContent = "Importing…"; }
+  if (btn) { btn.disabled = true; btn.textContent = t("fn_importing_btn"); }
   let n = 0;
   for (const item of list) {
     if (await importOneQuiet(item, dimension)) n++;
   }
   showToast(n === list.length
-    ? `Imported all ${n} — hit Sync now to pull their actuals in.`
-    : `Imported ${n} of ${list.length} — see errors above, then Sync now.`, n === list.length ? "info" : "error");
+    ? t("fn_imported_all", n)
+    : t("fn_imported_partial", n, list.length), n === list.length ? "info" : "error");
   renderMappingEditor(host);
 }
 
 async function linkCostCenter(item, appCcId, host, dimension = "costcenter") {
   await saveMapping(appCcId, item.code, dimension);
   item.mapped = true;
-  showToast(`Linked ${item.code} → ${COST_CENTERS.find((c) => c.id === appCcId)?.name || "line"}.`);
+  showToast(t("fn_linked", item.code, COST_CENTERS.find((c) => c.id === appCcId)?.name || t("fn_fallback_line")));
   renderMappingEditor(host);
 }
 
@@ -437,8 +437,8 @@ function handleFortnoxRedirect() {
   const p = new URLSearchParams(location.search);
   const r = p.get("fortnox");
   if (!r) return;
-  if (r === "connected") showToast("Fortnox connected. Hit “Sync now” to pull your actuals.");
-  else showToast("Fortnox connection failed. Please try again.", "error");
+  if (r === "connected") showToast(t("fn_connected_redirect"));
+  else showToast(t("fn_failed_redirect"), "error");
   p.delete("fortnox");
   history.replaceState({}, "", location.pathname + (p.toString() ? "?" + p : ""));
 }
