@@ -16,6 +16,7 @@ Live: https://gavuzzi.github.io/finance-budget-forecast/ · Supabase project ref
 - `tests.html` — 34-assertion engine test suite (see Tools below); loads `lib.js`+`i18n.js`+`data.js` with a stubbed Supabase client
 - `index.html` — the marketing landing page. Separate from the app (no sidebar/data.js) but loads `i18n.js` for its own `lp_*` strings and a nav language toggle
 - `ROADMAP.md` — backlog + honest verification notes · `TESTING.md` — manual checks collected for Felix
+- `TEARDOWN.md` — competitor UI convention sheet (C1–C12). Any UI/design change must cite a convention ID from it
 
 ## Sacred rules (violating these is a bug even if the code works)
 1. **Fortnox is READ-ONLY.** Never call any Fortnox write endpoint, not even to create test data. No exceptions.

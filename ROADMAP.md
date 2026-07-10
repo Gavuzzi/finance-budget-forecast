@@ -297,11 +297,19 @@ tool (Runway, Causal, Fathom, Abacum) is light-first with one restrained accent;
 invent** — same rule we already use for features, now applied to UI. Order matters: teardown BEFORE any
 repaint, so we never restyle twice.
 
-- [ ] `[B]` **1. Competitor UI teardown (~1 day)** — Runway, Causal, Fathom, Abacum: product screenshots,
-  design writeups, G2/user reviews for *why* each is praised. Output: a convention sheet committed to the
-  repo (default theme, palette, typography, nav structure, dashboard hierarchy, density rules, empty-state
-  and onboarding patterns). Every Phase 7 design decision must cite a line from this sheet — if we can't
-  point at who we're copying, we don't do it.
+- [x] `[B]` **1. Competitor UI teardown** *(done 2026-07-10)* — see **`TEARDOWN.md`**: 12 convention IDs
+  (C1–C12) with quoted evidence per product, plus a "what we do NOT copy" list. Researched Runway (incl.
+  design tokens pulled from their live CSS — brand is warm amber `#f9a600` on warm paper neutrals, NOT
+  blue; one grotesque sans, no serif in-app), Fathom ("No noise. Just signal. Every number is traceable"
+  — the density principle; light + green; SMB/accountant buyer), Abacum (G2 4.8/5 — "non-finance
+  stakeholders explore without hand-holding"; concierge onboarding is the market norm), Causal (scenario
+  side-by-side praise; standalone product confirmed dead — causal.app 301s to Lucanet), and Fortnox
+  itself (buyer's daily comfort zone: light, green `#00db33`, plain Swedish). Headline answers to Felix's
+  questions: every product studied is **light-first** (dark-by-default was our real color problem, not
+  the blue — accent stays blue-family per C3, desaturated); density fix is C6 (one screen = one question,
+  hero variance number + one chart + "this month" action block, rest demoted). Verification note: quotes
+  are from marketing/review sites fetched 2026-07-10, not hands-on product use — conventions are
+  triangulated across 5 sources rather than single-sourced to compensate.
 - [ ] `[B]` **2. Information architecture restructure (1–2 days)** — Overview becomes: one hero row
   (the number that matters + variance), one chart, one **"This month"** action block (Signals + review
   ritual + Re-forecast — the loop, front and center since it's our differentiator), everything else
