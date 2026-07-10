@@ -18,10 +18,24 @@ Organization creation is not a direct table write; it goes through a `SECURITY D
 database function (`create_organization()`), which closes the "add myself to a company I don't
 belong to" class of bug by construction rather than by policy logic that could be misconfigured.
 
-**Not yet independently verified:** a live cross-tenant query attempt using two real,
-simultaneously logged-in customer accounts. The policy-level audit above is complete, but a
-hands-on confirmation with two real accounts is a cheap additional check once a second
-customer exists.
+**Independently verified live (2026-07-10):** a real authenticated account holding no
+membership in any organization was used to attempt, against the live production database, to
+read every tenant table and to escalate its own privileges. All eight attempts failed as
+required:
+- reading `organizations`, `reporting_lines`, `monthly_actual`, and `memberships` each returned
+  zero rows (the attacker sees nothing, not even the existence of other tenants' data);
+- reading `integrations` (the OAuth-token table) returned zero rows, confirming the deny-all
+  posture holds against a real authenticated session, not just in theory;
+- inserting a `memberships` row to make the attacker an owner of an existing organization (the
+  "add myself to any company" escalation) was rejected by the database with a row-level-security
+  violation;
+- injecting a `reporting_lines` row into another org, and forging an `oauth_states` row to hijack
+  an OAuth callback, were both likewise rejected at the database.
+
+The test account was created solely for this check and deleted immediately afterward; it created
+no data (every write it attempted was blocked), so removal was clean and the production database
+was left in its prior state. This is now a hands-on end-to-end confirmation, not only a
+policy-text audit.
 
 ## 2. Credential and secret handling
 
@@ -95,8 +109,11 @@ Stated plainly, not buried:
 - No third-party penetration test has been performed. The findings above come from an internal
   adversarial review of the RLS policy set and rendering code, not an external audit.
 - No formal accessibility (WCAG) contrast audit has been performed on the UI.
-- The cross-tenant live-query check in §1 and the deletion-timeline commitment in §5 are open
-  items, not yet complete.
+- The deletion-timeline commitment in §5 is still an open item (needs a real committed number in
+  the DPA, not a mechanism question — the mechanism exists and is verified).
+
+The cross-tenant live-query check formerly listed here as open was completed on 2026-07-10; see
+§1.
 
 This document should be revisited and re-verified before being shared with any customer whose
 onboarding is imminent, and any claim in it should be spot-checked against the live system

@@ -410,4 +410,19 @@ repaint, so we never restyle twice.
   is named-individual or role-aggregate (changes GDPR scope). **Get this reviewed by an actual
   lawyer before any customer sees it** — this is not a model-capability gap that a stronger model
   closes; no LLM output should be treated as legal advice for a binding contract.
-- [ ] `[F]` **Live UI click-through pass** — every backend mechanism built this session was fault-injection-tested via direct DB/SQL access (coverage/Unassigned, account ranges, projects, drill-down, budget drift, revenue target, re-forecast apply/revert — all verified correct against real synced data). What's NOT yet done: clicking the real buttons as a logged-in user in a browser. Low risk (same render code already screenshot-verified in `?preview`; same write functions verified by hand) but not zero — do one full pass through Monthly/Overview/Planning/Assumptions before a real client's data is on the line.
+- [x] `[B]` **Cross-tenant isolation — live-verified end-to-end** *(done 2026-07-10)* — went beyond
+  the earlier policy-text audit: created a real authenticated no-membership account via the auth API
+  (email-confirmed via CLI SQL to get a session past the confirmation gate) and ran an 8-step breach
+  attempt against the live production DB — read `organizations`/`reporting_lines`/`monthly_actual`/
+  `memberships`/`integrations` (all returned empty) and attempted to insert itself as an org owner,
+  inject a reporting line, and forge an `oauth_states` row (all rejected with 42501 RLS violations).
+  Test account deleted afterward, created zero data (writes all blocked), production left untouched.
+  Result written into `SECURITY.md` §1. This is the strongest form of the isolation guarantee — a
+  real hostile session against real data — and it's now done, not deferred.
+- [ ] `[F]` **Live UI click-through pass** — every backend mechanism was fault-injection-tested via
+  direct DB/SQL access, and the security-critical cross-tenant portion is now fully live-verified
+  (item above). What genuinely still needs a human: clicking the real buttons as a logged-in user in
+  a browser (does "Apply run-rate" fire the write and re-render, etc.) and judging how the app *feels*
+  to use — both of which are the dress rehearsal (Phase 7 step 5), and neither of which an agent can
+  stand in for. Low residual risk (same render code screenshot-verified in `?preview`; same write
+  functions verified by hand) but it's the last mile before a real client's data is on the line.
