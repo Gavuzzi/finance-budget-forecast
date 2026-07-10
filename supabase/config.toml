@@ -416,5 +416,8 @@ enabled = true
 [functions.fortnox-oauth]
 verify_jwt = false
 
+[functions.send-digest]
+verify_jwt = false
+
 [functions.fortnox-sync]
 verify_jwt = false
