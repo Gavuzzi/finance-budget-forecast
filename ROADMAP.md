@@ -375,6 +375,22 @@ repaint, so we never restyle twice.
   changes. **Deliberately HELD for Felix's input** (working unsupervised, model swapped): C16 (collapse
   variance to one indicator — changes a number he reads daily) and C15 (sparklines in stat tiles — more
   effort, cosmetic). Those are the taste/habit calls that need a human, not more autonomous edits.
+- [x] `[B]` **3c. Per-line revenue + the "who's the customer" model question** *(done 2026-07-11)* —
+  Felix (rightly) asked whether you can only plan on cost-centres and what about projects/revenue. Dug
+  into how the real tools structure planning (Jirav/Fathom = one primary dimension + slice actuals by
+  tracking category; Causal = full matrix, praised-but-complexity-warned). Conclusion: our model IS the
+  proven SMB pattern (Jirav-style); the gap was per-line revenue. Built it (**Tier 1**, the proportionate
+  profit-centre pattern, NOT the enterprise matrix): `reporting_lines.revenue_plan`, engine
+  (`lineRevenue*`/`lineMargin`, org revenue prefers per-line sum when any line earns, else falls back —
+  fully backward-compatible), 10 hand-derived tests (44 total, green), Planning UI (quiet "+ Add revenue"
+  → margin), and it flows to Overview/Cash Flow for free via the engine. A line named after a project +
+  its Fortnox project-code mapped (already worked) + per-line revenue = **per-project P&L, margin, and
+  variance**. The full department×project matrix stays deferred (Tier 2, YAGNI for SMEs, fights the
+  simplicity goal). Plus IA fixes from Felix's session: the persistent "how this works" → an on-demand
+  **? button** (SAC-style); and actuals-loading (Fortnox connect + CSV import) moved off Monthly to a new
+  **"Data"** nav page (Monthly is now purely the grid). **OPEN for Felix:** should the Overview *reorient*
+  around per-project margins for a genuinely project-based org (vs just showing margin on Planning)? —
+  a real "who's the customer" call, not built speculatively.
 - [x] `[B]` **4a. First-run experience** *(done 2026-07-10 — demo script deferred, Felix's call)* —
   the empty-org screen (`emptyOrgHtml()`, shared by Overview/Monthly) offered two paths: a preset or
   manual entry. Neither was "connect Fortnox," even though that's the fastest route to a real number for

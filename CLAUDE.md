@@ -10,10 +10,11 @@ Live: https://gavuzzi.github.io/finance-budget-forecast/ · Supabase project ref
 - `i18n.js` — bilingual strings (English/Swedish); see "Localization" below. Loads right after `lib.js`, before `data.js`, on every page
 - `data.js` — in-memory model + calculation engine + ALL db reads/writes. UI-agnostic: never put rendering here
 - `sidebar.js` — shared nav, theme + language toggles, "actuals booked through" selector
-- `script.js` (Overview/app.html), `monthly.js`, `planning.js`, `assumptions.js`, `cashflow.js`, `fortnox.js` — per-page rendering only
-- `schema.sql` / `integration-schema.sql` — idempotent DB source of truth (mirror every live DB change here)
+- `script.js` (Overview/app.html), `monthly.js`, `planning.js`, `assumptions.js`, `cashflow.js`, `connect.js` (Data page), `fortnox.js` — per-page rendering only. `fortnox.js` owns all actuals-loading (integration panel + `initImport`), rendered on `connect.html` (the "Data" nav page), NOT Monthly
+- `connect.html` / `connect.js` — the "Data" page: Fortnox connect/sync/mapping + reconciled P&L + manual CSV import. Actuals-loading lives here, kept out of the reporting views
+- `schema.sql` / `integration-schema.sql` — idempotent DB source of truth (mirror every live DB change here). Note `reporting_lines.revenue_plan` — optional per-line revenue makes a line a profit centre (own P&L + margin); engine prefers per-line revenue over the org-level plan when any line earns
 - `supabase/functions/fortnox-sync/index.ts` — the sync Edge Function (self-contained, no imports beyond supabase-js)
-- `tests.html` — 34-assertion engine test suite (see Tools below); loads `lib.js`+`i18n.js`+`data.js` with a stubbed Supabase client
+- `tests.html` — 44-assertion engine test suite (see Tools below); loads `lib.js`+`i18n.js`+`data.js` with a stubbed Supabase client
 - `index.html` — the marketing landing page. Separate from the app (no sidebar/data.js) but loads `i18n.js` for its own `lp_*` strings and a nav language toggle
 - `ROADMAP.md` — backlog + honest verification notes · `TESTING.md` — manual checks collected for Felix
 - `TEARDOWN.md` — competitor UI convention sheet (C1–C12). Any UI/design change must cite a convention ID from it
@@ -40,7 +41,7 @@ Live: https://gavuzzi.github.io/finance-budget-forecast/ · Supabase project ref
   `"/c/Program Files/Google/Chrome/Application/chrome.exe" --headless --disable-gpu --no-sandbox --screenshot=<scratchpad>\x.png --window-size=1500,1400 --virtual-time-budget=6000 "file:///C:/Users/felix/dev/finance-budget-forecast/<page>.html?preview"`
   Append `&theme=light` and re-check when styling changes; append `&lang=sv` (or `#teamtest`/`#maptest` combined with it) and re-check when touching any string, since Swedish text is often longer and can break layouts English never would (e.g. a long unbroken compound word in a narrow stat-card — happened once, fixed by adding a hyphen). Some pages have hash dev-hooks for exact-value checks (`#csvtest`, `#smoothtest`, `#drilltest`, `#alloctest`, `#teamtest`, `#maptest`).
 - **Numbers must tie out**: hand-compute the expected values from the preview fixtures (loadPreviewData in data.js) BEFORE looking at the screenshot, then confirm they match exactly.
-- **Run the engine tests after ANY change to data.js** (34 assertions over rates, forecasts, the cash walk, Skatteverket due-dates, allocation conservation, CSV parsing, escapeHtml):
+- **Run the engine tests after ANY change to data.js** (44 assertions over rates, forecasts, the cash walk, Skatteverket due-dates, allocation conservation, per-line revenue/margin, CSV parsing, escapeHtml):
   `"/c/Program Files/Google/Chrome/Application/chrome.exe" --headless --disable-gpu --no-sandbox --dump-dom --virtual-time-budget=6000 "file:///C:/Users/felix/dev/finance-budget-forecast/tests.html" | grep -oE "(ALL PASS.*|FAIL.*|✗ [^<]*)"`
   Expect `ALL PASS`. When you add engine features, add tests with hand-derived expected values — never values copied from the implementation's own output.
 - DB changes: apply live via the CLI **and** add them idempotently to schema.sql / integration-schema.sql in the same commit.
