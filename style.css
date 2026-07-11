@@ -1276,6 +1276,23 @@ html[data-theme="light"] .panel {
 }
 .btn-secondary:hover { border-color: var(--accent); }
 
+/* Inline "how this is calculated" disclosure — keeps a genuine methodology
+   caveat available on demand instead of walling the page with it (C13). */
+.calc-details { margin-top: 14px; border-top: 1px solid var(--panel-border); padding-top: 12px; }
+.calc-details > summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.calc-details > summary::-webkit-details-marker { display: none; }
+.calc-details > summary::before { content: "▸"; font-size: 0.72rem; transition: transform 0.15s ease; }
+.calc-details[open] > summary::before { transform: rotate(90deg); }
+.calc-body { margin-top: 10px; font-size: 0.82rem; color: var(--text-dim); line-height: 1.6; }
+
 .chart-panel { height: 340px; }
 
 .chart-panel canvas {
