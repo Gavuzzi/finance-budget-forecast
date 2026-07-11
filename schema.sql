@@ -150,6 +150,7 @@ alter table organizations add column if not exists close_month_manual boolean no
 alter table reporting_lines add column if not exists source text not null default 'manual';  -- fortnox|manual (fortnox-sourced lines refresh on sync)
 alter table reporting_lines add column if not exists state  text not null default 'linked';  -- planned|linked (plan-ahead lifecycle)
 alter table reporting_lines add column if not exists is_shared boolean not null default false; -- corporate/overhead reporting line — optionally allocated to the others, never on by default
+alter table reporting_lines add column if not exists revenue_plan jsonb; -- optional per-line 12-month revenue profile (array of 12 SEK values, FY-relative). A line with revenue is a profit centre → its own P&L + margin. When ANY line has revenue, the org revenue total = sum of per-line revenue (org-level assumptions.revenue_plan is ignored); no line revenue → falls back to the org-level number. Backward-compatible: existing cost-only lines are unaffected.
 alter table assumptions add column if not exists revenue_budget numeric not null default 0; -- simple annual revenue target — no driver engine, just a number to compare actuals against
 alter table assumptions add column if not exists revenue_plan jsonb; -- optional 12-month revenue profile (array of 12 SEK values, FY-relative); null/absent = flat revenue_budget/12
 -- VAT/payroll-tax cash-flow timing (Phase 5 v2). Account ranges default wide

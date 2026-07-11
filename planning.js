@@ -151,10 +151,30 @@ function renderCcBlock(i) {
         </label>
       </div>
 
+      <div class="cc-revenue">${revenueRowHtml(cc, i)}</div>
       <div class="cc-summary">${summaryHtml(cc, i)}</div>
       <div class="cc-bridge" data-bridgepanel="${i}" hidden>${bridgeHtml(cc)}</div>
     </div>
   `;
+}
+
+// Per-line revenue (profit centre). Cost-only lines stay clean — just a quiet
+// "+ Add revenue" link; a line that earns shows an annual-revenue input and
+// its margin (revenue − cost). Annual amount spreads flat across the 12 months
+// (monthly shaping can come later); stored as the [12] revenuePlan.
+function revenueRowHtml(cc, i) {
+  if (!lineHasRevenue(cc) && !cc._showRevenue) {
+    return `<button class="add-revenue-link" data-addrevenue="${i}" type="button">${t("add_revenue_btn")}</button>`;
+  }
+  // annual is reconstructed from the [12] monthly plan — round it for a clean
+  // display (storage stays exact).
+  const annual = lineRevenueFyTotal(cc);
+  const margin = lineMargin(cc);
+  return `
+    <label class="line-revenue-label">${t("line_revenue_label")}
+      <input type="number" data-revenue="${i}" value="${annual ? Math.round(annual) : ""}" step="10000" placeholder="0">
+    </label>
+    ${margin != null ? `<span class="cc-margin ${margin >= 0 ? "under" : "over"}">${t("line_margin_label", fmtMkrSigned(margin))}</span>` : ""}`;
 }
 
 // The composition breakdown behind a cost centre's FY total — "what's this
@@ -297,7 +317,15 @@ function initPlanningGrid() {
   // <select> elements don't reliably fire "input" on every browser, so handle
   // dropdown changes (role, start/end month, one-off month) via "change" too.
   ccBlocks.addEventListener("change", (e) => {
-    if (e.target.tagName === "SELECT") handleCcFieldChange(e.target);
+    if (e.target.tagName === "SELECT") { handleCcFieldChange(e.target); return; }
+    if (e.target.dataset.revenue !== undefined) {
+      const ccIndex = Number(e.target.dataset.revenue);
+      const cc = COST_CENTERS[ccIndex];
+      const annual = Number(e.target.value) || 0;
+      cc.revenuePlan = annual > 0 ? Array(12).fill(annual / 12) : null; // flat spread
+      dbSetLineRevenue(cc);
+      buildPlanningGrid(); // refresh margin + any org-revenue-dependent readouts
+    }
   });
 
   ccBlocks.addEventListener("click", async (e) => {
@@ -309,6 +337,16 @@ function initPlanningGrid() {
         panel.hidden = !panel.hidden;
         if (!panel.hidden) panel.innerHTML = bridgeHtml(COST_CENTERS[ccIndex]); // fresh on open
       }
+      return;
+    }
+
+    const addRevBtn = e.target.closest("[data-addrevenue]");
+    if (addRevBtn) {
+      const ccIndex = Number(addRevBtn.dataset.addrevenue);
+      COST_CENTERS[ccIndex]._showRevenue = true; // transient reveal; persists only once an amount is saved
+      buildPlanningGrid();
+      const input = document.querySelector(`[data-revenue="${ccIndex}"]`);
+      if (input) input.focus();
       return;
     }
 

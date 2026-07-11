@@ -263,6 +263,12 @@ function taxDueDate(kind, fyMonth) {
 // pre-plan behavior, so orgs that never touch it see no change.
 
 function revenuePlanForMonth(m) {
+  // Per-line revenue wins: when any reporting line is a profit centre (carries
+  // its own revenue), company revenue = the sum across lines, and the org-level
+  // number is ignored. Otherwise fall back to the org-level plan / flat target.
+  if (anyLineHasRevenue()) {
+    return COST_CENTERS.reduce((s, cc) => s + lineRevenueForMonth(cc, m), 0);
+  }
   const plan = ASSUMPTIONS.revenuePlan;
   if (Array.isArray(plan) && plan.length === 12 && plan.some((v) => v > 0)) {
     // Months 13-24 reuse the same profile — seasonality carries into next FY
@@ -276,6 +282,40 @@ function revenuePlanFyTotal() {
   let total = 0;
   for (let m = 1; m <= FY_MONTHS; m++) total += revenuePlanForMonth(m);
   return total;
+}
+
+// ---- Per-line revenue (Tier 1: a reporting line can be a profit centre) -----
+// A reporting line may carry its own optional 12-month revenue profile
+// (cc.revenuePlan, [12] SEK, FY-relative). A line with revenue is a profit
+// centre — its revenue minus its driver-built cost is its margin (a project
+// P&L). This is the SMB "profit centre" pattern (Jirav/Fathom-style), not a
+// second planning dimension: a line is still a line, it can just also earn.
+
+function lineHasRevenue(cc) {
+  return Array.isArray(cc.revenuePlan) && cc.revenuePlan.length === 12 && cc.revenuePlan.some((v) => v > 0);
+}
+
+function anyLineHasRevenue() {
+  return COST_CENTERS.some(lineHasRevenue);
+}
+
+function lineRevenueForMonth(cc, m) {
+  if (!lineHasRevenue(cc)) return 0;
+  return Number(cc.revenuePlan[(m - 1) % 12]) || 0;
+}
+
+function lineRevenueFyTotal(cc) {
+  let total = 0;
+  for (let m = 1; m <= FY_MONTHS; m++) total += lineRevenueForMonth(cc, m);
+  return total;
+}
+
+// A line's margin = its revenue − its full-year cost. Only meaningful for a
+// profit centre; returns null for a pure cost line so callers show nothing
+// rather than presenting "−(cost)" as if it were a margin.
+function lineMargin(cc) {
+  if (!lineHasRevenue(cc)) return null;
+  return lineRevenueFyTotal(cc) - fySummary(cc).total;
 }
 
 // Runway cap: how far ahead we'll walk looking for a zero-crossing before
@@ -448,6 +488,9 @@ async function loadData(orgId) {
         otherMonthly: Number(cc.other_monthly), // legacy — superseded by recurringCosts, kept only so old writes don't error
         note: cc.note || "",
         isShared: !!cc.is_shared,
+        // Optional per-line revenue profile (profit centre). Malformed/absent → null.
+        revenuePlan: Array.isArray(cc.revenue_plan) && cc.revenue_plan.length === 12
+          ? cc.revenue_plan.map((v) => Number(v) || 0) : null,
         headcount: hcRes.data
           .filter((h) => h.reporting_line_id === cc.id)
           .map((h) => ({ id: h.id, roleId: h.role_id, count: h.count, startMonth: h.start_month, endMonth: h.end_month })),
@@ -578,6 +621,17 @@ function loadPreviewData() {
 
   const itCc = COST_CENTERS.find((c) => c.name === "IT");
   if (itCc) itCc.note = t("demo_it_note");
+
+  // Dev hook: ?preview&profit turns the demo lines into profit centres (each
+  // with its own revenue) so the per-line revenue / margin feature is
+  // screenshot-verifiable. Left OFF by default — the sales demo stays an
+  // org-level-revenue manufacturer.
+  if (new URLSearchParams(location.search).has("profit")) {
+    const rev = { Production: 35000000, "R&D": 11000000, IT: 2000000 };
+    COST_CENTERS.forEach((cc) => {
+      if (rev[cc.name]) cc.revenuePlan = Array(12).fill(rev[cc.name] / 12);
+    });
+  }
 
   // Monthly trajectories are illustrative fixed demo fixtures (not derived
   // from the engine, unlike everything else in this function) — chosen so
@@ -767,6 +821,13 @@ async function dbDeleteCostCenter(id) {
 // is run (the note column may not exist yet).
 async function dbSetCostCenterNote(cc) {
   const { error } = await sb.from("reporting_lines").update({ note: cc.note || null }).eq("id", cc.id);
+  if (error) flagWriteError(error);
+}
+
+// Per-line revenue (profit centre). Persists cc.revenuePlan; null clears it
+// (the line reverts to a pure cost centre).
+async function dbSetLineRevenue(cc) {
+  const { error } = await sb.from("reporting_lines").update({ revenue_plan: cc.revenuePlan || null }).eq("id", cc.id);
   if (error) flagWriteError(error);
 }
 

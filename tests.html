@@ -80,6 +80,23 @@ ASSUMPTIONS.revenuePlan = Array(12).fill(0);
 approx("revenue plan: all-zero plan treated as absent", revenuePlanForMonth(7), 50000000 / 12, 0.01);
 ASSUMPTIONS.revenuePlan = savedPlan;
 
+// ---- Per-line revenue (profit centres) --------------------------------------
+// Cost hand-derived: Production booked m1-6 = 14,600,000; forecast m7-12 =
+// 2,184,318·2 + 2,892,970 + 2,242,970·3 = 13,990,516 → FY cost 28,590,516.
+eq("line revenue: none by default", anyLineHasRevenue(), false);
+eq("line revenue: cost-only line has null margin", lineMargin(prod), null);
+prod.revenuePlan = Array(12).fill(3000000);              // Production → profit centre, flat 3.0M/mo
+eq("line revenue: flagged as profit centre", lineHasRevenue(prod), true);
+eq("line revenue: month value", lineRevenueForMonth(prod, 3), 3000000);
+eq("line revenue: repeats into next FY (m13)", lineRevenueForMonth(prod, 13), 3000000);
+eq("line revenue: FY total = 12 × 3.0M", lineRevenueFyTotal(prod), 36000000);
+eq("line revenue: margin = 36.0M revenue − 28,590,516 cost", lineMargin(prod), 7409484);
+// Per-line revenue OVERRIDES the org-level plan once any line earns:
+eq("line revenue: org month total = sum of lines, not org plan", revenuePlanForMonth(1), 3000000);
+eq("line revenue: org FY total = 36.0M (per-line), not 50.0M (org plan)", revenuePlanFyTotal(), 36000000);
+prod.revenuePlan = null;
+eq("line revenue: cleared → org-level plan restored (50.0M)", revenuePlanFyTotal(), 50000000);
+
 // ---- Skatteverket due-date rules ---------------------------------------------
 eq("tax: payroll m6 due 12th of month+1", taxDueDate("payroll", 6), "2026-07-12");
 eq("tax: payroll m12 rolls year AND hits the Jan-17 rule", taxDueDate("payroll", 12), "2027-01-17");
