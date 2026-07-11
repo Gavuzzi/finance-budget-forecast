@@ -724,6 +724,26 @@ html, body {
 
 .new-org-btn:hover { border-color: var(--accent); }
 
+/* Plan-version switcher (Main / scenarios / locked budget) */
+.version-box { margin: 4px 0 12px; }
+.version-label {
+  display: block; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-dim); margin-bottom: 5px;
+}
+.version-row { display: flex; gap: 6px; }
+.version-switcher {
+  flex: 1; min-width: 0; background: var(--panel); border: 1px solid var(--panel-border);
+  color: var(--text); border-radius: 8px; padding: 7px 9px; font-size: 0.85rem;
+  font-weight: 600; cursor: pointer; font-family: inherit;
+}
+.version-switcher:focus { outline: none; border-color: var(--accent); }
+.version-new {
+  flex: 0 0 auto; background: none; border: 1px dashed var(--panel-border);
+  color: var(--accent-soft); border-radius: 8px; padding: 0 10px; font-size: 0.8rem;
+  font-weight: 600; cursor: pointer; white-space: nowrap; font-family: inherit;
+}
+.version-new:hover { border-color: var(--accent); }
+
 .sidebar-nav {
   display: flex;
   flex-direction: column;

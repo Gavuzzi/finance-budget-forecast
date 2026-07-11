@@ -445,7 +445,53 @@ async function loadPlanVersions() {
     }
   }
   PLAN_VERSIONS = rows.map((v) => ({ id: v.id, name: v.name, isMain: !!v.is_main, lockedAt: v.locked_at }));
-  ACTIVE_VERSION_ID = main ? main.id : null;
+  // Active = the saved choice for this org if it still exists, else Main.
+  const saved = localStorage.getItem(activeVersionKey());
+  const active = PLAN_VERSIONS.find((v) => v.id === saved) || PLAN_VERSIONS.find((v) => v.isMain);
+  ACTIVE_VERSION_ID = active ? active.id : (main ? main.id : null);
+}
+
+function activeVersionKey() { return "almgren-active-version-" + CURRENT_ORG_ID; }
+function activeVersion() { return PLAN_VERSIONS.find((v) => v.id === ACTIVE_VERSION_ID) || null; }
+
+// Switch which plan version is active (reloads to pull that version's drivers).
+function switchVersion(id) {
+  localStorage.setItem(activeVersionKey(), id);
+  location.reload();
+}
+
+// Branch a new scenario: a full copy of the active version's drivers under a
+// new version, then switch to it so you can edit it immediately.
+async function dbCreateVersion(name) {
+  if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast(t("toast_signin_save_data")); return null; }
+  const src = ACTIVE_VERSION_ID;
+  const { data: v, error } = await sb.from("plan_versions")
+    .insert({ org_id: CURRENT_ORG_ID, name, is_main: false }).select("id").single();
+  if (error) { flagWriteError(error); return null; }
+  for (const tbl of ["headcount_lines", "one_offs", "recurring_costs", "forecast_overrides"]) {
+    const { data: srcRows, error: se } = await sb.from(tbl).select("*").eq("org_id", CURRENT_ORG_ID).eq("version_id", src);
+    if (se) { flagWriteError(se); return null; }
+    if (srcRows && srcRows.length) {
+      const copies = srcRows.map(({ id, created_at, ...rest }) => ({ ...rest, version_id: v.id }));
+      const { error: ce } = await sb.from(tbl).insert(copies);
+      if (ce) { flagWriteError(ce); return null; }
+    }
+  }
+  localStorage.setItem(activeVersionKey(), v.id); // switchVersion reloads; caller triggers it
+  return v.id;
+}
+
+async function dbRenameVersion(id, name) {
+  const { error } = await sb.from("plan_versions").update({ name }).eq("id", id);
+  if (error) flagWriteError(error);
+}
+
+// Delete a scenario (its drivers cascade). Never Main. If it was active, the
+// caller switches back to Main.
+async function dbDeleteVersion(id) {
+  const { error } = await sb.from("plan_versions").delete().eq("id", id);
+  if (error) { flagWriteError(error); return false; }
+  return true;
 }
 
 async function loadData(orgId) {
@@ -614,6 +660,13 @@ function loadPreviewData() {
     { id: "preview-2", name: "Vantage Consulting AB", close_month: 6, currency: "SEK" },
   ];
   CURRENT_ORG_ID = "preview-1";
+  // Fake plan versions so the sidebar switcher renders in the demo (real writes
+  // are blocked in demo mode, so branching just shows the sign-in toast).
+  PLAN_VERSIONS = [
+    { id: "pv-main", name: "Main", isMain: true, lockedAt: null },
+    { id: "pv-budget", name: "Budget 2026", isMain: false, lockedAt: "2026-01-15T09:00:00Z" },
+  ];
+  ACTIVE_VERSION_ID = "pv-main";
   CLOSE_MONTH = 6;
   DISPLAY_UNIT = "mkr"; // demo figures are millions-scale — keep the portfolio clean
   // Dev hook: ?preview&fystart=5 renders a broken fiscal year (May–Apr) to verify labels.
@@ -968,9 +1021,7 @@ async function dbApplyRunRate(cc) {
 
   const rows = [];
   for (let m = CLOSE_MONTH + 1; m <= TIMELINE_LENGTH; m++) rows.push({ org_id: CURRENT_ORG_ID, version_id: ACTIVE_VERSION_ID, reporting_line_id: cc.id, month: m, amount: runRate });
-  // onConflict stays (reporting_line_id, month) while there's a single version;
-  // becomes (version_id, reporting_line_id, month) when scenarios land (step 1c).
-  const { error } = await sb.from("forecast_overrides").upsert(rows, { onConflict: "reporting_line_id,month" });
+  const { error } = await sb.from("forecast_overrides").upsert(rows, { onConflict: "version_id,reporting_line_id,month" });
   if (error) { flagWriteError(error); return null; }
   rows.forEach((r) => (cc.overrides[r.month] = runRate));
   return runRate;

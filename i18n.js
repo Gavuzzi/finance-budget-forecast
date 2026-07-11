@@ -52,6 +52,10 @@ en: {
   // ---- sidebar / nav ----
   nav_overview: "Overview", nav_monthly: "Monthly", nav_planning: "Planning",
   nav_cashflow: "Cash Flow", nav_connect: "Data", nav_assumptions: "Assumptions",
+  plan_version_label: "Plan",
+  new_scenario_btn: "+ Scenario",
+  new_scenario_title: "Branch a new scenario from this version",
+  prompt_new_scenario: "Name this scenario (a copy of the current plan you can edit and compare):",
   connect_h1: "Data",
   connect_subtitle: "Where your actuals come from — connect Fortnox, or import a CSV",
   import_csv_h2: "Manual import",
@@ -517,6 +521,10 @@ en: {
 sv: {
   nav_overview: "Översikt", nav_monthly: "Månadsvis", nav_planning: "Planering",
   nav_cashflow: "Kassaflöde", nav_connect: "Data", nav_assumptions: "Antaganden",
+  plan_version_label: "Plan",
+  new_scenario_btn: "+ Scenario",
+  new_scenario_title: "Förgrena ett nytt scenario från denna version",
+  prompt_new_scenario: "Namnge detta scenario (en kopia av den aktuella planen du kan redigera och jämföra):",
   connect_h1: "Data",
   connect_subtitle: "Varifrån ditt utfall kommer — anslut Fortnox, eller importera en CSV",
   import_csv_h2: "Manuell import",

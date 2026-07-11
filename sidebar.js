@@ -83,6 +83,7 @@ function sidebarHtml() {
       <span class="sb-sub">${t("brand_sub")}</span>
     </div>
     <button class="new-org-btn" id="newOrgBtn" type="button">${t("new_org_btn")}</button>
+    ${versionSwitcherHtml()}
     <nav class="sidebar-nav">${nav}</nav>
     <div class="sidebar-footer">
       ${syncBadgeHtml()}
@@ -95,6 +96,22 @@ function sidebarHtml() {
       <button class="logout-btn" id="logoutBtn" type="button">${t("sign_out")}</button>
     </div>
   `;
+}
+
+// The plan-version switcher (Phase 8): pick Main / a scenario / a locked
+// budget, or branch a new scenario. Hidden until versions are loaded.
+function versionSwitcherHtml() {
+  if (!Array.isArray(PLAN_VERSIONS) || PLAN_VERSIONS.length === 0) return "";
+  const opts = PLAN_VERSIONS.map((v) =>
+    `<option value="${v.id}" ${v.id === ACTIVE_VERSION_ID ? "selected" : ""}>${escapeHtml(v.name)}${v.lockedAt ? " 🔒" : ""}</option>`).join("");
+  return `
+    <div class="version-box">
+      <label class="version-label" for="versionSwitcher">${t("plan_version_label")}</label>
+      <div class="version-row">
+        <select class="version-switcher" id="versionSwitcher">${opts}</select>
+        <button class="version-new" id="newScenarioBtn" type="button" title="${t("new_scenario_title")}">${t("new_scenario_btn")}</button>
+      </div>
+    </div>`;
 }
 
 function renderSidebar() {
@@ -138,6 +155,19 @@ function renderSidebar() {
       location.reload();
     });
   }
+
+  // Switching plan version reloads with that version's drivers.
+  const verSel = document.getElementById("versionSwitcher");
+  if (verSel) verSel.addEventListener("change", () => switchVersion(verSel.value));
+
+  const newScenarioBtn = document.getElementById("newScenarioBtn");
+  if (newScenarioBtn) newScenarioBtn.addEventListener("click", async () => {
+    if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast(t("toast_signin_save_data")); return; }
+    const name = prompt(t("prompt_new_scenario"));
+    if (!name || !name.trim()) return;
+    const id = await dbCreateVersion(name.trim());
+    if (id) switchVersion(id); // reloads into the new scenario, ready to edit
+  });
 
   const newOrgBtn = document.getElementById("newOrgBtn");
   if (newOrgBtn) newOrgBtn.addEventListener("click", createOrg);
