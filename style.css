@@ -1385,20 +1385,20 @@ html[data-theme="light"] .panel {
   gap: 8px;
 }
 
+/* The % variance sits next to the absolute figure as quiet colored text, not
+   a tinted badge (TEARDOWN C16 — one calm indicator, don't shout; keeps the
+   krona magnitude the badge version also had). Colour comes from the .over/
+   .under/.neutral rules below, which now track the theme variables instead of
+   the old hardcoded dark-theme rgba tints. */
 .variance-pill {
-  font-size: 0.75rem;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-weight: 600;
+  font-size: 0.78rem;
+  font-weight: 500;
+  opacity: 0.85;
 }
 
-.variance-cell.over { color: var(--red); }
-.variance-cell.under { color: var(--green); }
-.variance-cell.neutral { color: var(--amber); }
-
-.variance-pill.over { background: rgba(212,113,106,0.15); color: var(--red); }
-.variance-pill.under { background: rgba(92,184,138,0.15); color: var(--green); }
-.variance-pill.neutral { background: rgba(217,166,71,0.15); color: var(--amber); }
+.variance-cell.over,  .variance-pill.over    { color: var(--red); }
+.variance-cell.under, .variance-pill.under   { color: var(--green); }
+.variance-cell.neutral, .variance-pill.neutral { color: var(--amber); }
 
 .budget-row.total {
   border-top: 2px solid var(--panel-border);
