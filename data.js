@@ -825,6 +825,12 @@ function loadPreviewData() {
     COST_CENTERS.forEach((cc) => {
       if (rev[cc.name]) cc.revenuePlan = Array(12).fill(rev[cc.name] / 12);
     });
+    // Dev hook: &revgrid shows a shaped (custom monthly) line with its grid open
+    // so the per-line monthly editor (#12) is screenshot-verifiable.
+    if (new URLSearchParams(location.search).has("revgrid")) {
+      const prod = COST_CENTERS.find((c) => c.name === "Production");
+      if (prod) { prod.revenuePlan = [2.4, 2.4, 3.0, 3.2, 3.0, 2.6, 1.8, 2.2, 3.4, 3.6, 4.0, 3.4].map((v) => v * 1e6); prod._showRevMonthly = true; }
+    }
   }
 
   // Cross-version summaries for the demo Overview panels. Monthly trajectories

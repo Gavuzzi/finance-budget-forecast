@@ -160,8 +160,10 @@ function renderCcBlock(i) {
 
 // Per-line revenue (profit centre). Cost-only lines stay clean — just a quiet
 // "+ Add revenue" link; a line that earns shows an annual-revenue input and
-// its margin (revenue − cost). Annual amount spreads flat across the 12 months
-// (monthly shaping can come later); stored as the [12] revenuePlan.
+// its margin (revenue − cost). The annual box is the quick path (spreads flat);
+// "Monthly" expands a 12-cell grid to SHAPE revenue month by month — the point
+// of #12, since project/milestone billing is lumpy, not flat. Stored as the
+// [12] revenuePlan either way, so the cost side and revenue side now match.
 function revenueRowHtml(cc, i) {
   if (!lineHasRevenue(cc) && !cc._showRevenue) {
     return `<button class="add-revenue-link" data-addrevenue="${i}" type="button">${t("add_revenue_btn")}</button>`;
@@ -170,11 +172,43 @@ function revenueRowHtml(cc, i) {
   // display (storage stays exact).
   const annual = lineRevenueFyTotal(cc);
   const margin = lineMargin(cc);
+  const plan = Array.isArray(cc.revenuePlan) && cc.revenuePlan.length === 12 ? cc.revenuePlan : null;
+  // "Custom" once the months aren't all equal — the visible signal that this
+  // line is shaped (a ramp / milestones), not a flat 1/12 spread.
+  const isCustom = plan && plan.some((v) => Math.abs((Number(v) || 0) - (Number(plan[0]) || 0)) > 0.5);
+  const flat = plan ? Math.round(annual / 12) : 0;
+  const cells = Array.from({ length: 12 }, (_, m) => `
+    <label>${monthLabel(m + 1)}
+      <input type="number" step="10000" data-revmonthline="${i}" data-m="${m}" value="${plan ? Math.round(Number(plan[m]) || 0) : ""}" placeholder="${flat || 0}">
+    </label>`).join("");
   return `
-    <label class="line-revenue-label">${t("line_revenue_label")}
-      <input type="number" data-revenue="${i}" value="${annual ? Math.round(annual) : ""}" step="10000" placeholder="0">
-    </label>
-    ${margin != null ? `<span class="cc-margin ${margin >= 0 ? "under" : "over"}">${t("line_margin_label", fmtMkrSigned(margin))}</span>` : ""}`;
+    <div class="line-revenue-row">
+      <label class="line-revenue-label">${t("line_revenue_label")}
+        <input type="number" data-revenue="${i}" value="${annual ? Math.round(annual) : ""}" step="10000" placeholder="0">
+      </label>
+      ${margin != null ? `<span class="cc-margin ${margin >= 0 ? "under" : "over"}">${t("line_margin_label", fmtMkrSigned(margin))}</span>` : ""}
+      <button class="rev-monthly-toggle" data-revtoggle="${i}" type="button">${t("rev_monthly_toggle")}${isCustom ? ` <span class="rev-custom-tag">${t("rev_custom_tag")}</span>` : ""} ${cc._showRevMonthly ? "▴" : "▾"}</button>
+    </div>
+    ${cc._showRevMonthly ? `<div class="line-rev-grid rev-plan-grid">${cells}</div><p class="rate-hint rev-grid-hint">${t("rev_monthly_hint")}</p>` : ""}`;
+}
+
+// Live update of one month of a line's revenue while typing. Seeds the [12]
+// plan from the current flat annual so untouched months keep their value, then
+// sets the edited month. Clears back to null once every month is 0 (= no
+// revenue). Updates the annual total in place so it stays in sync without a
+// rebuild (which would drop focus mid-type); margin + custom tag refresh on
+// blur (change → buildPlanningGrid).
+function updateLineRevMonth(input) {
+  const i = Number(input.dataset.revmonthline), m = Number(input.dataset.m);
+  const cc = COST_CENTERS[i];
+  if (!Array.isArray(cc.revenuePlan) || cc.revenuePlan.length !== 12) {
+    const flat = lineRevenueFyTotal(cc) / 12;
+    cc.revenuePlan = Array.from({ length: 12 }, () => flat || 0);
+  }
+  cc.revenuePlan[m] = Number(input.value) || 0;
+  if (!cc.revenuePlan.some((v) => (Number(v) || 0) > 0)) cc.revenuePlan = null;
+  const annualInput = document.querySelector(`[data-revenue="${i}"]`);
+  if (annualInput) annualInput.value = cc.revenuePlan ? Math.round(lineRevenueFyTotal(cc)) : "";
 }
 
 // The composition breakdown behind a cost centre's FY total — "what's this
@@ -313,16 +347,27 @@ function initPlanningGrid() {
     }
   }
 
-  ccBlocks.addEventListener("input", (e) => handleCcFieldChange(e.target));
+  ccBlocks.addEventListener("input", (e) => {
+    // A month cell updates the in-memory plan + annual total live (no rebuild,
+    // so typing stays smooth); persistence happens on change (blur).
+    if (e.target.dataset.revmonthline !== undefined) { updateLineRevMonth(e.target); return; }
+    handleCcFieldChange(e.target);
+  });
   // <select> elements don't reliably fire "input" on every browser, so handle
   // dropdown changes (role, start/end month, one-off month) via "change" too.
   ccBlocks.addEventListener("change", (e) => {
     if (e.target.tagName === "SELECT") { handleCcFieldChange(e.target); return; }
+    if (e.target.dataset.revmonthline !== undefined) {
+      const cc = COST_CENTERS[Number(e.target.dataset.revmonthline)];
+      dbSetLineRevenue(cc);
+      buildPlanningGrid(); // refresh margin + the flat/custom tag
+      return;
+    }
     if (e.target.dataset.revenue !== undefined) {
       const ccIndex = Number(e.target.dataset.revenue);
       const cc = COST_CENTERS[ccIndex];
       const annual = Number(e.target.value) || 0;
-      cc.revenuePlan = annual > 0 ? Array(12).fill(annual / 12) : null; // flat spread
+      cc.revenuePlan = annual > 0 ? Array(12).fill(annual / 12) : null; // annual box = spread flat
       dbSetLineRevenue(cc);
       buildPlanningGrid(); // refresh margin + any org-revenue-dependent readouts
     }
@@ -347,6 +392,14 @@ function initPlanningGrid() {
       buildPlanningGrid();
       const input = document.querySelector(`[data-revenue="${ccIndex}"]`);
       if (input) input.focus();
+      return;
+    }
+
+    const revToggle = e.target.closest("[data-revtoggle]");
+    if (revToggle) {
+      const cc = COST_CENTERS[Number(revToggle.dataset.revtoggle)];
+      cc._showRevMonthly = !cc._showRevMonthly; // transient reveal of the 12-month grid
+      buildPlanningGrid();
       return;
     }
 

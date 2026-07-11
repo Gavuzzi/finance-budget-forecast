@@ -1716,6 +1716,19 @@ html[data-theme="light"] .panel {
 .cc-margin { font-size: 0.9rem; font-weight: 600; }
 .cc-margin.under { color: var(--green); }
 .cc-margin.over { color: var(--red); }
+.line-revenue-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.rev-monthly-toggle {
+  margin-left: auto; background: none; border: none; padding: 2px 4px; cursor: pointer;
+  font-family: inherit; font-size: 0.8rem; font-weight: 600; color: var(--text-dim);
+}
+.rev-monthly-toggle:hover { color: var(--accent); }
+.rev-custom-tag {
+  font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+  color: var(--accent); background: var(--accent-wash, rgba(52,97,168,0.12));
+  border-radius: 4px; padding: 1px 5px; margin-left: 2px;
+}
+.line-rev-grid { margin-top: 10px; }
+.rev-grid-hint { margin-top: 6px; }
 
 .bridge-toggle {
   background: none; border: 1px solid var(--panel-border); color: var(--accent-soft);
