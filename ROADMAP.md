@@ -354,6 +354,27 @@ repaint, so we never restyle twice.
   (zero data.js touched), shadowing grep clean. NOT checked: a real accessibility contrast-ratio audit
   (eyeballed via screenshots only) — reasonable given the accent was deliberately kept at the old
   luminance, but a formal WCAG pass is cheap and worth doing before a real client demo.
+- [x] `[B]` **3b. UI round 2 — real teardown + density/sectioning purge** *(done 2026-07-11)* — Felix
+  opened the live app and (rightly) said it was confusing, text-heavy, and things "blended" — and
+  questioned whether we'd actually copied the praised tools. Honest answer: round 1's TEARDOWN was
+  principle-level (marketing sites + reviews), not layout-level. Round 2 fixed that: pulled the **actual
+  product screenshots** (Runway's Exec Dashboard / variance table / month-end view, Fathom's dashboards)
+  as image files and studied them directly — findings are TEARDOWN **C13–C18**, highest confidence in the
+  doc. Dominant lesson **C13**: the praised tools SHOW, never EXPLAIN — *zero* instructional prose in
+  their UIs; ours embedded a manual inline, the #1 "busy/amateur" driver. Executed the safe, high-value
+  cuts across all 4 content pages: **Monthly** — orphaned Export/Import buttons became a grouped toolbar
+  in a titled "Month by month" card (C18), legend → one caption line; **Planning** (the worst wall) —
+  cut the intro paragraph, the redundant per-card "actuals booked through" note (the sidebar already
+  shows it), and the verbose recurring-costs explanation, keeping the two non-obvious facts (negative =
+  leaver, pay rates on Assumptions) as one line; **Cash Flow** — the 8-line methodology essay → a
+  one-line honesty caption + a "How this is calculated" disclosure (caveat survives per sacred rule #6,
+  page stops walling); **Assumptions** (a settings page — more guidance is legitimately OK) — conservatively
+  trimmed only the two essay-length hints. New reusable `.panel-head`/`.panel-actions`/`.panel-legend`/
+  `.btn-secondary`/`.calc-details` + `data-i18n-title`/`data-i18n-alt` handlers. **Verified:** every page
+  screenshotted light + dark + Swedish, 34 tests green throughout, shadowing grep clean, zero engine
+  changes. **Deliberately HELD for Felix's input** (working unsupervised, model swapped): C16 (collapse
+  variance to one indicator — changes a number he reads daily) and C15 (sparklines in stat tiles — more
+  effort, cosmetic). Those are the taste/habit calls that need a human, not more autonomous edits.
 - [x] `[B]` **4a. First-run experience** *(done 2026-07-10 — demo script deferred, Felix's call)* —
   the empty-org screen (`emptyOrgHtml()`, shared by Overview/Monthly) offered two paths: a preset or
   manual entry. Neither was "connect Fortnox," even though that's the fastest route to a real number for
