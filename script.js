@@ -281,10 +281,13 @@ function renderOnboard() {
   const slot = document.getElementById("onboardSlot");
   if (!slot) return;
 
-  if (localStorage.getItem("almgren-onboard-dismissed") === "true") {
-    slot.innerHTML = `<button class="onboard-link" id="onboardOpen" type="button">${t("onboard_reopen")}</button>`;
+  // Default CLOSED (progressive disclosure, SAC-style): a quiet "? How this
+  // works" button; the explainer card opens only on demand instead of
+  // permanently walling the page (TEARDOWN C13 — show, don't explain).
+  if (localStorage.getItem("almgren-onboard-open") !== "true") {
+    slot.innerHTML = `<button class="onboard-help-btn" id="onboardOpen" type="button">${t("onboard_help_btn")}</button>`;
     document.getElementById("onboardOpen").addEventListener("click", () => {
-      localStorage.removeItem("almgren-onboard-dismissed");
+      localStorage.setItem("almgren-onboard-open", "true");
       renderOnboard();
     });
     return;
@@ -292,7 +295,7 @@ function renderOnboard() {
 
   slot.innerHTML = onboardCardHtml();
   document.getElementById("onboardClose").addEventListener("click", () => {
-    localStorage.setItem("almgren-onboard-dismissed", "true");
+    localStorage.setItem("almgren-onboard-open", "false");
     renderOnboard();
   });
 }

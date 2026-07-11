@@ -312,6 +312,22 @@
   padding: 0;
 }
 
+/* Quiet "? How this works" affordance — the on-demand replacement for the
+   persistent explainer card (progressive disclosure). */
+.onboard-help-btn {
+  align-self: flex-start;
+  background: none;
+  border: 1px solid var(--panel-border);
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-family: inherit;
+}
+.onboard-help-btn:hover { border-color: var(--accent); color: var(--text); }
+
 /* Cost by role breakdown */
 .rb-row {
   display: grid;
