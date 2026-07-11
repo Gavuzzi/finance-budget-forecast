@@ -417,6 +417,117 @@ repaint, so we never restyle twice.
   "the UI feels perfect" is explicitly NOT the bar, because taste has no finish line and this becomes
   avoidance. The product is already functionally ahead of what any SME expects from a first meeting.
 
+### Phase 8 — Planning platform: versioning spine + the ways of planning (backlog set 2026-07-11)
+
+**Context / strategy.** Felix opened the app fresh and surfaced ~27 issues (the raw list + the
+critique thread are in the chat transcript). Two decisions frame this phase: (1) **build broad,
+segment-agnostic** — we support multiple ways of planning/viewing, but each org only ever *sees*
+its own model ("**breadth in the engine, narrowness in each org's UI**" — this is what lets us be
+powerful without recreating the "too much everywhere" problem); (2) **build before any customer**
+— Felix will create manufacturer / consultancy / agency test orgs and test every mode himself.
+
+Two honest caveats recorded up front:
+- **Felix's own testing validates correctness, not product-market fit.** Synthetic orgs confirm the
+  machine runs; they don't confirm the workflow is what a real services firm wants. Mitigation:
+  use **his dad's real web-dev firm** (real Fortnox books, real projects, a real services business)
+  as the first real-data test, not only synthetic orgs.
+- **Segment doesn't gate capability, only sequencing.** With broad primitives + config, we don't need
+  to pick a segment to start. Profile only re-orders the *final polish* and the *default preset*.
+
+**Competitor grounding** (researched 2026-07-11): scenario/budget model from Runway
+(docs.runway.com/guides/modeling/bva + "a new way to plan scenarios") — Main forecast, scenarios as
+editable branches, budget = a *locked* scenario. Cash-flow method confirmed: we already built the
+**direct / ~13-week method** (bank + AR/AP by due date + estimated operating/tax), which is the
+correct SMB treasury method — the fix is legibility, not method. Professional-services planning
+(utilization 70–80%, capacity-constrained headcount, project profitability) is **core, not edge**,
+for the likely Gothenburg/Fortnox services segment.
+
+Ordered by build sequence — each tier leans on the one above. `[B]` unless noted.
+
+**Tier 0 — the versioning spine (foundational, first, the genuinely big one)**
+- [ ] **One versioned driver-plan: Main forecast → scenarios (editable branches) → lock-as-budget.**
+  Replaces all three of today's half-overlapping notions at once: the typed `annual_budget` number
+  (divorced from drivers), the dead-end read-only `scenarios.snapshot`, and the buried
+  `budget_versions.snapshot`. Target UX (copy Runway): a **Main** working forecast (rolling R12); a
+  **scenario** is a branch you enter, edit ("revenue dips 20%"), and compare to Main; a **budget** is
+  a scenario you **lock** (e.g. "Budget 2027") — budget & forecast then independently editable, BvA
+  compares locked-budget vs Main+actuals. **[#4, #24(partly), #25]**
+  - **Storage decision (verified 2026-07-11):** every driver table (`headcount_lines`, `one_offs`,
+    `recurring_costs`, `forecast_overrides`) is scoped only by `org_id`+`reporting_line_id` — no
+    version dimension. The spine adds one. **Use full-copy-per-version, NOT Runway's internal
+    diff/layer model** — a nullable `scenario_id` on each driver, a scenario = a complete duplicate
+    of the drivers. Same user-facing UX (branch/edit/compare/lock), far less merge-logic risk for a
+    solo vanilla-JS app; storage cost is trivial at SME scale. "Changes to Main don't auto-propagate
+    into an old scenario" is acceptable (usually desirable for a locked budget).
+  - **Do this incrementally & test each step** — it's a schema + engine + migration change touching
+    the whole model; not a one-sitting job. Hand-derived engine tests per step (the suite exists).
+
+**Tier 1 — org-creation ergonomics (the test harness; can start early, in parallel with Tier 0)**
+- [ ] **Fast create/switch between org *types*** (extend presets) so Felix can spin up a
+  manufacturer / consultancy / agency org in seconds to test every mode. This is his QA harness — it
+  earns its keep immediately. (The *"show only the relevant model's UI"* gating is NOT here — that
+  interleaves with Tier 2 below, since it can only hide primitives once they exist.)
+
+**Tier 2 — the ways of planning (the driver primitives → "support all")**
+- [ ] **Per-line revenue → monthly** (today it's a single annual number spread flat — wrong for
+  milestone/project billing; make it monthly like the cost side). **[#12]**
+- [ ] **Utilization / capacity driver** — billable hours × rate → revenue, AND hours ÷ utilization ÷
+  hours-per-head → required headcount → cost. The services/consulting unlock. A *bounded* driver
+  type (optional per line), NOT a general formula engine. **[#26 styles 4–5]**
+- [ ] **Formalize account-level line planning** (revenue / travel / marketing as structured
+  categories; today it's manual one-offs/recurring). Assess how much is already covered. **[#26 style 2]**
+- [ ] **Surface shared/corporate allocation clearly** — the capability exists (a "Shared / corporate"
+  checkbox per line + "Fully-loaded view" toggle) but it's undiscoverable and mislabelled; most SMEs
+  won't need it → make it clear AND tuck it under "advanced". **[#14, #15]**
+- [ ] **Per-org model gating** — each org type shows only its relevant planning UI (interleaves here
+  as the primitives above land; this is the "narrowness in each org's UI" half of the strategy).
+
+**Tier 3 — progressive disclosure (breadth without clutter)**
+- [ ] **Contextual `?` pattern (SAC-style)** — a `?` next to a specific thing pops its own
+  explanation; delete the inline explanatory paragraphs. Discipline: ruthless — a `?` only where
+  genuinely non-obvious, ≤2 sentences, and prefer a clearer label over a `?` where possible.
+  **[#2, #5, #18]**
+- [ ] **Hide advanced features** (sync exclusions, allocation, account-range mapping) behind an
+  "advanced" affordance. Keep them (they're legit) but off the default surface. **[#20]**
+
+**Tier 4 — IA / placement**
+- [ ] **Re-forecast → Planning** (it *edits the plan*; doesn't belong on Overview), + **selectable
+  run-rate source** (recent actuals / budget / manual, user's choice). **[#3, #24]**
+- [ ] **Import → auto-link + auto-reflect** — importing a Fortnox code already creates+maps the line,
+  but actuals only appear after a re-sync and there's a refresh gap; make it one smooth action. **[#17]**
+- [ ] **"Actuals booked through" → auto by default, hidden unless overriding** (concept is needed,
+  sidebar placement/prominence is wrong). **[#7]**
+- [ ] **Reconcile revenue-plan placement** — org-level "Revenue Plan" in Assumptions is redundant once
+  revenue is planned per line/project; decide its home (likely Planning) and relationship. **[#22]**
+- [ ] **"Your data" export → account settings, honest framing** — it's GDPR portability (JSON,
+  export-only, not backup/restore), not a user feature; move it and label it truthfully. **[#23]**
+- [ ] **Cash-flow legibility + live walkthrough with Felix** — method is already right (direct/13-week);
+  label it as short-term direct cash, consider a selectable horizon, keep the hard/estimated
+  separation. Felix needs to *understand* it to sell it. **[#16]**
+
+**Tier 5 — polish / chrome (the small, correct ones)**
+- [ ] Company selector truncates ("Meridian Manufac…") — width/tooltip **[#1]**
+- [ ] Language toggle shows the *target* language (confusing) → dropdown or "current + switch" **[#8]**
+- [ ] Kill the "Budget & Forecast" subtitle under the company name (adds nothing) **[#9, #27]**
+- [ ] Planning visual hierarchy — the line name ("Production") reads same-weight as its sub-sections
+  ("One-off costs"); make the line clearly the container + reduce density **[#10, #11]**
+- [ ] Variance note → small inline note/icon, not a full-width row; add save feedback **[#13]**
+- [ ] Fix the misleading fallback wording (projects *do* fall back; the copy implies otherwise) **[#19]**
+- [ ] CSV import → de-emphasize as a fallback; ship a downloadable Excel/CSV template + plain
+  instructions (SMEs live in Excel, "CSV" is jargon) **[#21]**
+- [ ] Revenue-plan grid → unambiguous 12-month layout (2×6 reads as "6 months") **[#22]**
+- [ ] **Kill "spread lumpy actuals"** — no competitor does it, low value, fights "actuals are as-is" **[#6]**
+
+**Quick-wins note:** several Tier 5 items (company-selector, language toggle, subtitle, kill
+spread-lumpy) are near-zero cost and make Felix's own testing less annoying — fine to do a small batch
+first/in parallel, ahead of the tiers, since they don't depend on anything.
+
+**Model guidance for this phase:** Tier 0 (schema/engine/migration, correctness-critical) and the
+utilization driver in Tier 2 want the **strongest model at high effort** (architecture + math where
+being wrong is expensive) — Fable/Opus, 1M context helps since it touches many files. Tiers 3–5
+(execution against decided design, screenshot- and test-guarded) are fine on **Sonnet** — cheaper,
+faster, and the verification loop catches mistakes. Split accordingly.
+
 ### Compliance gate — before onboarding a REAL client
 - [ ] `[F]` Confirm Fortnox **production** API access (partner agreement if needed)
 - [x] `[B]` **Security review write-up** *(done 2026-07-10)* — see **`SECURITY.md`**: the Phase 6
