@@ -99,7 +99,6 @@ function renderCcBlock(i) {
           <button class="cc-delete" data-deletecc="${i}" type="button" title="${t("delete_line_title")}">${t("common_delete")}</button>
         </div>
       </div>
-      <p class="cc-actual">${t("cc_actual_note", monthLabel(CLOSE_MONTH))}</p>
       ${cc.isShared ? `<p class="shared-note">${t("shared_note")}</p>` : ""}
 
       <div class="driver-table-wrap">
@@ -135,7 +134,6 @@ function renderCcBlock(i) {
 
       <div class="recurring-section">
         <h3>${t("recurring_h3")}</h3>
-        <p class="line-hint">${t("recurring_hint")}</p>
         <div class="driver-table-wrap">
           <table class="driver-table recurring-table">
             <thead>
