@@ -111,6 +111,9 @@ function versionSwitcherHtml() {
         <select class="version-switcher" id="versionSwitcher">${opts}</select>
         <button class="version-new" id="newScenarioBtn" type="button" title="${t("new_scenario_title")}">${t("new_scenario_btn")}</button>
       </div>
+      ${versionLocked()
+        ? `<span class="version-locked-note">${t("version_locked_note")}</span>`
+        : `<button class="version-lock" id="lockBudgetBtn" type="button">${t("lock_budget_btn")}</button>`}
     </div>`;
 }
 
@@ -167,6 +170,15 @@ function renderSidebar() {
     if (!name || !name.trim()) return;
     const id = await dbCreateVersion(name.trim());
     if (id) switchVersion(id); // reloads into the new scenario, ready to edit
+  });
+
+  const lockBudgetBtn = document.getElementById("lockBudgetBtn");
+  if (lockBudgetBtn) lockBudgetBtn.addEventListener("click", async () => {
+    if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast(t("toast_signin_save_data")); return; }
+    const name = prompt(t("prompt_lock_budget"), t("default_budget_name"));
+    if (!name || !name.trim()) return;
+    const id = await dbLockAsBudget(name.trim());
+    if (id) { showToast(t("toast_budget_locked")); location.reload(); } // stay on current version; dropdown gains the budget
   });
 
   const newOrgBtn = document.getElementById("newOrgBtn");

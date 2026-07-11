@@ -460,18 +460,26 @@ function switchVersion(id) {
   location.reload();
 }
 
-// Branch a new scenario: a full copy of the active version's drivers under a
-// new version, then switch to it so you can edit it immediately.
-async function dbCreateVersion(name) {
-  if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast(t("toast_signin_save_data")); return null; }
+// True when the active version is a locked budget → its numbers are frozen and
+// edits are refused. Write helpers call assertEditable() to enforce it.
+function versionLocked() { const av = activeVersion(); return !!(av && av.lockedAt); }
+function assertEditable() {
+  if (versionLocked()) { showToast(t("toast_version_locked")); return false; }
+  return true;
+}
+
+// Core: a full copy of the active version — drivers (cost) + per-line revenue
+// + the version's org-level revenue — under a new version. Optionally locked
+// (a budget). Returns the new id; does NOT switch.
+async function copyActiveVersion(name, { locked = false } = {}) {
   const src = ACTIVE_VERSION_ID;
   const srcV = activeVersion() || {};
-  // New version inherits the source's org-level revenue (target + profile).
-  const { data: v, error } = await sb.from("plan_versions")
-    .insert({ org_id: CURRENT_ORG_ID, name, is_main: false, revenue_budget: srcV.revenueBudget || 0, revenue_plan: srcV.revenuePlan || null })
-    .select("id").single();
+  const { data: v, error } = await sb.from("plan_versions").insert({
+    org_id: CURRENT_ORG_ID, name, is_main: false,
+    locked_at: locked ? new Date().toISOString() : null,
+    revenue_budget: srcV.revenueBudget || 0, revenue_plan: srcV.revenuePlan || null,
+  }).select("id").single();
   if (error) { flagWriteError(error); return null; }
-  // Copy the drivers (cost side) + per-line revenue (profit centres).
   for (const tbl of ["headcount_lines", "one_offs", "recurring_costs", "forecast_overrides", "version_line_revenue"]) {
     const { data: srcRows, error: se } = await sb.from(tbl).select("*").eq("org_id", CURRENT_ORG_ID).eq("version_id", src);
     if (se) { flagWriteError(se); return null; }
@@ -481,8 +489,22 @@ async function dbCreateVersion(name) {
       if (ce) { flagWriteError(ce); return null; }
     }
   }
-  localStorage.setItem(activeVersionKey(), v.id); // switchVersion reloads; caller triggers it
   return v.id;
+}
+
+// Branch a new scenario (editable copy) and switch into it.
+async function dbCreateVersion(name) {
+  if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast(t("toast_signin_save_data")); return null; }
+  const id = await copyActiveVersion(name);
+  if (id) localStorage.setItem(activeVersionKey(), id); // caller triggers switchVersion (reload)
+  return id;
+}
+
+// Lock the current plan as an approved budget: a frozen copy. Stays on the
+// current version (you keep forecasting); the budget is the immutable baseline.
+async function dbLockAsBudget(name) {
+  if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast(t("toast_signin_save_data")); return null; }
+  return await copyActiveVersion(name, { locked: true });
 }
 
 async function dbRenameVersion(id, name) {
@@ -862,6 +884,7 @@ async function exportAllData() {
 // active plan version, so a scenario can vary the top line. Also keeps the
 // in-memory activeVersion() copy in sync so a later re-read is correct.
 async function dbUpdateRevenuePlan() {
+  if (!assertEditable()) return;
   const av = activeVersion();
   if (av) { av.revenueBudget = ASSUMPTIONS.revenueBudget; av.revenuePlan = ASSUMPTIONS.revenuePlan; }
   const { error } = await sb.from("plan_versions")
@@ -933,6 +956,7 @@ async function dbSetCostCenterNote(cc) {
 // Per-line revenue (profit centre). Persists cc.revenuePlan; null clears it
 // (the line reverts to a pure cost centre).
 async function dbSetLineRevenue(cc) {
+  if (!assertEditable()) return;
   // Per-line revenue is versioned: upsert into version_line_revenue for the
   // active version; clearing it (null) removes the row (line reverts to cost-only).
   if (cc.revenuePlan) {
@@ -971,6 +995,7 @@ async function dbSetCostCenterShared(cc) {
 }
 
 async function dbInsertHeadcount(ccId, line) {
+  if (!assertEditable()) return null;
   const { data, error } = await sb.from("headcount_lines")
     .insert({ org_id: CURRENT_ORG_ID, version_id: ACTIVE_VERSION_ID, reporting_line_id: ccId, role_id: line.roleId, count: line.count, start_month: line.startMonth, end_month: line.endMonth })
     .select().single();
@@ -979,6 +1004,7 @@ async function dbInsertHeadcount(ccId, line) {
 }
 
 async function dbUpdateHeadcount(line) {
+  if (!assertEditable()) return;
   const { error } = await sb.from("headcount_lines")
     .update({ role_id: line.roleId, count: line.count, start_month: line.startMonth, end_month: line.endMonth })
     .eq("id", line.id);
@@ -986,11 +1012,13 @@ async function dbUpdateHeadcount(line) {
 }
 
 async function dbDeleteHeadcount(id) {
+  if (!assertEditable()) return;
   const { error } = await sb.from("headcount_lines").delete().eq("id", id);
   if (error) flagWriteError(error);
 }
 
 async function dbInsertOneOff(ccId, o) {
+  if (!assertEditable()) return null;
   const { data, error } = await sb.from("one_offs")
     .insert({ org_id: CURRENT_ORG_ID, version_id: ACTIVE_VERSION_ID, reporting_line_id: ccId, label: o.label, amount: o.amount, month: o.month })
     .select().single();
@@ -999,6 +1027,7 @@ async function dbInsertOneOff(ccId, o) {
 }
 
 async function dbUpdateOneOff(o) {
+  if (!assertEditable()) return;
   const { error } = await sb.from("one_offs")
     .update({ label: o.label, amount: o.amount, month: o.month })
     .eq("id", o.id);
@@ -1006,11 +1035,13 @@ async function dbUpdateOneOff(o) {
 }
 
 async function dbDeleteOneOff(id) {
+  if (!assertEditable()) return;
   const { error } = await sb.from("one_offs").delete().eq("id", id);
   if (error) flagWriteError(error);
 }
 
 async function dbInsertRecurringCost(ccId, r) {
+  if (!assertEditable()) return null;
   const { data, error } = await sb.from("recurring_costs")
     .insert({ org_id: CURRENT_ORG_ID, version_id: ACTIVE_VERSION_ID, reporting_line_id: ccId, label: r.label, amount: r.amount, start_month: r.startMonth, end_month: r.endMonth, escalation_pct: r.escalationPct })
     .select().single();
@@ -1019,6 +1050,7 @@ async function dbInsertRecurringCost(ccId, r) {
 }
 
 async function dbUpdateRecurringCost(r) {
+  if (!assertEditable()) return;
   const { error } = await sb.from("recurring_costs")
     .update({ label: r.label, amount: r.amount, start_month: r.startMonth, end_month: r.endMonth, escalation_pct: r.escalationPct })
     .eq("id", r.id);
@@ -1026,6 +1058,7 @@ async function dbUpdateRecurringCost(r) {
 }
 
 async function dbDeleteRecurringCost(id) {
+  if (!assertEditable()) return;
   const { error } = await sb.from("recurring_costs").delete().eq("id", id);
   if (error) flagWriteError(error);
 }
@@ -1036,6 +1069,7 @@ async function dbDeleteRecurringCost(id) {
 // a user clicking "Apply" — never by a sync. Returns the run-rate, or null if
 // there's no actual data yet to base one on.
 async function dbApplyRunRate(cc) {
+  if (!assertEditable()) return null;
   const recent = [];
   for (let m = CLOSE_MONTH; m >= 1 && recent.length < 3; m--) {
     const v = cc.actualMonthly[m - 1];
@@ -1055,6 +1089,7 @@ async function dbApplyRunRate(cc) {
 // Reversible: delete the override rows and the driver-based forecast resumes
 // unchanged (headcount/one-offs/recurring costs were never touched).
 async function dbClearOverrides(cc) {
+  if (!assertEditable()) return false;
   const { error } = await sb.from("forecast_overrides").delete()
     .eq("reporting_line_id", cc.id).eq("version_id", ACTIVE_VERSION_ID);
   if (error) { flagWriteError(error); return false; }

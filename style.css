@@ -743,6 +743,12 @@ html, body {
   font-weight: 600; cursor: pointer; white-space: nowrap; font-family: inherit;
 }
 .version-new:hover { border-color: var(--accent); }
+.version-lock {
+  display: block; margin-top: 6px; background: none; border: none; padding: 2px 0;
+  color: var(--text-dim); font-size: 0.76rem; font-weight: 600; cursor: pointer; font-family: inherit;
+}
+.version-lock:hover { color: var(--accent-soft); }
+.version-locked-note { display: block; margin-top: 6px; font-size: 0.76rem; color: var(--amber); font-weight: 600; }
 
 .sidebar-nav {
   display: flex;
