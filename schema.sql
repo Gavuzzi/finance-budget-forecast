@@ -113,6 +113,27 @@ drop policy if exists budget_versions_write on budget_versions;
 create policy budget_versions_read on budget_versions for select using (is_org_member(org_id));
 create policy budget_versions_write on budget_versions for all using (can_edit_org(org_id)) with check (can_edit_org(org_id));
 
+-- Phase 8 — the versioning spine. A "plan version" is a named copy of the
+-- driver plan (headcount/one-offs/recurring/overrides carry version_id). Every
+-- org has exactly one is_main version (the working forecast, R12). Scenarios
+-- are additional versions (full copies you branch + edit); a locked version
+-- (locked_at set) is a budget. Actuals, reporting lines, mappings and rates
+-- stay org-shared (reality/identity, never versioned). Supersedes the
+-- read-only scenarios/budget_versions snapshot tables above (retired later).
+create table if not exists plan_versions (
+  id         uuid primary key default gen_random_uuid(),
+  org_id     uuid not null references organizations(id) on delete cascade,
+  name       text not null,
+  is_main    boolean not null default false,
+  locked_at  timestamptz,                 -- null = editable; set = locked (a budget)
+  created_at timestamptz not null default now()
+);
+alter table plan_versions enable row level security;
+drop policy if exists plan_versions_read on plan_versions;
+drop policy if exists plan_versions_write on plan_versions;
+create policy plan_versions_read on plan_versions for select using (is_org_member(org_id));
+create policy plan_versions_write on plan_versions for all using (can_edit_org(org_id)) with check (can_edit_org(org_id));
+
 -- Recurring costs: named lines with a start/end month + optional annual
 -- escalation — replaces the old flat "other_monthly" blob (kept as a legacy
 -- column, no longer read by the engine) so run-rate costs (rent, subs, leases)
@@ -151,6 +172,23 @@ alter table reporting_lines add column if not exists source text not null defaul
 alter table reporting_lines add column if not exists state  text not null default 'linked';  -- planned|linked (plan-ahead lifecycle)
 alter table reporting_lines add column if not exists is_shared boolean not null default false; -- corporate/overhead reporting line — optionally allocated to the others, never on by default
 alter table reporting_lines add column if not exists revenue_plan jsonb; -- optional per-line 12-month revenue profile (array of 12 SEK values, FY-relative). A line with revenue is a profit centre → its own P&L + margin. When ANY line has revenue, the org revenue total = sum of per-line revenue (org-level assumptions.revenue_plan is ignored); no line revenue → falls back to the org-level number. Backward-compatible: existing cost-only lines are unaffected.
+
+-- Phase 8 versioning: the driver tables carry a version_id (which plan copy
+-- they belong to). Backfilled to each org's Main version. Nullable for now;
+-- the app always sets it on write. forecast_overrides' unique(reporting_line_id,
+-- month) becomes unique(version_id, reporting_line_id, month) once scenarios land.
+alter table headcount_lines    add column if not exists version_id uuid references plan_versions(id) on delete cascade;
+alter table one_offs           add column if not exists version_id uuid references plan_versions(id) on delete cascade;
+alter table recurring_costs    add column if not exists version_id uuid references plan_versions(id) on delete cascade;
+alter table forecast_overrides add column if not exists version_id uuid references plan_versions(id) on delete cascade;
+-- Seed Main per org + attach existing drivers (idempotent).
+insert into plan_versions (org_id, name, is_main)
+  select id, 'Main', true from organizations o
+  where not exists (select 1 from plan_versions pv where pv.org_id = o.id and pv.is_main);
+update headcount_lines    x set version_id = (select pv.id from plan_versions pv where pv.org_id = x.org_id and pv.is_main limit 1) where x.version_id is null;
+update one_offs           x set version_id = (select pv.id from plan_versions pv where pv.org_id = x.org_id and pv.is_main limit 1) where x.version_id is null;
+update recurring_costs    x set version_id = (select pv.id from plan_versions pv where pv.org_id = x.org_id and pv.is_main limit 1) where x.version_id is null;
+update forecast_overrides x set version_id = (select pv.id from plan_versions pv where pv.org_id = x.org_id and pv.is_main limit 1) where x.version_id is null;
 alter table assumptions add column if not exists revenue_budget numeric not null default 0; -- simple annual revenue target — no driver engine, just a number to compare actuals against
 alter table assumptions add column if not exists revenue_plan jsonb; -- optional 12-month revenue profile (array of 12 SEK values, FY-relative); null/absent = flat revenue_budget/12
 -- VAT/payroll-tax cash-flow timing (Phase 5 v2). Account ranges default wide

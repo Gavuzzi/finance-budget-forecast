@@ -32,6 +32,13 @@ let CLOSE_MONTH_MANUAL = false; // true = user picked the month; syncs won't tou
 let DISPLAY_UNIT = "mkr"; // "kr" | "tkr" | "mkr" — set per org in loadData/loadPreviewData
 let CURRENT_ORG_ID = null;
 let USER_ORGS = [];
+// Phase 8 versioning spine. PLAN_VERSIONS = this org's plan versions
+// ({ id, name, isMain, lockedAt }); ACTIVE_VERSION_ID = the version whose
+// drivers are currently loaded/edited (Main by default). version_id lives only
+// in the DB load/write layer — the engine operates on the in-memory model and
+// never sees it, so preview mode and the engine tests are unaffected.
+let PLAN_VERSIONS = [];
+let ACTIVE_VERSION_ID = null;
 let BUDGET_VERSIONS = []; // locked budget snapshots, newest first
 let CASH_POSITION = null; // { bankBalance, asOf } — from the last sync's SIE #UB lines
 let OPEN_INVOICES = [];   // [{ kind: 'customer'|'supplier', amount, dueDate, description, counterparty }]
@@ -416,6 +423,31 @@ function setCloseMonth(m) {
 
 // ---- Load from Supabase ----------------------------------------------------
 
+// Resolve this org's plan versions and pick the active one (Main for now).
+// Self-heals a brand-new org that has no Main yet (creates it + attaches any
+// orphaned drivers), so the versioned driver load always finds its rows.
+async function loadPlanVersions() {
+  PLAN_VERSIONS = [];
+  const { data, error } = await sb.from("plan_versions")
+    .select("id, name, is_main, locked_at").eq("org_id", CURRENT_ORG_ID).order("created_at");
+  let rows = error ? [] : (data || []);
+  let main = rows.find((v) => v.is_main);
+  if (!main) {
+    const ins = await sb.from("plan_versions")
+      .insert({ org_id: CURRENT_ORG_ID, name: "Main", is_main: true })
+      .select("id, name, is_main, locked_at").single();
+    if (!ins.error && ins.data) {
+      main = ins.data;
+      rows = [main, ...rows];
+      for (const tbl of ["headcount_lines", "one_offs", "recurring_costs", "forecast_overrides"]) {
+        await sb.from(tbl).update({ version_id: main.id }).eq("org_id", CURRENT_ORG_ID).is("version_id", null);
+      }
+    }
+  }
+  PLAN_VERSIONS = rows.map((v) => ({ id: v.id, name: v.name, isMain: !!v.is_main, lockedAt: v.locked_at }));
+  ACTIVE_VERSION_ID = main ? main.id : null;
+}
+
 async function loadData(orgId) {
   // Which orgs does this user belong to? RLS returns only their memberships.
   const orgsRes = await sb.from("organizations").select("*").order("name");
@@ -435,13 +467,19 @@ async function loadData(orgId) {
   FY_START_YEAR = org.fy_start_year || 2026;
   localStorage.setItem(ORG_STORAGE_KEY, CURRENT_ORG_ID);
 
+  // Resolve the active plan version (the driver copy we load/edit). Ensures a
+  // Main exists (self-heals new orgs); ACTIVE_VERSION_ID is Main for now —
+  // scenario switching arrives in a later step. Drivers are then filtered to
+  // this version; actuals / reporting lines / rates stay org-shared.
+  await loadPlanVersions();
+
   // Everything else is filtered to the active org (there may be several now).
   const [assRes, rolesRes, ccRes, hcRes, ooRes, actRes] = await Promise.all([
     sb.from("assumptions").select("*").eq("org_id", CURRENT_ORG_ID).single(),
     sb.from("roles").select("*").eq("org_id", CURRENT_ORG_ID),
     sb.from("reporting_lines").select("*").eq("org_id", CURRENT_ORG_ID),
-    sb.from("headcount_lines").select("*").eq("org_id", CURRENT_ORG_ID),
-    sb.from("one_offs").select("*").eq("org_id", CURRENT_ORG_ID),
+    sb.from("headcount_lines").select("*").eq("org_id", CURRENT_ORG_ID).eq("version_id", ACTIVE_VERSION_ID),
+    sb.from("one_offs").select("*").eq("org_id", CURRENT_ORG_ID).eq("version_id", ACTIVE_VERSION_ID),
     sb.from("monthly_actual").select("*").eq("org_id", CURRENT_ORG_ID),
   ]);
 
@@ -505,7 +543,7 @@ async function loadData(orgId) {
 
   // Recurring costs — loaded tolerantly (like scenarios) in case an older DB
   // hasn't run the migration yet; the app still works, just with no recurring lines.
-  const rcRes = await sb.from("recurring_costs").select("*").eq("org_id", CURRENT_ORG_ID);
+  const rcRes = await sb.from("recurring_costs").select("*").eq("org_id", CURRENT_ORG_ID).eq("version_id", ACTIVE_VERSION_ID);
   if (!rcRes.error) {
     rcRes.data.forEach((r) => {
       const cc = COST_CENTERS.find((c) => c.id === r.reporting_line_id);
@@ -518,7 +556,7 @@ async function loadData(orgId) {
 
   // Re-forecast overrides — likewise tolerant. Never written by a sync; only
   // ever present because a user explicitly clicked "Apply run-rate".
-  const foRes = await sb.from("forecast_overrides").select("*").eq("org_id", CURRENT_ORG_ID);
+  const foRes = await sb.from("forecast_overrides").select("*").eq("org_id", CURRENT_ORG_ID).eq("version_id", ACTIVE_VERSION_ID);
   if (!foRes.error) {
     foRes.data.forEach((o) => {
       const cc = COST_CENTERS.find((c) => c.id === o.reporting_line_id);
@@ -856,7 +894,7 @@ async function dbSetCostCenterShared(cc) {
 
 async function dbInsertHeadcount(ccId, line) {
   const { data, error } = await sb.from("headcount_lines")
-    .insert({ org_id: CURRENT_ORG_ID, reporting_line_id: ccId, role_id: line.roleId, count: line.count, start_month: line.startMonth, end_month: line.endMonth })
+    .insert({ org_id: CURRENT_ORG_ID, version_id: ACTIVE_VERSION_ID, reporting_line_id: ccId, role_id: line.roleId, count: line.count, start_month: line.startMonth, end_month: line.endMonth })
     .select().single();
   if (error) { flagWriteError(error); return null; }
   return data.id;
@@ -876,7 +914,7 @@ async function dbDeleteHeadcount(id) {
 
 async function dbInsertOneOff(ccId, o) {
   const { data, error } = await sb.from("one_offs")
-    .insert({ org_id: CURRENT_ORG_ID, reporting_line_id: ccId, label: o.label, amount: o.amount, month: o.month })
+    .insert({ org_id: CURRENT_ORG_ID, version_id: ACTIVE_VERSION_ID, reporting_line_id: ccId, label: o.label, amount: o.amount, month: o.month })
     .select().single();
   if (error) { flagWriteError(error); return null; }
   return data.id;
@@ -896,7 +934,7 @@ async function dbDeleteOneOff(id) {
 
 async function dbInsertRecurringCost(ccId, r) {
   const { data, error } = await sb.from("recurring_costs")
-    .insert({ org_id: CURRENT_ORG_ID, reporting_line_id: ccId, label: r.label, amount: r.amount, start_month: r.startMonth, end_month: r.endMonth, escalation_pct: r.escalationPct })
+    .insert({ org_id: CURRENT_ORG_ID, version_id: ACTIVE_VERSION_ID, reporting_line_id: ccId, label: r.label, amount: r.amount, start_month: r.startMonth, end_month: r.endMonth, escalation_pct: r.escalationPct })
     .select().single();
   if (error) { flagWriteError(error); return null; }
   return data.id;
@@ -929,7 +967,9 @@ async function dbApplyRunRate(cc) {
   const runRate = Math.round(recent.reduce((a, b) => a + b, 0) / recent.length);
 
   const rows = [];
-  for (let m = CLOSE_MONTH + 1; m <= TIMELINE_LENGTH; m++) rows.push({ org_id: CURRENT_ORG_ID, reporting_line_id: cc.id, month: m, amount: runRate });
+  for (let m = CLOSE_MONTH + 1; m <= TIMELINE_LENGTH; m++) rows.push({ org_id: CURRENT_ORG_ID, version_id: ACTIVE_VERSION_ID, reporting_line_id: cc.id, month: m, amount: runRate });
+  // onConflict stays (reporting_line_id, month) while there's a single version;
+  // becomes (version_id, reporting_line_id, month) when scenarios land (step 1c).
   const { error } = await sb.from("forecast_overrides").upsert(rows, { onConflict: "reporting_line_id,month" });
   if (error) { flagWriteError(error); return null; }
   rows.forEach((r) => (cc.overrides[r.month] = runRate));
@@ -939,7 +979,8 @@ async function dbApplyRunRate(cc) {
 // Reversible: delete the override rows and the driver-based forecast resumes
 // unchanged (headcount/one-offs/recurring costs were never touched).
 async function dbClearOverrides(cc) {
-  const { error } = await sb.from("forecast_overrides").delete().eq("reporting_line_id", cc.id);
+  const { error } = await sb.from("forecast_overrides").delete()
+    .eq("reporting_line_id", cc.id).eq("version_id", ACTIVE_VERSION_ID);
   if (error) { flagWriteError(error); return false; }
   cc.overrides = {};
   return true;
@@ -1187,12 +1228,12 @@ async function seedPreset(presetKey) {
     if (error) { flagWriteError(error); return false; }
     const ccId = ccRow.id;
 
-    const hcRows = cc.hc.map(([label, count]) => ({ org_id: CURRENT_ORG_ID, reporting_line_id: ccId, role_id: roleIds[label], count, start_month: 1, end_month: 24 }));
+    const hcRows = cc.hc.map(([label, count]) => ({ org_id: CURRENT_ORG_ID, version_id: ACTIVE_VERSION_ID, reporting_line_id: ccId, role_id: roleIds[label], count, start_month: 1, end_month: 24 }));
     const hcRes = await sb.from("headcount_lines").insert(hcRows);
     if (hcRes.error) { flagWriteError(hcRes.error); return false; }
 
     const rcRes = await sb.from("recurring_costs")
-      .insert({ org_id: CURRENT_ORG_ID, reporting_line_id: ccId, label: "Other costs", amount: cc.other, start_month: 1, end_month: 24, escalation_pct: 0 });
+      .insert({ org_id: CURRENT_ORG_ID, version_id: ACTIVE_VERSION_ID, reporting_line_id: ccId, label: "Other costs", amount: cc.other, start_month: 1, end_month: 24, escalation_pct: 0 });
     if (rcRes.error) { flagWriteError(rcRes.error); return false; }
 
     // Believable 6 months of actuals derived from the monthly budget run-rate
