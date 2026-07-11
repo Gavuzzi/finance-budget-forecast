@@ -336,54 +336,70 @@ function renderRoleBreakdown() {
   el.innerHTML = html;
 }
 
-function renderScenarioDetail(s, currentByName) {
-  const names = [...new Set([...(s.breakdown || []).map((b) => b.name), ...Object.keys(currentByName)])];
+// A scenario version's per-line totals vs the live (active) plan's, so the
+// caret-expand shows WHERE the difference sits, not just the FY delta. Both
+// sides come from VERSION_SUMMARIES (live cross-version compute), so there's no
+// stale snapshot — expand a scenario and it reflects its current drivers.
+function renderScenarioDetail(scen, currentByName) {
+  const scenByName = (scen && scen.byName) || {};
+  const names = [...new Set([...Object.keys(scenByName), ...Object.keys(currentByName)])];
   let rows = "";
   names.forEach((name) => {
-    const scen = ((s.breakdown || []).find((b) => b.name === name) || {}).total;
-    const cur = currentByName[name];
-    const d = (scen ?? 0) - (cur ?? 0);
+    const s = scenByName[name], cur = currentByName[name];
+    const d = (s ?? 0) - (cur ?? 0);
     const cls = d > 0 ? "over" : d < 0 ? "under" : "neutral";
     rows += `
       <div class="scen-detail-row">
         <span>${escapeHtml(name)}</span>
-        <span class="num">${scen != null ? fmtMkr(scen) : "—"}</span>
+        <span class="num">${s != null ? fmtMkr(s) : "—"}</span>
         <span class="num">${cur != null ? fmtMkr(cur) : "—"}</span>
-        <span class="num ${cls}">${scen != null && cur != null ? fmtMkrSigned(d) : ""}</span>
+        <span class="num ${cls}">${s != null && cur != null ? fmtMkrSigned(d) : ""}</span>
       </div>`;
   });
   return `<div class="scen-detail-head"><span>${t("col_reporting_line")}</span><span class="num">${t("col_scenario")}</span><span class="num">${t("col_current")}</span><span class="num">Δ</span></div>${rows}`;
 }
 
+// Scenarios are now real plan versions (branches), compared LIVE against the
+// active plan via VERSION_SUMMARIES — not frozen snapshots. Lists every
+// non-locked version other than the one you're on; locked budgets get their
+// own panel. Branch a new one from the sidebar (+ Scenario).
+function scenarioVersions() {
+  return PLAN_VERSIONS.filter((v) => !v.lockedAt && v.id !== ACTIVE_VERSION_ID);
+}
+
 function renderScenarios() {
   const listEl = document.getElementById("scenarioList");
-  const currentTotal = companyFySummary().total;
-  const currentByName = {};
-  COST_CENTERS.forEach((cc) => { currentByName[cc.name] = fySummary(cc).total; });
+  const active = VERSION_SUMMARIES[ACTIVE_VERSION_ID] || { total: 0, byName: {} };
+  const currentTotal = active.total;
+  const currentByName = active.byName || {};
+  const activeName = (activeVersion() || {}).name || t("scenario_current_plan");
 
   let html = `
     <div class="scenario-row current">
-      <span>${t("scenario_current_plan")}</span>
+      <span>${escapeHtml(activeName)} <span class="pnl-src">${t("scenario_live")}</span></span>
       <span class="num">${fmtMkr(currentTotal)}</span>
       <span class="num"></span>
       <span></span>
     </div>`;
 
-  if (SCENARIOS.length === 0) {
+  const scens = scenarioVersions();
+  if (scens.length === 0) {
     html += `<p class="empty-hint">${t("no_scenarios_hint")}</p>`;
   } else {
-    SCENARIOS.forEach((s) => {
-      const delta = s.fyTotal - currentTotal;
+    scens.forEach((v) => {
+      const sum = VERSION_SUMMARIES[v.id];
+      if (!sum) return;
+      const delta = sum.total - currentTotal;
       const cls = delta > 0 ? "over" : delta < 0 ? "under" : "neutral";
       html += `
-        <div class="scenario-row scenario-toggle" data-scen="${s.id}">
-          <span>${escapeHtml(s.name)} <span class="scenario-caret">▾</span></span>
-          <span class="num">${fmtMkr(s.fyTotal)}</span>
+        <div class="scenario-row scenario-toggle" data-scen="${v.id}">
+          <span>${escapeHtml(v.name)}${v.isMain ? ` <span class="pnl-src">${t("scenario_main_tag")}</span>` : ""} <span class="scenario-caret">▾</span></span>
+          <span class="num">${fmtMkr(sum.total)}</span>
           <span class="num ${cls}">${fmtMkrSigned(delta)}</span>
-          <button class="row-remove" data-delscen="${s.id}" title="${t("delete_scenario_title")}">✕</button>
+          ${v.isMain ? "<span></span>" : `<button class="row-remove" data-delscen="${v.id}" title="${t("delete_scenario_title")}">✕</button>`}
         </div>
-        <div class="scenario-detail" data-detailscen="${s.id}" hidden>
-          ${renderScenarioDetail(s, currentByName)}
+        <div class="scenario-detail" data-detailscen="${v.id}" hidden>
+          ${renderScenarioDetail(sum, currentByName)}
         </div>`;
     });
   }
@@ -401,7 +417,9 @@ function renderScenarios() {
 function renderScenarioChart() {
   const wrap = document.getElementById("scenarioChartWrap");
   if (!wrap) return;
-  const withMonthly = SCENARIOS.filter((s) => Array.isArray(s.monthly) && s.monthly.length === FY_MONTHS);
+  const withMonthly = scenarioVersions()
+    .map((v) => ({ name: v.name, monthly: (VERSION_SUMMARIES[v.id] || {}).monthly }))
+    .filter((s) => Array.isArray(s.monthly) && s.monthly.length === FY_MONTHS);
   if (withMonthly.length === 0) { wrap.hidden = true; return; }
   // Inside a closed <details> the canvas has zero size and Chart.js renders
   // blank — skip; the details' toggle listener re-renders on first open.
@@ -455,25 +473,24 @@ function initScenarios() {
   const host = document.getElementById("scenariosDetails");
   if (host) host.addEventListener("toggle", () => { if (host.open) renderScenarioChart(); });
 
-  document.getElementById("saveScenarioBtn").addEventListener("click", async () => {
-    const name = prompt(t("prompt_scenario_name"));
+  document.getElementById("newScenarioFromOverview").addEventListener("click", async () => {
+    if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast(t("toast_signin_save_data")); return; }
+    const name = prompt(t("prompt_new_scenario"));
     if (!name || !name.trim()) return;
-    const s = await dbSaveScenario(name.trim());
-    if (!s) return;
-    SCENARIOS.push(s);
-    renderScenarios();
+    const id = await dbCreateVersion(name.trim());
+    if (id) switchVersion(id); // branch + open it, same as the sidebar
   });
 
   document.getElementById("scenarioList").addEventListener("click", async (e) => {
     const delBtn = e.target.closest("[data-delscen]");
     if (delBtn) {
       const id = delBtn.dataset.delscen;
-      const s = SCENARIOS.find((x) => x.id === id);
-      if (!confirm(t("confirm_delete_scenario", s ? s.name : ""))) return;
-      if (!(await dbDeleteScenario(id))) return;
-      const idx = SCENARIOS.findIndex((x) => x.id === id);
-      if (idx > -1) SCENARIOS.splice(idx, 1);
-      renderScenarios();
+      const v = PLAN_VERSIONS.find((x) => x.id === id);
+      if (!confirm(t("confirm_delete_scenario", v ? v.name : ""))) return;
+      if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast(t("toast_signin_save_data")); return; }
+      if (!(await dbDeleteVersion(id))) return;
+      if (id === ACTIVE_VERSION_ID) localStorage.removeItem(activeVersionKey()); // was active → fall back to Main
+      location.reload(); // versions + summaries reload cleanly
       return;
     }
 
@@ -521,51 +538,36 @@ function renderAll() {
   if (wrap && sig && rf) wrap.hidden = sig.hidden && rf.hidden;
 }
 
-// Steal-list (Abacum): budgets are locked/versioned, not just a live editable
-// number. Shows the locked baseline, flags drift from the live budget, and
-// lets you lock the current numbers as a new approved version.
+// Steal-list (Abacum): a budget is an approved, locked plan version — not a
+// live editable number. This panel shows the latest locked budget and whether
+// the live plan has since drifted from it (live cost vs the budget's cost,
+// both engine-computed via VERSION_SUMMARIES). Locking happens in the sidebar
+// (Lock as budget), so there's no button here — just the read-out.
 function renderBudgetVersion() {
   const panel = document.getElementById("budgetVersionPanel");
   if (!panel) return;
   const v = latestBudgetVersion();
   const drift = budgetDrift();
-  const lockBtn = `<button class="add-cc-btn" id="lockBudgetBtn" type="button">${v ? t("lock_new_version") : t("lock_current_budget")}</button>`;
+
+  const driftHtml = drift == null
+    ? `<span class="bv-clean">${t("budget_version_clean")}</span>`
+    : `<span class="bv-drift ${drift > 0 ? "over" : "under"}">${t("budget_version_drift", fmtMkrSigned(drift))}</span>`;
 
   // Status chip lives in the collapsed <summary> so the drift/✓ verdict is
   // visible without expanding — collapsed must never mean hidden information.
   const status = document.getElementById("bvStatus");
-  if (status) {
-    status.innerHTML = !v ? ""
-      : drift == null ? `<span class="bv-clean">${t("budget_version_clean")}</span>`
-      : `<span class="bv-drift ${drift > 0 ? "over" : "under"}">${t("budget_version_drift", fmtMkrSigned(drift))}</span>`;
-  }
+  if (status) status.innerHTML = !v ? "" : driftHtml;
 
   if (!v) {
-    panel.innerHTML = `
-      <div class="bv-row">
-        <p class="table-hint">${t("budget_version_none")}</p>
-        ${lockBtn}
-      </div>`;
-  } else {
-    const dateStr = new Date(v.lockedAt).toLocaleDateString("sv-SE");
-    const driftHtml = drift == null
-      ? `<span class="bv-clean">${t("budget_version_clean")}</span>`
-      : `<span class="bv-drift ${drift > 0 ? "over" : "under"}">${t("budget_version_drift", fmtMkrSigned(drift))}</span>`;
-    panel.innerHTML = `
-      <div class="bv-row">
-        <p class="table-hint">${t("budget_version_approved", `<strong>${escapeHtml(v.name)}</strong>`, fmtMkr(v.total))} <span class="pnl-src">${t("budget_version_locked", dateStr)}</span> ${driftHtml}</p>
-        ${lockBtn}
-      </div>`;
+    panel.innerHTML = `<div class="bv-row"><p class="table-hint">${t("budget_version_none")}</p></div>`;
+    return;
   }
-
-  document.getElementById("lockBudgetBtn").addEventListener("click", async () => {
-    const suggested = `${t("suggested_fy_budget")}${BUDGET_VERSIONS.length ? " v" + (BUDGET_VERSIONS.length + 1) : ""}`;
-    const name = prompt(t("prompt_lock_version"), suggested);
-    if (!name || !name.trim()) return;
-    if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast(t("toast_signin_lock")); return; }
-    const version = await dbLockBudgetVersion(name.trim());
-    if (version) { showToast(t("toast_locked", version.name)); renderBudgetVersion(); }
-  });
+  const sum = VERSION_SUMMARIES[v.id] || { total: 0 };
+  const dateStr = new Date(v.lockedAt).toLocaleDateString("sv-SE");
+  panel.innerHTML = `
+    <div class="bv-row">
+      <p class="table-hint">${t("budget_version_approved", `<strong>${escapeHtml(v.name)}</strong>`, fmtMkr(sum.total))} <span class="pnl-src">${t("budget_version_locked", dateStr)}</span> ${driftHtml}</p>
+    </div>`;
 }
 
 function initLensControls() {

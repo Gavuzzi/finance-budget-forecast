@@ -86,32 +86,12 @@ create table if not exists monthly_actual (
   unique (reporting_line_id, month)
 );
 
--- What-if scenario snapshots: name + full-year total + per-cost-center breakdown.
-create table if not exists scenarios (
-  id                uuid primary key default gen_random_uuid(),
-  org_id            uuid not null references organizations(id) on delete cascade,
-  name              text not null,
-  fy_total          numeric not null,
-  snapshot          jsonb,
-  created_at        timestamptz not null default now()
-);
-
--- A locked, approved budget baseline: a snapshot of every cost centre's
--- annual_budget at lock time, so "variance vs budget" can mean "vs what was
--- approved" even after the live budget keeps getting edited.
-create table if not exists budget_versions (
-  id                uuid primary key default gen_random_uuid(),
-  org_id            uuid not null references organizations(id) on delete cascade,
-  name              text not null,
-  locked_at         timestamptz not null default now(),
-  snapshot          jsonb not null,   -- { reporting_line_id: annual_budget }
-  total             numeric not null default 0
-);
-alter table budget_versions enable row level security;
-drop policy if exists budget_versions_read on budget_versions;
-drop policy if exists budget_versions_write on budget_versions;
-create policy budget_versions_read on budget_versions for select using (is_org_member(org_id));
-create policy budget_versions_write on budget_versions for all using (can_edit_org(org_id)) with check (can_edit_org(org_id));
+-- Retired (Phase 8): the old what-if `scenarios` and locked `budget_versions`
+-- snapshot tables. Scenarios and budgets are now real, editable plan_versions
+-- (full driver copies; a locked version is a budget) and comparison is live
+-- via the engine — so these frozen-number tables are dropped.
+drop table if exists scenarios cascade;
+drop table if exists budget_versions cascade;
 
 -- Phase 8 — the versioning spine. A "plan version" is a named copy of the
 -- driver plan (headcount/one-offs/recurring/overrides carry version_id). Every
@@ -171,10 +151,8 @@ alter table organizations add column if not exists close_month_manual boolean no
 alter table reporting_lines add column if not exists source text not null default 'manual';  -- fortnox|manual (fortnox-sourced lines refresh on sync)
 alter table reporting_lines add column if not exists state  text not null default 'linked';  -- planned|linked (plan-ahead lifecycle)
 alter table reporting_lines add column if not exists is_shared boolean not null default false; -- corporate/overhead reporting line — optionally allocated to the others, never on by default
-alter table reporting_lines add column if not exists revenue_plan jsonb; -- optional per-line 12-month revenue profile (array of 12 SEK values, FY-relative). A line with revenue is a profit centre → its own P&L + margin. When ANY line has revenue, the org revenue total = sum of per-line revenue (org-level assumptions.revenue_plan is ignored); no line revenue → falls back to the org-level number. Backward-compatible: existing cost-only lines are unaffected.
-
-alter table assumptions add column if not exists revenue_budget numeric not null default 0; -- simple annual revenue target — no driver engine, just a number to compare actuals against
-alter table assumptions add column if not exists revenue_plan jsonb; -- optional 12-month revenue profile (array of 12 SEK values, FY-relative); null/absent = flat revenue_budget/12
+-- (Legacy revenue columns — reporting_lines.revenue_plan, assumptions.revenue_budget/revenue_plan —
+-- were migrated onto the versioned model and dropped; see the Phase 8 block below.)
 -- VAT/payroll-tax cash-flow timing (Phase 5 v2). Account ranges default wide
 -- enough to be robust to either bookkeeping style (whether or not sub-accounts
 -- get formally closed into the settlement account mid-year) — reclassification
@@ -244,13 +222,27 @@ create policy version_line_revenue_read on version_line_revenue for select using
 create policy version_line_revenue_write on version_line_revenue for all using (can_edit_org(org_id)) with check (can_edit_org(org_id));
 alter table plan_versions add column if not exists revenue_budget numeric not null default 0;
 alter table plan_versions add column if not exists revenue_plan jsonb;
-insert into version_line_revenue (version_id, org_id, reporting_line_id, revenue_plan)
-  select pv.id, rl.org_id, rl.id, rl.revenue_plan
-  from reporting_lines rl join plan_versions pv on pv.org_id = rl.org_id and pv.is_main
-  where rl.revenue_plan is not null
-  on conflict (version_id, reporting_line_id) do nothing;
-update plan_versions pv set revenue_budget = a.revenue_budget, revenue_plan = a.revenue_plan
-  from assumptions a where a.org_id = pv.org_id and pv.is_main and pv.revenue_budget = 0 and pv.revenue_plan is null;
+-- One-time migration of the legacy revenue columns onto the versioned model,
+-- each guarded by column existence so it's a clean no-op once dropped (a bare
+-- reference to a dropped column would fail to parse). Then drop the legacy
+-- columns — revenue now lives on plan_versions / version_line_revenue only.
+do $$
+begin
+  if exists (select 1 from information_schema.columns where table_name = 'reporting_lines' and column_name = 'revenue_plan') then
+    insert into version_line_revenue (version_id, org_id, reporting_line_id, revenue_plan)
+      select pv.id, rl.org_id, rl.id, rl.revenue_plan
+      from reporting_lines rl join plan_versions pv on pv.org_id = rl.org_id and pv.is_main
+      where rl.revenue_plan is not null
+      on conflict (version_id, reporting_line_id) do nothing;
+  end if;
+  if exists (select 1 from information_schema.columns where table_name = 'assumptions' and column_name = 'revenue_budget') then
+    update plan_versions pv set revenue_budget = a.revenue_budget, revenue_plan = a.revenue_plan
+      from assumptions a where a.org_id = pv.org_id and pv.is_main and pv.revenue_budget = 0 and pv.revenue_plan is null;
+  end if;
+end $$;
+alter table reporting_lines drop column if exists revenue_plan;
+alter table assumptions     drop column if exists revenue_budget;
+alter table assumptions     drop column if exists revenue_plan;
 
 -- Sync noise filters: excluded voucher series (e.g. a correction/adjustment
 -- series) or excluded accounts (e.g. opening-balance postings) — rows matching
@@ -343,7 +335,6 @@ alter table reporting_lines enable row level security;
 alter table headcount_lines enable row level security;
 alter table one_offs        enable row level security;
 alter table monthly_actual  enable row level security;
-alter table scenarios       enable row level security;
 
 -- ---------------------------------------------------------------------------
 -- Helper functions. SECURITY DEFINER so they can read memberships without
@@ -418,7 +409,7 @@ create policy "org edit" on organizations for update using (can_edit_org(id)) wi
 do $$
 declare t text;
 begin
-  foreach t in array array['assumptions','roles','reporting_lines','headcount_lines','one_offs','monthly_actual','scenarios']
+  foreach t in array array['assumptions','roles','reporting_lines','headcount_lines','one_offs','monthly_actual']
   loop
     execute format('drop policy if exists "member access" on %I', t);
     execute format('drop policy if exists %I on %I', t || '_read', t);

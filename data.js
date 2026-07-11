@@ -39,14 +39,17 @@ let USER_ORGS = [];
 // never sees it, so preview mode and the engine tests are unaffected.
 let PLAN_VERSIONS = [];
 let ACTIVE_VERSION_ID = null;
-let BUDGET_VERSIONS = []; // locked budget snapshots, newest first
+// Cross-version engine results, keyed by version id — { total, byName, monthly,
+// revenue, result } for every version. Filled at load (loadVersionSummaries) so
+// the Overview panels can compare Main / scenarios / locked budgets without an
+// async call per render. The active version is always the live in-memory model.
+let VERSION_SUMMARIES = {};
 let CASH_POSITION = null; // { bankBalance, asOf } — from the last sync's SIE #UB lines
 let OPEN_INVOICES = [];   // [{ kind: 'customer'|'supplier', amount, dueDate, description, counterparty }]
 // VAT/payroll-tax closing balances by FY-relative month, from the sync's #IB +
 // #TRANS tracking of the configured account ranges — an ESTIMATE of what's
 // owed, kept separate from OPEN_INVOICES (a hard Fortnox figure).
 let TAX_LIABILITY = { vat: new Map(), payroll: new Map() };
-let SCENARIOS = [];
 // Freshness of the Fortnox connection, for the sidebar badge — null for orgs
 // that aren't connected (manual/CSV orgs get no badge, no nagging).
 let SYNC_STATUS = null; // { connected, last_synced_at, last_sync_error }
@@ -384,26 +387,29 @@ function cashFlowProjection(monthsAhead = 6, fromIdx = null) {
   return { rows, runway };
 }
 
-// ---- Budget versioning (locked baseline vs the live, editable budget) ------
-// "Variance vs budget" above always compares to the CURRENT annualBudget,
-// which keeps moving as people edit it. A locked version freezes a snapshot so
-// you can also see "vs what was approved" — and whether the live plan has
-// since drifted from it.
+// ---- Budget baseline (a locked plan version) -------------------------------
+// A budget is now a locked plan_version (see lock-as-budget), not a separate
+// snapshot table. "Are we drifting from budget?" = the live plan's projected
+// cost vs the approved budget version's cost, both computed by the same engine
+// (VERSION_SUMMARIES). Most-recently-locked budget is the active baseline.
 
+function lockedBudgetVersions() {
+  return PLAN_VERSIONS.filter((v) => v.lockedAt)
+    .sort((a, b) => new Date(b.lockedAt) - new Date(a.lockedAt));
+}
 function latestBudgetVersion() {
-  return BUDGET_VERSIONS[0] || null;
+  return lockedBudgetVersions()[0] || null;
 }
 
-function currentBudgetTotal() {
-  return COST_CENTERS.reduce((s, cc) => s + cc.annualBudget, 0);
-}
-
-// null when there's no locked version yet, or once one exists but nothing has
-// drifted (nothing to flag).
+// null when there's no locked budget yet, or once one exists but the live plan
+// hasn't drifted from it (nothing to flag). Positive = live plan costs MORE
+// than the approved budget.
 function budgetDrift() {
   const v = latestBudgetVersion();
   if (!v) return null;
-  const diff = currentBudgetTotal() - v.total;
+  const budget = VERSION_SUMMARIES[v.id], live = VERSION_SUMMARIES[ACTIVE_VERSION_ID];
+  if (!budget || !live) return null;
+  const diff = live.total - budget.total;
   return Math.abs(diff) < 1 ? null : diff;
 }
 
@@ -518,6 +524,82 @@ async function dbDeleteVersion(id) {
   const { error } = await sb.from("plan_versions").delete().eq("id", id);
   if (error) { flagWriteError(error); return false; }
   return true;
+}
+
+// ---- Cross-version computation ---------------------------------------------
+// Run the same engine on ANY version's drivers without disturbing the live
+// in-memory model. The active version is already fully materialised in
+// COST_CENTERS, so for it we just read the live model; for every other version
+// we load its versioned drivers + per-line revenue and overlay them onto the
+// org-shared skeleton (reporting lines + booked actuals + rates + close month,
+// none of which are versioned). fySummary/monthAmount take a cost-centre
+// argument, so they compute correctly on the alt centres.
+
+// FY revenue for an arbitrary version: per-line profit centres win (sum across
+// lines); otherwise the version's own org-level plan / flat budget. Mirrors
+// revenuePlanForMonth but reads the passed version + alt centres, not globals.
+function versionRevenueFyTotal(ver, altCenters) {
+  const anyLine = altCenters.some((cc) => Array.isArray(cc.revenuePlan) && cc.revenuePlan.length === 12 && cc.revenuePlan.some((v) => v > 0));
+  const plan = ver && Array.isArray(ver.revenuePlan) && ver.revenuePlan.length === 12 && ver.revenuePlan.some((v) => v > 0) ? ver.revenuePlan : null;
+  let total = 0;
+  for (let m = 1; m <= FY_MONTHS; m++) {
+    if (anyLine) total += altCenters.reduce((s, cc) => s + (Array.isArray(cc.revenuePlan) ? (Number(cc.revenuePlan[(m - 1) % 12]) || 0) : 0), 0);
+    else if (plan) total += Number(plan[(m - 1) % 12]) || 0;
+    else total += ((ver && ver.revenueBudget) || 0) / 12;
+  }
+  return total;
+}
+
+async function computeVersionSummary(versionId) {
+  // Active version = the live model already in memory.
+  if (versionId === ACTIVE_VERSION_ID) {
+    const monthly = [];
+    for (let m = 1; m <= FY_MONTHS; m++) monthly[m - 1] = companyMonthAmount(m);
+    const byName = {};
+    COST_CENTERS.forEach((cc) => { byName[cc.name] = fySummary(cc).total; });
+    const total = companyFySummary().total, revenue = revenuePlanFyTotal();
+    return { total, byName, monthly, revenue, result: revenue - total };
+  }
+  const ver = PLAN_VERSIONS.find((v) => v.id === versionId);
+  const [hcRes, ooRes, rcRes, foRes, vlrRes] = await Promise.all([
+    sb.from("headcount_lines").select("*").eq("org_id", CURRENT_ORG_ID).eq("version_id", versionId),
+    sb.from("one_offs").select("*").eq("org_id", CURRENT_ORG_ID).eq("version_id", versionId),
+    sb.from("recurring_costs").select("*").eq("org_id", CURRENT_ORG_ID).eq("version_id", versionId),
+    sb.from("forecast_overrides").select("*").eq("org_id", CURRENT_ORG_ID).eq("version_id", versionId),
+    sb.from("version_line_revenue").select("reporting_line_id, revenue_plan").eq("org_id", CURRENT_ORG_ID).eq("version_id", versionId),
+  ]);
+  const lineRev = {};
+  if (!vlrRes.error) (vlrRes.data || []).forEach((r) => { lineRev[r.reporting_line_id] = r.revenue_plan; });
+  const alt = COST_CENTERS.map((base) => ({
+    id: base.id, name: base.name, annualBudget: base.annualBudget,
+    isShared: base.isShared, actualMonthly: base.actualMonthly, // shared — actuals aren't versioned
+    revenuePlan: Array.isArray(lineRev[base.id]) && lineRev[base.id].length === 12 ? lineRev[base.id].map((v) => Number(v) || 0) : null,
+    headcount: (hcRes.data || []).filter((h) => h.reporting_line_id === base.id)
+      .map((h) => ({ roleId: h.role_id, count: h.count, startMonth: h.start_month, endMonth: h.end_month })),
+    oneOffs: (ooRes.data || []).filter((o) => o.reporting_line_id === base.id)
+      .map((o) => ({ amount: Number(o.amount), month: o.month })),
+    recurringCosts: (rcRes.error ? [] : rcRes.data).filter((r) => r.reporting_line_id === base.id)
+      .map((r) => ({ amount: Number(r.amount), startMonth: r.start_month, endMonth: r.end_month, escalationPct: Number(r.escalation_pct || 0) })),
+    overrides: {},
+  }));
+  if (!foRes.error) (foRes.data || []).forEach((o) => { const cc = alt.find((c) => c.id === o.reporting_line_id); if (cc) cc.overrides[o.month] = Number(o.amount); });
+
+  let total = 0; const byName = {}; const monthly = new Array(FY_MONTHS).fill(0);
+  alt.forEach((cc) => {
+    const fy = fySummary(cc);
+    total += fy.total; byName[cc.name] = fy.total;
+    for (let m = 1; m <= FY_MONTHS; m++) monthly[m - 1] += monthAmount(cc, m).value;
+  });
+  const revenue = versionRevenueFyTotal(ver, alt);
+  return { total, byName, monthly, revenue, result: revenue - total };
+}
+
+// Fill VERSION_SUMMARIES for every version (Main + scenarios + budgets). Called
+// at the end of loadData; versions are few, so the parallel loads are cheap.
+async function loadVersionSummaries() {
+  VERSION_SUMMARIES = {};
+  const results = await Promise.all(PLAN_VERSIONS.map((v) => computeVersionSummary(v.id).catch(() => null)));
+  PLAN_VERSIONS.forEach((v, i) => { if (results[i]) VERSION_SUMMARIES[v.id] = results[i]; });
 }
 
 async function loadData(orgId) {
@@ -641,21 +723,6 @@ async function loadData(orgId) {
     });
   }
 
-  // Scenarios are optional — the table may not exist until migration-scenarios.sql
-  // is run — so load them tolerantly; the app works either way.
-  SCENARIOS.length = 0;
-  const scenRes = await sb.from("scenarios").select("*").eq("org_id", CURRENT_ORG_ID).order("created_at");
-  if (!scenRes.error) scenRes.data.forEach((s) => SCENARIOS.push({
-    id: s.id, name: s.name, fyTotal: Number(s.fy_total),
-    breakdown: (s.snapshot && s.snapshot.breakdown) || [],
-    monthly: (s.snapshot && Array.isArray(s.snapshot.monthly) && s.snapshot.monthly.length === FY_MONTHS) ? s.snapshot.monthly.map(Number) : [],
-  }));
-
-  // Budget versions — likewise optional/tolerant (table may not exist yet on an older DB).
-  BUDGET_VERSIONS.length = 0;
-  const bvRes = await sb.from("budget_versions").select("*").eq("org_id", CURRENT_ORG_ID).order("locked_at", { ascending: false });
-  if (!bvRes.error) bvRes.data.forEach((v) => BUDGET_VERSIONS.push({ id: v.id, name: v.name, lockedAt: v.locked_at, snapshot: v.snapshot, total: Number(v.total) }));
-
   // Sync freshness for the sidebar badge — tolerant, absent for unconnected orgs.
   SYNC_STATUS = null;
   const stRes = await sb.from("integration_status")
@@ -679,6 +746,10 @@ async function loadData(orgId) {
   SIGNAL_REVIEWS = new Set();
   const srRes = await sb.from("signal_reviews").select("reporting_line_id, month").eq("org_id", CURRENT_ORG_ID);
   if (!srRes.error) srRes.data.forEach((r) => SIGNAL_REVIEWS.add(r.reporting_line_id + ":" + r.month));
+
+  // Cross-version summaries for the Overview panels (scenarios vs live, budget
+  // drift). Runs the engine on every version; needs the shared skeleton above.
+  await loadVersionSummaries();
 }
 
 // ---- Preview mode ----------------------------------------------------------
@@ -694,8 +765,9 @@ function loadPreviewData() {
   // Fake plan versions so the sidebar switcher renders in the demo (real writes
   // are blocked in demo mode, so branching just shows the sign-in toast).
   PLAN_VERSIONS = [
-    { id: "pv-main", name: "Main", isMain: true, lockedAt: null },
-    { id: "pv-budget", name: "Budget 2026", isMain: false, lockedAt: "2026-01-15T09:00:00Z" },
+    { id: "pv-main", name: "Main", isMain: true, lockedAt: null, revenueBudget: 50000000, revenuePlan: null },
+    { id: "pv-scen", name: "Hiring freeze", isMain: false, lockedAt: null, revenueBudget: 50000000, revenuePlan: null },
+    { id: "pv-budget", name: "Budget 2026", isMain: false, lockedAt: "2026-01-15T09:00:00Z", revenueBudget: 50000000, revenuePlan: null },
   ];
   ACTIVE_VERSION_ID = "pv-main";
   CLOSE_MONTH = 6;
@@ -710,7 +782,7 @@ function loadPreviewData() {
 
   ROLE_CATALOG.length = 0;
   COST_CENTERS.length = 0;
-  SCENARIOS.length = 0;
+  VERSION_SUMMARIES = {};
   if (new URLSearchParams(location.search).has("empty")) return; // ?preview&empty → fresh-org state
 
   ROLE_CATALOG.push(
@@ -755,21 +827,22 @@ function loadPreviewData() {
     });
   }
 
-  // Monthly trajectories are illustrative fixed demo fixtures (not derived
-  // from the engine, unlike everything else in this function) — chosen so
-  // "Hiring freeze" tracks Base exactly through month 8 then visibly dips for
-  // months 9-12, right where Base has the September hire + one-off, so the
-  // trajectory chart demonstrates its whole point (see the shape of the
-  // divergence, not just the FY delta) without needing real data.
-  SCENARIOS.push(
-    { id: "s1", name: "Base", fyTotal: 41800000, breakdown: [{ name: "Production", total: 28600000 }, { name: "R&D", total: 9300000 }, { name: "IT", total: 3900000 }],
+  // Cross-version summaries for the demo Overview panels. Monthly trajectories
+  // are illustrative fixed fixtures (not engine-derived, unlike everything else
+  // here) — "Hiring freeze" tracks Main exactly through month 8 then visibly
+  // dips for months 9-12, right where Main has the September hire + one-off, so
+  // the trajectory chart demonstrates its whole point (see the SHAPE of the
+  // divergence, not just the FY delta). Main mirrors the live model (~41.8M);
+  // Budget 2026 is the approved baseline (42.0M) so the drift chip shows a
+  // small clean under-budget number.
+  VERSION_SUMMARIES = {
+    "pv-main": { total: 41800000, byName: { Production: 28600000, "R&D": 9300000, IT: 3900000 }, revenue: 50000000, result: 8200000,
       monthly: [3300000, 3300000, 3300000, 3300000, 3300000, 3300000, 3400000, 3400000, 4100000, 3700000, 3700000, 3700000] },
-    { id: "s2", name: "Hiring freeze", fyTotal: 39500000, breakdown: [{ name: "Production", total: 27000000 }, { name: "R&D", total: 8600000 }, { name: "IT", total: 3900000 }],
+    "pv-scen": { total: 39500000, byName: { Production: 27000000, "R&D": 8600000, IT: 3900000 }, revenue: 50000000, result: 10500000,
       monthly: [3300000, 3300000, 3300000, 3300000, 3300000, 3300000, 3400000, 3400000, 3200000, 3200000, 3200000, 3300000] },
-  );
-
-  BUDGET_VERSIONS.length = 0;
-  BUDGET_VERSIONS.push({ id: "bv1", name: "FY2026 Budget", lockedAt: "2026-01-15T09:00:00Z", snapshot: { c1: 28000000, c2: 9000000, c3: 5000000 }, total: 42000000 });
+    "pv-budget": { total: 42000000, byName: { Production: 28000000, "R&D": 9000000, IT: 5000000 }, revenue: 50000000, result: 8000000,
+      monthly: [3500000, 3500000, 3500000, 3500000, 3500000, 3500000, 3500000, 3500000, 3500000, 3500000, 3500000, 3500000] },
+  };
 
   // Seasonal revenue profile summing to exactly the 50.0M annual target —
   // July dips (industrisemester), Q4 pushes. Gives the demo a non-flat cash
@@ -1142,41 +1215,10 @@ function parseActualsCsv(text) {
   return { rows, unmatched: [...unmatched], skipped };
 }
 
-async function dbSaveScenario(name) {
-  const breakdown = COST_CENTERS.map((cc) => ({ name: cc.name, total: fySummary(cc).total }));
-  // Month-by-month trajectory (steal: Causal) — frozen at save time, same as
-  // fyTotal/breakdown, so a later CLOSE_MONTH advance or driver edit doesn't
-  // retroactively change what a saved scenario says it was.
-  const monthly = [];
-  for (let m = 1; m <= FY_MONTHS; m++) monthly.push(companyMonthAmount(m));
-  const fyTotal = companyFySummary().total;
-  const { data, error } = await sb.from("scenarios")
-    .insert({ org_id: CURRENT_ORG_ID, name, fy_total: fyTotal, snapshot: { breakdown, monthly } })
-    .select().single();
-  if (error) { flagWriteError(error); return null; }
-  return { id: data.id, name: data.name, fyTotal: Number(data.fy_total), breakdown, monthly };
-}
-
-async function dbDeleteScenario(id) {
-  const { error } = await sb.from("scenarios").delete().eq("id", id);
-  if (error) { flagWriteError(error); return false; }
-  return true;
-}
-
-// Lock the CURRENT annualBudget of every cost centre into a named, permanent
-// snapshot. Doesn't touch the live budget — that stays editable — so future
-// edits can be measured against "what was approved" via budgetDrift().
-async function dbLockBudgetVersion(name) {
-  const snapshot = Object.fromEntries(COST_CENTERS.map((cc) => [cc.id, cc.annualBudget]));
-  const total = currentBudgetTotal();
-  const { data, error } = await sb.from("budget_versions")
-    .insert({ org_id: CURRENT_ORG_ID, name, snapshot, total })
-    .select().single();
-  if (error) { flagWriteError(error); return null; }
-  const version = { id: data.id, name: data.name, lockedAt: data.locked_at, snapshot: data.snapshot, total: Number(data.total) };
-  BUDGET_VERSIONS.unshift(version);
-  return version;
-}
+// (Scenarios and budgets used to be immutable snapshots in their own tables.
+// They're now real, editable plan_versions — see copyActiveVersion /
+// dbCreateVersion / dbLockAsBudget above — so dbSaveScenario / dbDeleteScenario
+// / dbLockBudgetVersion are gone. Comparison is live via VERSION_SUMMARIES.)
 
 // Stand up a brand-new tenant via the locked-down server-side function — one
 // atomic call that creates the org, your owner membership, and default
