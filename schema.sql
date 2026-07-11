@@ -226,6 +226,32 @@ alter table forecast_overrides drop constraint if exists forecast_overrides_cost
 alter table forecast_overrides drop constraint if exists forecast_overrides_reporting_line_id_month_key;  -- fresh-DB auto-name
 create unique index if not exists forecast_overrides_ver_line_month on forecast_overrides (version_id, reporting_line_id, month);
 
+-- Revenue is versioned too (so a scenario can vary the top line and per-project
+-- revenue). Per-line revenue moves out of reporting_lines.revenue_plan into a
+-- versioned table; org-level revenue moves off assumptions onto the version.
+-- The old columns are left in place as legacy (unread) and dropped later.
+create table if not exists version_line_revenue (
+  version_id        uuid not null references plan_versions(id) on delete cascade,
+  org_id            uuid not null references organizations(id) on delete cascade,
+  reporting_line_id uuid not null references reporting_lines(id) on delete cascade,
+  revenue_plan      jsonb,
+  primary key (version_id, reporting_line_id)
+);
+alter table version_line_revenue enable row level security;
+drop policy if exists version_line_revenue_read on version_line_revenue;
+drop policy if exists version_line_revenue_write on version_line_revenue;
+create policy version_line_revenue_read on version_line_revenue for select using (is_org_member(org_id));
+create policy version_line_revenue_write on version_line_revenue for all using (can_edit_org(org_id)) with check (can_edit_org(org_id));
+alter table plan_versions add column if not exists revenue_budget numeric not null default 0;
+alter table plan_versions add column if not exists revenue_plan jsonb;
+insert into version_line_revenue (version_id, org_id, reporting_line_id, revenue_plan)
+  select pv.id, rl.org_id, rl.id, rl.revenue_plan
+  from reporting_lines rl join plan_versions pv on pv.org_id = rl.org_id and pv.is_main
+  where rl.revenue_plan is not null
+  on conflict (version_id, reporting_line_id) do nothing;
+update plan_versions pv set revenue_budget = a.revenue_budget, revenue_plan = a.revenue_plan
+  from assumptions a where a.org_id = pv.org_id and pv.is_main and pv.revenue_budget = 0 and pv.revenue_plan is null;
+
 -- Sync noise filters: excluded voucher series (e.g. a correction/adjustment
 -- series) or excluded accounts (e.g. opening-balance postings) — rows matching
 -- these are fully ignored by the sync, not just left unmapped.

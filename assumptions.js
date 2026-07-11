@@ -297,7 +297,9 @@ function initAssumptions() {
       updateRateFormula();
       const rpTotal = document.getElementById("revPlanTotal");
       if (rpTotal) rpTotal.innerHTML = revPlanTotalHtml();
-      dbUpdateAssumptions();
+      // Revenue target is versioned; the rate fields are org-shared.
+      if (target.dataset.assumption === "revenueBudget") dbUpdateRevenuePlan();
+      else dbUpdateAssumptions();
       return;
     }
 

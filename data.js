@@ -429,13 +429,13 @@ function setCloseMonth(m) {
 async function loadPlanVersions() {
   PLAN_VERSIONS = [];
   const { data, error } = await sb.from("plan_versions")
-    .select("id, name, is_main, locked_at").eq("org_id", CURRENT_ORG_ID).order("created_at");
+    .select("id, name, is_main, locked_at, revenue_budget, revenue_plan").eq("org_id", CURRENT_ORG_ID).order("created_at");
   let rows = error ? [] : (data || []);
   let main = rows.find((v) => v.is_main);
   if (!main) {
     const ins = await sb.from("plan_versions")
       .insert({ org_id: CURRENT_ORG_ID, name: "Main", is_main: true })
-      .select("id, name, is_main, locked_at").single();
+      .select("id, name, is_main, locked_at, revenue_budget, revenue_plan").single();
     if (!ins.error && ins.data) {
       main = ins.data;
       rows = [main, ...rows];
@@ -444,7 +444,7 @@ async function loadPlanVersions() {
       }
     }
   }
-  PLAN_VERSIONS = rows.map((v) => ({ id: v.id, name: v.name, isMain: !!v.is_main, lockedAt: v.locked_at }));
+  PLAN_VERSIONS = rows.map((v) => ({ id: v.id, name: v.name, isMain: !!v.is_main, lockedAt: v.locked_at, revenueBudget: Number(v.revenue_budget || 0), revenuePlan: v.revenue_plan }));
   // Active = the saved choice for this org if it still exists, else Main.
   const saved = localStorage.getItem(activeVersionKey());
   const active = PLAN_VERSIONS.find((v) => v.id === saved) || PLAN_VERSIONS.find((v) => v.isMain);
@@ -465,10 +465,14 @@ function switchVersion(id) {
 async function dbCreateVersion(name) {
   if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast(t("toast_signin_save_data")); return null; }
   const src = ACTIVE_VERSION_ID;
+  const srcV = activeVersion() || {};
+  // New version inherits the source's org-level revenue (target + profile).
   const { data: v, error } = await sb.from("plan_versions")
-    .insert({ org_id: CURRENT_ORG_ID, name, is_main: false }).select("id").single();
+    .insert({ org_id: CURRENT_ORG_ID, name, is_main: false, revenue_budget: srcV.revenueBudget || 0, revenue_plan: srcV.revenuePlan || null })
+    .select("id").single();
   if (error) { flagWriteError(error); return null; }
-  for (const tbl of ["headcount_lines", "one_offs", "recurring_costs", "forecast_overrides"]) {
+  // Copy the drivers (cost side) + per-line revenue (profit centres).
+  for (const tbl of ["headcount_lines", "one_offs", "recurring_costs", "forecast_overrides", "version_line_revenue"]) {
     const { data: srcRows, error: se } = await sb.from(tbl).select("*").eq("org_id", CURRENT_ORG_ID).eq("version_id", src);
     if (se) { flagWriteError(se); return null; }
     if (srcRows && srcRows.length) {
@@ -520,27 +524,31 @@ async function loadData(orgId) {
   await loadPlanVersions();
 
   // Everything else is filtered to the active org (there may be several now).
-  const [assRes, rolesRes, ccRes, hcRes, ooRes, actRes] = await Promise.all([
+  // Per-line revenue is versioned too (vlrRes), so scenarios can vary it.
+  const [assRes, rolesRes, ccRes, hcRes, ooRes, actRes, vlrRes] = await Promise.all([
     sb.from("assumptions").select("*").eq("org_id", CURRENT_ORG_ID).single(),
     sb.from("roles").select("*").eq("org_id", CURRENT_ORG_ID),
     sb.from("reporting_lines").select("*").eq("org_id", CURRENT_ORG_ID),
     sb.from("headcount_lines").select("*").eq("org_id", CURRENT_ORG_ID).eq("version_id", ACTIVE_VERSION_ID),
     sb.from("one_offs").select("*").eq("org_id", CURRENT_ORG_ID).eq("version_id", ACTIVE_VERSION_ID),
     sb.from("monthly_actual").select("*").eq("org_id", CURRENT_ORG_ID),
+    sb.from("version_line_revenue").select("reporting_line_id, revenue_plan").eq("org_id", CURRENT_ORG_ID).eq("version_id", ACTIVE_VERSION_ID),
   ]);
 
   const failed = [assRes, rolesRes, ccRes, hcRes, ooRes, actRes].find((r) => r.error);
   if (failed) throw new Error(failed.error.message);
+  const lineRevByCc = {};
+  if (!vlrRes.error) (vlrRes.data || []).forEach((r) => { lineRevByCc[r.reporting_line_id] = r.revenue_plan; });
 
   Object.assign(ASSUMPTIONS, {
     employerContributionPct: Number(assRes.data.employer_contribution_pct),
     equipmentMonthly: Number(assRes.data.equipment_monthly),
     otherOverheadPct: Number(assRes.data.other_overhead_pct),
-    revenueBudget: Number(assRes.data.revenue_budget || 0),
-    // Optional 12-month revenue profile; anything malformed loads as null and
-    // the engine falls back to flat revenueBudget/12 (the pre-plan behavior).
-    revenuePlan: Array.isArray(assRes.data.revenue_plan) && assRes.data.revenue_plan.length === 12
-      ? assRes.data.revenue_plan.map((v) => Number(v) || 0)
+    // Org-level revenue is now versioned — it lives on the active plan version,
+    // not the (org-shared) assumptions row. Falls back to 0/null.
+    revenueBudget: Number((activeVersion() || {}).revenueBudget || 0),
+    revenuePlan: Array.isArray((activeVersion() || {}).revenuePlan) && activeVersion().revenuePlan.length === 12
+      ? activeVersion().revenuePlan.map((v) => Number(v) || 0)
       : null,
     vatFrequency: assRes.data.vat_frequency || "quarterly",
     vatAccountFrom: Number(assRes.data.vat_account_from ?? 2610),
@@ -572,9 +580,10 @@ async function loadData(orgId) {
         otherMonthly: Number(cc.other_monthly), // legacy — superseded by recurringCosts, kept only so old writes don't error
         note: cc.note || "",
         isShared: !!cc.is_shared,
-        // Optional per-line revenue profile (profit centre). Malformed/absent → null.
-        revenuePlan: Array.isArray(cc.revenue_plan) && cc.revenue_plan.length === 12
-          ? cc.revenue_plan.map((v) => Number(v) || 0) : null,
+        // Per-line revenue (profit centre), versioned — from version_line_revenue
+        // for the active version. Malformed/absent → null.
+        revenuePlan: Array.isArray(lineRevByCc[cc.id]) && lineRevByCc[cc.id].length === 12
+          ? lineRevByCc[cc.id].map((v) => Number(v) || 0) : null,
         headcount: hcRes.data
           .filter((h) => h.reporting_line_id === cc.id)
           .map((h) => ({ id: h.id, roleId: h.role_id, count: h.count, startMonth: h.start_month, endMonth: h.end_month })),
@@ -798,11 +807,12 @@ function flagWriteError(error) {
 }
 
 async function dbUpdateAssumptions() {
+  // Rates are org-shared (same across versions). Revenue is versioned — see
+  // dbUpdateRevenuePlan (writes both the target and the monthly profile).
   const { error } = await sb.from("assumptions").update({
     employer_contribution_pct: ASSUMPTIONS.employerContributionPct,
     equipment_monthly: ASSUMPTIONS.equipmentMonthly,
     other_overhead_pct: ASSUMPTIONS.otherOverheadPct,
-    revenue_budget: ASSUMPTIONS.revenueBudget,
   }).eq("org_id", CURRENT_ORG_ID);
   if (error) flagWriteError(error);
 }
@@ -848,10 +858,15 @@ async function exportAllData() {
   showToast(t("toast_export_done"));
 }
 
+// Org-level revenue (target + monthly profile) is versioned — it lives on the
+// active plan version, so a scenario can vary the top line. Also keeps the
+// in-memory activeVersion() copy in sync so a later re-read is correct.
 async function dbUpdateRevenuePlan() {
-  const { error } = await sb.from("assumptions")
-    .update({ revenue_plan: ASSUMPTIONS.revenuePlan })
-    .eq("org_id", CURRENT_ORG_ID);
+  const av = activeVersion();
+  if (av) { av.revenueBudget = ASSUMPTIONS.revenueBudget; av.revenuePlan = ASSUMPTIONS.revenuePlan; }
+  const { error } = await sb.from("plan_versions")
+    .update({ revenue_budget: ASSUMPTIONS.revenueBudget, revenue_plan: ASSUMPTIONS.revenuePlan })
+    .eq("id", ACTIVE_VERSION_ID);
   if (error) flagWriteError(error);
 }
 
@@ -918,8 +933,18 @@ async function dbSetCostCenterNote(cc) {
 // Per-line revenue (profit centre). Persists cc.revenuePlan; null clears it
 // (the line reverts to a pure cost centre).
 async function dbSetLineRevenue(cc) {
-  const { error } = await sb.from("reporting_lines").update({ revenue_plan: cc.revenuePlan || null }).eq("id", cc.id);
-  if (error) flagWriteError(error);
+  // Per-line revenue is versioned: upsert into version_line_revenue for the
+  // active version; clearing it (null) removes the row (line reverts to cost-only).
+  if (cc.revenuePlan) {
+    const { error } = await sb.from("version_line_revenue").upsert(
+      { version_id: ACTIVE_VERSION_ID, org_id: CURRENT_ORG_ID, reporting_line_id: cc.id, revenue_plan: cc.revenuePlan },
+      { onConflict: "version_id,reporting_line_id" });
+    if (error) flagWriteError(error);
+  } else {
+    const { error } = await sb.from("version_line_revenue").delete()
+      .eq("version_id", ACTIVE_VERSION_ID).eq("reporting_line_id", cc.id);
+    if (error) flagWriteError(error);
+  }
 }
 
 // Month-end review ritual: mark/unmark a signal as reviewed. Optimistic on the
