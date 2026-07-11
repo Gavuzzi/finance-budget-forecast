@@ -51,7 +51,11 @@ const STRINGS = {
 en: {
   // ---- sidebar / nav ----
   nav_overview: "Overview", nav_monthly: "Monthly", nav_planning: "Planning",
-  nav_cashflow: "Cash Flow", nav_assumptions: "Assumptions",
+  nav_cashflow: "Cash Flow", nav_connect: "Data", nav_assumptions: "Assumptions",
+  connect_h1: "Data",
+  connect_subtitle: "Where your actuals come from — connect Fortnox, or import a CSV",
+  import_csv_h2: "Manual import",
+  import_csv_sub: "No Fortnox connection? Paste or upload your actuals as CSV.",
   brand_sub: "Budget & Forecast",
   new_org_btn: "+ New organization",
   period_label: "Actuals booked through",
@@ -512,7 +516,11 @@ en: {
 },
 sv: {
   nav_overview: "Översikt", nav_monthly: "Månadsvis", nav_planning: "Planering",
-  nav_cashflow: "Kassaflöde", nav_assumptions: "Antaganden",
+  nav_cashflow: "Kassaflöde", nav_connect: "Data", nav_assumptions: "Antaganden",
+  connect_h1: "Data",
+  connect_subtitle: "Varifrån ditt utfall kommer — anslut Fortnox, eller importera en CSV",
+  import_csv_h2: "Manuell import",
+  import_csv_sub: "Ingen Fortnox-anslutning? Klistra in eller ladda upp ditt utfall som CSV.",
   brand_sub: "Budget & Prognos",
   new_org_btn: "+ Ny organisation",
   period_label: "Utfall bokfört t.o.m.",

@@ -235,49 +235,6 @@ function initDrill() {
   });
 }
 
-function initImport() {
-  const panel = document.getElementById("importPanel");
-  const textArea = document.getElementById("csvText");
-  const fileInput = document.getElementById("csvFile");
-  const preview = document.getElementById("importPreview");
-  const doBtn = document.getElementById("doImportBtn");
-  let parsed = { rows: [], unmatched: [], skipped: 0 };
-
-  document.getElementById("importActualsBtn").addEventListener("click", () => {
-    panel.hidden = !panel.hidden;
-  });
-
-  function refreshPreview() {
-    if (!textArea.value.trim()) {
-      parsed = { rows: [], unmatched: [], skipped: 0 };
-      preview.innerHTML = "";
-      doBtn.disabled = true;
-      return;
-    }
-    parsed = parseActualsCsv(textArea.value);
-    let msg = t("import_ready", parsed.rows.length);
-    if (parsed.unmatched.length) msg += ` <span class="import-warn">${t("import_unmatched", parsed.unmatched.map(escapeHtml).join(", "))}</span>`;
-    if (parsed.skipped) msg += ` ${t("import_skipped", parsed.skipped)}`;
-    preview.innerHTML = msg;
-    doBtn.disabled = parsed.rows.length === 0;
-  }
-
-  textArea.addEventListener("input", refreshPreview);
-  fileInput.addEventListener("change", async () => {
-    if (!fileInput.files[0]) return;
-    textArea.value = await fileInput.files[0].text();
-    refreshPreview();
-  });
-
-  doBtn.addEventListener("click", async () => {
-    if (parsed.rows.length === 0) return;
-    doBtn.disabled = true;
-    const ok = await dbUpsertActuals(parsed.rows);
-    if (ok) location.reload();
-    else doBtn.disabled = false;
-  });
-}
-
 function initMonthly() {
   document.querySelectorAll(".lens-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -292,25 +249,9 @@ function initMonthly() {
   });
   document.getElementById("exportBtn").addEventListener("click", downloadExport);
   initDrill();
-  initImport();
-  handleFortnoxRedirect();
-  renderIntegrationPanel(document.getElementById("integrationPanel"));
   renderMonthlyGrid();
   // Dev hooks for headless verification.
   if (location.hash === "#drilltest" && COST_CENTERS.length) showDrill(COST_CENTERS[0].id, 3);
-  if (location.hash === "#maptest" && typeof DEMO_MODE !== "undefined" && DEMO_MODE) {
-    // Render the mapping editor with a mixed mapped/unmapped list so the
-    // "Import all" path is screenshot-verifiable without a live Fortnox org.
-    lastCostCenters = [
-      { code: "1", name: "Produktion", cost: 14200000, mapped: true },
-      { code: "2", name: "Försäljning", cost: 8300000, mapped: false },
-      { code: "3", name: "Lager & Logistik", cost: 5100000, mapped: false },
-      { code: "4", name: "Administration", cost: 2400000, mapped: false },
-    ];
-    const host = document.getElementById("integrationPanel");
-    host.innerHTML = `<div class="integration-card connected"><div class="integ-mapping" id="fnMapping"></div></div>`;
-    renderMappingEditor(host.querySelector("#fnMapping"));
-  }
   if (location.hash === "#csvtest") {
     document.getElementById("monthlyGrid").innerHTML = `<pre style="font-size:11px">${escapeHtml(buildExportCsv())}</pre>`;
   }

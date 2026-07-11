@@ -12,6 +12,7 @@ const NAV = [
   { id: "monthly", href: "monthly.html" },
   { id: "planning", href: "planning.html" },
   { id: "cashflow", href: "cashflow.html" },
+  { id: "connect", href: "connect.html" },
   { id: "assumptions", href: "assumptions.html" },
 ];
 
@@ -20,6 +21,7 @@ function currentPageId() {
   if (file.startsWith("monthly")) return "monthly";
   if (file.startsWith("planning")) return "planning";
   if (file.startsWith("cashflow")) return "cashflow";
+  if (file.startsWith("connect")) return "connect";
   if (file.startsWith("assumptions")) return "assumptions";
   return "overview";
 }

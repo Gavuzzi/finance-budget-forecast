@@ -455,3 +455,50 @@ function handleFortnoxRedirect() {
   p.delete("fortnox");
   history.replaceState({}, "", location.pathname + (p.toString() ? "?" + p : ""));
 }
+
+// Manual CSV import of actuals — the no-Fortnox path. Lives with the other
+// actuals-loading code (moved off Monthly onto the Data page). Self-contained:
+// only needs its own DOM + parseActualsCsv/dbUpsertActuals (data.js).
+function initImport() {
+  const panel = document.getElementById("importPanel");
+  if (!panel) return; // only present on the Data page
+  const textArea = document.getElementById("csvText");
+  const fileInput = document.getElementById("csvFile");
+  const preview = document.getElementById("importPreview");
+  const doBtn = document.getElementById("doImportBtn");
+  let parsed = { rows: [], unmatched: [], skipped: 0 };
+
+  document.getElementById("importActualsBtn").addEventListener("click", () => {
+    panel.hidden = !panel.hidden;
+  });
+
+  function refreshPreview() {
+    if (!textArea.value.trim()) {
+      parsed = { rows: [], unmatched: [], skipped: 0 };
+      preview.innerHTML = "";
+      doBtn.disabled = true;
+      return;
+    }
+    parsed = parseActualsCsv(textArea.value);
+    let msg = t("import_ready", parsed.rows.length);
+    if (parsed.unmatched.length) msg += ` <span class="import-warn">${t("import_unmatched", parsed.unmatched.map(escapeHtml).join(", "))}</span>`;
+    if (parsed.skipped) msg += ` ${t("import_skipped", parsed.skipped)}`;
+    preview.innerHTML = msg;
+    doBtn.disabled = parsed.rows.length === 0;
+  }
+
+  textArea.addEventListener("input", refreshPreview);
+  fileInput.addEventListener("change", async () => {
+    if (!fileInput.files[0]) return;
+    textArea.value = await fileInput.files[0].text();
+    refreshPreview();
+  });
+
+  doBtn.addEventListener("click", async () => {
+    if (parsed.rows.length === 0) return;
+    doBtn.disabled = true;
+    const ok = await dbUpsertActuals(parsed.rows);
+    if (ok) location.reload();
+    else doBtn.disabled = false;
+  });
+}

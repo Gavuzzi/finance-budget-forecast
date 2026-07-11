@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data — FP&A</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="app-main">
+      <header class="page-head">
+        <div class="page-head-text">
+          <h1 data-i18n="connect_h1">Data</h1>
+          <p class="page-sub" data-i18n="connect_subtitle">Where your actuals come from — connect Fortnox, or import a CSV</p>
+        </div>
+      </header>
+
+      <div id="integrationPanel"></div>
+
+      <section class="panel">
+        <h2 data-i18n="import_csv_h2">Manual import</h2>
+        <p class="panel-legend" data-i18n="import_csv_sub">No Fortnox connection? Paste or upload your actuals as CSV.</p>
+        <button class="btn-secondary" id="importActualsBtn" type="button" data-i18n="import_csv_btn">Import actuals (CSV)</button>
+        <div class="import-panel" id="importPanel" hidden>
+          <p class="import-help" data-i18n-html="import_help">One value per row: <code>Reporting Line; Month (1–24); Amount</code>, separated by <code>;</code>, comma, or tab. A header row is fine. Upload a file or paste below — reporting lines match by name.</p>
+          <input type="file" id="csvFile" accept=".csv,.txt,text/csv">
+          <textarea id="csvText" rows="5" placeholder="Production; 1; 2380000&#10;R&amp;D; 1; 780000&#10;IT; 1; 360000"></textarea>
+          <div class="import-preview" id="importPreview"></div>
+          <button class="add-cc-btn" id="doImportBtn" type="button" disabled data-i18n="import_btn">Import</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="lib.js"></script>
+  <script src="i18n.js"></script>
+  <script src="data.js"></script>
+  <script src="sidebar.js"></script>
+  <script src="fortnox.js"></script>
+  <script src="connect.js"></script>
+  <script>requireAuthAndLoad(() => { renderSidebar(); window.initPage(); });</script>
+</body>
+</html>
