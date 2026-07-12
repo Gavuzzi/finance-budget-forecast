@@ -94,9 +94,21 @@ async function runFortnoxSync(btn) {
     if (ls) ls.textContent = t("fn_last_synced_prefix") + new Date().toLocaleString("sv-SE");
   } catch (e) {
     showToast(t("fn_sync_failed", e.message), "error");
+    return false;
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = t("fn_sync_now_btn"); }
   }
+  return true;
+}
+
+// One smooth action [#17]: after importing/linking a Fortnox code, its actuals
+// used to appear only after a manual re-sync + refresh. Now we sync right away
+// and reload, so the new line arrives WITH its numbers. No reload on a failed
+// sync — the error toast stays visible and the mapping is already saved.
+async function syncAndReflect() {
+  if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) return;
+  showToast(t("fn_autosync_toast"));
+  if (await runFortnoxSync(null)) location.reload();
 }
 
 function fmtKr(n) {
@@ -253,9 +265,14 @@ async function renderMappingEditor(host) {
     ? `<p class="integ-map-hint fn-section-gap">${t("fn_proj_hint")}</p>`
       + importAllBtn(lastProjects, "project") + codeRowsHtml(lastProjects, "project")
     : "";
+  // Account ranges + sync exclusions are legit but advanced [#20] — off the
+  // default surface, one click away behind a plain "Advanced" disclosure.
   host.innerHTML = ccSection + projSection
-    + `<div id="fnAcctRanges" class="fn-acct-ranges"></div>`
-    + `<div id="fnExclusions" class="fn-acct-ranges"></div>`;
+    + `<details class="fn-advanced">
+        <summary>${t("fn_advanced_summary")}</summary>
+        <div id="fnAcctRanges" class="fn-acct-ranges"></div>
+        <div id="fnExclusions" class="fn-acct-ranges"></div>
+      </details>`;
   renderAccountRanges(host);
   renderExclusions(host);
   host.querySelectorAll("[data-importall]").forEach((btn) =>
@@ -374,8 +391,10 @@ async function importOneQuiet(item, dimension) {
 }
 
 async function importCostCenter(item, host, dimension = "costcenter") {
-  if (await importOneQuiet(item, dimension)) showToast(t("fn_imported_one", item.name));
+  const ok = await importOneQuiet(item, dimension);
+  if (ok) showToast(t("fn_imported_one", item.name));
   renderMappingEditor(host);
+  if (ok) syncAndReflect();
 }
 
 // One-click onboarding: import every still-unmapped Fortnox code as a new
@@ -391,6 +410,7 @@ async function importAllUnmapped(dimension, host, btn) {
     ? t("fn_imported_all", n)
     : t("fn_imported_partial", n, list.length), n === list.length ? "info" : "error");
   renderMappingEditor(host);
+  if (n > 0) syncAndReflect();
 }
 
 async function linkCostCenter(item, appCcId, host, dimension = "costcenter") {
@@ -398,6 +418,7 @@ async function linkCostCenter(item, appCcId, host, dimension = "costcenter") {
   item.mapped = true;
   showToast(t("fn_linked", item.code, COST_CENTERS.find((c) => c.id === appCcId)?.name || t("fn_fallback_line")));
   renderMappingEditor(host);
+  syncAndReflect();
 }
 
 function wireIntegrationPanel(host, status) {

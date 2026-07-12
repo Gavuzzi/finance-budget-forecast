@@ -310,6 +310,17 @@
   padding: 0;
 }
 
+/* Advanced sync config disclosure [#20] */
+.fn-advanced { margin-top: 18px; border-top: 1px solid var(--panel-border); padding-top: 10px; }
+.fn-advanced > summary {
+  cursor: pointer; font-size: 0.82rem; font-weight: 600; color: var(--text-dim);
+  list-style: none;
+}
+.fn-advanced > summary::-webkit-details-marker { display: none; }
+.fn-advanced > summary::before { content: "▸ "; font-size: 0.75rem; }
+.fn-advanced[open] > summary::before { content: "▾ "; }
+.fn-advanced > summary:hover { color: var(--text); }
+
 /* Contextual "?" help marks (SAC-style, Tier 3) */
 .help-mark {
   display: inline-flex; align-items: center; justify-content: center;
