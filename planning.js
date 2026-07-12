@@ -53,12 +53,18 @@ function renderHeadcountRow(h, hc) {
   `;
 }
 
+// One MERGED costs table [#8] — monthly (recurring) and one-off rows share the
+// same columns, so one header, one table, half the space. A one-off is simply
+// a cost that exists in a single month: Until and %/yr show "—". Rows keep
+// their original data-attrs, so every existing edit/remove handler is untouched.
 function renderOneOffRow(o, oi) {
   return `
     <tr data-oneoff="${oi}">
       <td><input type="text" data-ofield="label" value="${escapeHtml(o.label)}"></td>
-      <td><input type="number" data-ofield="amount" value="${o.amount}" step="10000"></td>
+      <td class="cost-amount"><input type="number" data-ofield="amount" value="${o.amount}" step="10000"></td>
       <td><select data-ofield="month">${monthOptionsHtml(o.month)}</select></td>
+      <td class="cost-na">—</td>
+      <td class="cost-na">—</td>
       <td><button class="row-remove" data-removeoneoff="${oi}" title="${t("remove_title")}">✕</button></td>
     </tr>
   `;
@@ -68,7 +74,7 @@ function renderRecurringRow(r, ri) {
   return `
     <tr data-recurring="${ri}">
       <td><input type="text" data-rfield="label" value="${escapeHtml(r.label)}"></td>
-      <td><input type="number" data-rfield="amount" value="${r.amount}" step="1000"></td>
+      <td class="cost-amount"><input type="number" data-rfield="amount" value="${r.amount}" step="1000"><span class="cost-unit">${t("cost_per_month")}</span></td>
       <td><select data-rfield="startMonth">${monthOptionsHtml(r.startMonth)}</select></td>
       <td><select data-rfield="endMonth">${monthOptionsHtml(r.endMonth)}</select></td>
       <td><input type="number" data-rfield="escalationPct" value="${r.escalationPct}" step="0.5"></td>
@@ -96,11 +102,20 @@ function renderCcBlock(i) {
             <input type="checkbox" data-ccfield="isShared" ${cc.isShared ? "checked" : ""}>
             ${t("shared_corporate_label")}
           </label>
+          <button class="note-icon ${cc.note ? "has-note" : ""}" data-notetoggle="${i}" type="button" title="${escapeHtml(cc.note || t("comment_note_label"))}">✎</button>
           <button class="cc-delete" data-deletecc="${i}" type="button" title="${t("delete_line_title")}">${t("common_delete")}</button>
         </div>
       </div>
       ${cc.isShared ? `<p class="shared-note">${t("shared_note")}</p>` : ""}
+      ${cc._showNote ? `
+      <div class="cc-note-row">
+        <label>${t("comment_note_label")} <span class="cc-note-hint">${t("comment_note_hint")}</span>
+          <input type="text" data-ccfield="note" value="${escapeHtml(cc.note || "")}" placeholder="${t("comment_note_placeholder")}">
+        </label>
+        <span class="note-saved" data-notesaved="${i}" hidden>${t("note_saved")}</span>
+      </div>` : ""}
 
+      <h3 class="cc-section-label">${t("people_h3")}${helpMark("headcount")}</h3>
       <div class="driver-table-wrap">
         <table class="driver-table">
           <thead>
@@ -116,43 +131,23 @@ function renderCcBlock(i) {
           <tbody>${headcountRows}</tbody>
         </table>
       </div>
-      <button class="add-headcount" data-add="${i}">${t("add_line_btn")}</button>${helpMark("headcount")}
+      <button class="add-headcount" data-add="${i}">${t("add_line_btn")}</button>
 
-      <div class="oneoffs-section">
-        <h3>${t("oneoffs_h3")}</h3>
+      <div class="costs-section">
+        <h3 class="cc-section-label">${t("costs_h3")}${helpMark("costs")}</h3>
         <div class="driver-table-wrap">
-          <table class="driver-table oneoffs-table">
+          <table class="driver-table costs-table">
             <thead>
-              <tr><th>${t("col_description")}</th><th>${t("col_amount_sek")}</th><th>${t("col_month")}</th><th></th></tr>
+              <tr><th>${t("col_description")}</th><th>${t("col_amount_sek")}</th><th>${t("col_active_from")}</th><th>${t("col_active_until")}</th><th>${t("col_escalation")}</th><th></th></tr>
             </thead>
-            <tbody>${oneOffRows}</tbody>
-          </table>
-        </div>
-        <button class="add-headcount" data-addoneoff="${i}">${t("add_oneoff_btn")}</button>
-      </div>
-
-      <div class="recurring-section">
-        <h3>${t("recurring_h3")}</h3>
-        <div class="driver-table-wrap">
-          <table class="driver-table recurring-table">
-            <thead>
-              <tr><th>${t("col_description")}</th><th>${t("col_amount_sek_mo")}</th><th>${t("col_active_from")}</th><th>${t("col_active_until")}</th><th>${t("col_escalation")}</th><th></th></tr>
-            </thead>
-            <tbody>${recurringRows}</tbody>
+            <tbody>${recurringRows}${oneOffRows}</tbody>
           </table>
         </div>
         <button class="add-headcount" data-addrecurring="${i}">${t("add_recurring_btn")}</button>
+        <button class="add-headcount" data-addoneoff="${i}">${t("add_oneoff_btn")}</button>
       </div>
 
       <div class="utilization-section">${utilizationHtml(cc, i)}</div>
-
-      ${cc.note || cc._showNote ? `
-      <div class="cc-note-row">
-        <label>${t("comment_note_label")} <span class="cc-note-hint">${t("comment_note_hint")}</span>
-          <input type="text" data-ccfield="note" value="${escapeHtml(cc.note || "")}" placeholder="${t("comment_note_placeholder")}">
-        </label>
-        <span class="note-saved" data-notesaved="${i}" hidden>${t("note_saved")}</span>
-      </div>` : `<button class="add-revenue-link" data-addnote="${i}" type="button">${t("add_note_btn")}</button>`}
 
       <div class="cc-revenue">${revenueRowHtml(cc, i)}</div>
       <div class="cc-reforecast">${reforecastHtml(cc, i)}</div>
@@ -260,7 +255,7 @@ function reforecastHtml(cc, i) {
     return `
       <span class="rf-label">${t("rf_label")}</span>
       <span class="rf-badge">${t("rf_override_badge", fmtSek(cc.overrides[CLOSE_MONTH + 1] ?? Object.values(cc.overrides)[0]))}</span>
-      <button class="add-headcount" data-rfrevert="${i}" type="button">${t("rf_revert")}</button>`;
+      <button class="integ-link" data-rfrevert="${i}" type="button">${t("rf_revert")}</button>`;
   }
   const recent = recentRunRate(cc);
   if (recent == null || CLOSE_MONTH + 1 > TIMELINE_LENGTH) return "";
@@ -275,7 +270,7 @@ function reforecastHtml(cc, i) {
       <option value="budget">${t("rf_source_budget")}</option>
       <option value="manual">${t("rf_source_manual")}</option>
     </select>
-    <button class="add-headcount" data-rfapply="${i}" type="button">${t("rf_apply")}</button>`;
+    <button class="integ-link" data-rfapply="${i}" type="button">${t("rf_apply")}</button>`;
 }
 
 // Live update of one month of a line's revenue while typing. Seeds the [12]
@@ -541,13 +536,16 @@ function initPlanningGrid() {
       return;
     }
 
-    const addNoteBtn = e.target.closest("[data-addnote]");
-    if (addNoteBtn) {
-      const ccIndex = Number(addNoteBtn.dataset.addnote);
-      COST_CENTERS[ccIndex]._showNote = true; // transient reveal; persists once text is saved
+    const noteToggle = e.target.closest("[data-notetoggle]");
+    if (noteToggle) {
+      const ccIndex = Number(noteToggle.dataset.notetoggle);
+      const cc = COST_CENTERS[ccIndex];
+      cc._showNote = !cc._showNote; // ✎ opens AND closes (the note itself persists either way)
       buildPlanningGrid();
-      const input = document.querySelector(`.cc-block[data-cc="${ccIndex}"] [data-ccfield="note"]`);
-      if (input) input.focus();
+      if (cc._showNote) {
+        const input = document.querySelector(`.cc-block[data-cc="${ccIndex}"] [data-ccfield="note"]`);
+        if (input) input.focus();
+      }
       return;
     }
 

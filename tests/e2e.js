@@ -31,8 +31,12 @@ function check(name, ok, detail = "") {
   await page.waitForSelector(".hero-verdict");
   check("overview: hero verdict renders", !!(await page.textContent(".hero-verdict")).trim());
 
-  // Version switcher + lock affordance (Tier 0 spine)
+  // Version switcher + lock affordance (Tier 0 spine), with the
+  // Forecast/Budgets/Scenarios grouping (Phase 8b-B)
   check("overview: plan version switcher present", await page.locator("#versionSwitcher").count() === 1);
+  check("overview: switcher groups Budgets + Scenarios", await page.locator("#versionSwitcher optgroup").count() === 2);
+  check("overview: working plan displays as Forecast",
+    (await page.textContent('#versionSwitcher option[selected], #versionSwitcher option:checked')).trim() === "Forecast");
   check("overview: lock-as-budget button present", await page.locator("#lockBudgetBtn").count() === 1);
 
   // Demo guard: branching a scenario while signed out shows the sign-in toast
@@ -58,7 +62,11 @@ function check(name, ok, detail = "") {
   await page.goto(url("planning.html", "&consulting"));
   await page.waitForSelector(".cc-block");
 
-  // Contextual ? popover opens with text, closes on second click
+  // Help mode (Phase 8b-C): marks invisible until the page ? is toggled on
+  check("planning: help marks hidden by default", await page.locator('[data-help="headcount"]').first().isHidden());
+  await page.click(".help-toggle");
+  await page.waitForSelector('[data-help="headcount"]', { state: "visible" });
+  check("planning: help toggle reveals the marks", true);
   await page.click('[data-help="headcount"]');
   await page.waitForSelector(".help-pop");
   const popText = (await page.textContent(".help-pop")).trim();
@@ -66,10 +74,19 @@ function check(name, ok, detail = "") {
   await page.click('[data-help="headcount"]');
   check("planning: same ? click closes it", await page.locator(".help-pop").count() === 0);
 
-  // + Add note reveals the input and focuses it
-  await page.click('[data-addnote="0"]');
+  // Merged Costs table: monthly + one-off rows share ONE table
+  const costsTable = page.locator('.cc-block[data-cc="0"] .costs-table');
+  check("planning: one merged costs table per line", await costsTable.count() === 1);
+  check("planning: it holds both monthly and one-off rows",
+    await costsTable.locator("tr[data-recurring]").count() >= 1 && await costsTable.locator("tr[data-oneoff]").count() >= 1);
+
+  // Note ✎ toggle opens AND closes (the old + Add note couldn't close — #9)
+  await page.click('[data-notetoggle="0"]');
   await page.waitForSelector('.cc-block[data-cc="0"] [data-ccfield="note"]');
-  check("planning: + Add note reveals the note input", true);
+  check("planning: ✎ opens the note input", true);
+  await page.click('[data-notetoggle="0"]');
+  await page.waitForTimeout(100);
+  check("planning: ✎ closes it again", await page.locator('.cc-block[data-cc="0"] [data-ccfield="note"]').count() === 0);
 
   // Utilization driver (consulting hook): derived read-back present
   const derived = (await page.textContent(".util-derived")).trim();
@@ -88,6 +105,19 @@ function check(name, ok, detail = "") {
 
   // Allocation toggle hidden with no overhead line (progressive disclosure)
   check("planning: allocation toggle hidden by default", await page.locator("#allocToggleWrap").isHidden());
+
+  // Planning-mode gating (Phase 8b-A): an org-mode company sees ZERO
+  // revenue/capacity affordances on Planning — one revenue home.
+  await page.goto(url("planning.html"));
+  await page.waitForSelector(".cc-block");
+  check("planning (org mode): no + Add revenue anywhere", await page.locator("[data-addrevenue]").count() === 0);
+  check("planning (org mode): no billable-hours affordance", await page.locator("[data-addutil]").count() === 0);
+  await page.goto(url("assumptions.html", "&profit"));
+  await page.waitForSelector(".planmode-block");
+  check("assumptions (lines mode): no org revenue panel (one home)", await page.locator(".revenue-block").count() === 0);
+  check("assumptions: How-you-plan picker present", await page.locator(".planmode-opt").count() === 3);
+  check("assumptions: Manage plans panel with unlock on the budget",
+    await page.locator("[data-planunlock]").count() === 1);
 
   // ---- Cash Flow -----------------------------------------------------------------
   await page.goto(url("cashflow.html"));

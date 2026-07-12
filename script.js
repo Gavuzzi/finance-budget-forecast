@@ -262,43 +262,8 @@ function renderChart() {
   });
 }
 
-function onboardCardHtml() {
-  return `
-    <div class="onboard-card">
-      <button class="onboard-close" id="onboardClose" type="button" title="${t("onboard_dismiss")}">✕</button>
-      <h2>${t("onboard_h2")}</h2>
-      <p>${t("onboard_intro")}</p>
-      <div class="onboard-tabs">
-        <div><strong>${t("nav_overview")}</strong> ${t("onboard_overview")}</div>
-        <div><strong>${t("nav_monthly")}</strong> ${t("onboard_monthly")}</div>
-        <div><strong>${t("nav_planning")}</strong> ${t("onboard_planning")}</div>
-        <div><strong>${t("nav_assumptions")}</strong> ${t("onboard_assumptions")}</div>
-      </div>
-    </div>`;
-}
-
-function renderOnboard() {
-  const slot = document.getElementById("onboardSlot");
-  if (!slot) return;
-
-  // Default CLOSED (progressive disclosure, SAC-style): a quiet "? How this
-  // works" button; the explainer card opens only on demand instead of
-  // permanently walling the page (TEARDOWN C13 — show, don't explain).
-  if (localStorage.getItem("almgren-onboard-open") !== "true") {
-    slot.innerHTML = `<button class="onboard-help-btn" id="onboardOpen" type="button">${t("onboard_help_btn")}</button>`;
-    document.getElementById("onboardOpen").addEventListener("click", () => {
-      localStorage.setItem("almgren-onboard-open", "true");
-      renderOnboard();
-    });
-    return;
-  }
-
-  slot.innerHTML = onboardCardHtml();
-  document.getElementById("onboardClose").addEventListener("click", () => {
-    localStorage.setItem("almgren-onboard-open", "false");
-    renderOnboard();
-  });
-}
+// (The "? How this works" button + explainer card were removed [#1] — the
+// pages explain themselves now; contextual help lives in help mode instead.)
 
 // Total people cost per role across all reporting lines, for the fiscal year.
 function roleFyTotals() {
@@ -718,7 +683,6 @@ window.initPage = () => {
   initScenarios();
   initSignals();
   initPrint();
-  renderOnboard();
   renderAll();
   renderFortnoxPnl();
 };

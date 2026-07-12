@@ -251,65 +251,6 @@
 .mt-legend-actual { color: var(--text); font-weight: 600; }
 .mt-legend-forecast { color: var(--text-dim); font-weight: 600; }
 
-/* Onboarding "how this works" */
-.onboard-card {
-  position: relative;
-  background: linear-gradient(135deg, rgba(77, 124, 199, 0.10), var(--panel));
-  border: 1px solid var(--accent);
-  border-radius: 14px;
-  padding: 22px 26px;
-}
-
-.onboard-card h2 {
-  font-family: 'Inter', sans-serif;
-  font-size: 1.35rem;
-  font-weight: 700;
-  margin-bottom: 8px;
-}
-
-.onboard-card p {
-  color: var(--text-dim);
-  font-size: 0.95rem;
-  max-width: 720px;
-  margin-bottom: 16px;
-}
-
-.onboard-tabs {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 24px;
-}
-
-.onboard-tabs div {
-  font-size: 0.9rem;
-  color: var(--text-dim);
-}
-
-.onboard-tabs strong { color: var(--accent-soft); margin-right: 6px; }
-
-.onboard-close {
-  position: absolute;
-  top: 14px;
-  right: 16px;
-  background: none;
-  border: none;
-  color: var(--text-dim);
-  font-size: 1rem;
-  cursor: pointer;
-}
-
-.onboard-close:hover { color: var(--text); }
-
-.onboard-link {
-  background: none;
-  border: none;
-  color: var(--accent-soft);
-  font-size: 0.88rem;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0;
-}
-
 /* Advanced sync config disclosure [#20] */
 .fn-advanced { margin-top: 18px; border-top: 1px solid var(--panel-border); padding-top: 10px; }
 .fn-advanced > summary {
@@ -321,8 +262,11 @@
 .fn-advanced[open] > summary::before { content: "▾ "; }
 .fn-advanced > summary:hover { color: var(--text); }
 
-/* Contextual "?" help marks (SAC-style, Tier 3) */
-.help-mark {
+/* Contextual "?" help marks (SAC-style, Tier 3). Hidden by default — one
+   page-level ? toggle (help mode) reveals every mark at once, so the normal
+   view carries zero help chrome. */
+.help-mark { display: none; }
+body.help-on .help-mark {
   display: inline-flex; align-items: center; justify-content: center;
   width: 17px; height: 17px; border-radius: 50%;
   border: 1px solid var(--panel-border); background: var(--bg);
@@ -339,21 +283,15 @@
   box-shadow: 0 8px 24px rgba(0,0,0,0.18);
 }
 
-/* Quiet "? How this works" affordance — the on-demand replacement for the
-   persistent explainer card (progressive disclosure). */
-.onboard-help-btn {
-  align-self: flex-start;
-  background: none;
-  border: 1px solid var(--panel-border);
-  color: var(--text-dim);
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 6px 12px;
-  border-radius: 999px;
-  font-family: inherit;
+/* The page-level help-mode toggle (in .page-head on pages that have marks) */
+.help-toggle {
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid var(--panel-border); background: var(--panel);
+  color: var(--text-dim); font-size: 0.9rem; font-weight: 700;
+  cursor: pointer; font-family: inherit; flex-shrink: 0;
 }
-.onboard-help-btn:hover { border-color: var(--accent); color: var(--text); }
+.help-toggle:hover { border-color: var(--accent); color: var(--accent); }
+body.help-on .help-toggle { background: var(--accent); border-color: var(--accent); color: #fff; }
 
 /* Cost by role breakdown */
 .rb-row {
@@ -1579,7 +1517,7 @@ html[data-theme="light"] .panel {
 }
 
 /* Driver sub-sections inside a line block — quiet labels, not headings. */
-.oneoffs-section h3, .recurring-section h3, .util-head h3 {
+.cc-section-label, .util-head h3 {
   font-size: 0.78rem;
   color: var(--text-dim);
   text-transform: uppercase;
@@ -1588,6 +1526,21 @@ html[data-theme="light"] .panel {
   margin: 16px 0 4px;
 }
 .note-saved { font-size: 0.82rem; font-weight: 600; color: var(--green); }
+
+/* Note ✎ icon in the line header — dim when empty, accent when a note exists;
+   click toggles the compact input row open/closed. */
+.note-icon {
+  background: none; border: 1px solid var(--panel-border); border-radius: 8px;
+  color: var(--text-dim); font-size: 0.9rem; padding: 5px 9px; cursor: pointer;
+}
+.note-icon:hover { border-color: var(--accent); color: var(--accent); }
+.note-icon.has-note { color: var(--accent); border-color: var(--accent); }
+
+/* Merged costs table: one-off rows show "—" where a range doesn't apply */
+.cost-na { color: var(--text-dim); text-align: center; }
+.cost-amount { white-space: nowrap; }
+.cost-unit { color: var(--text-dim); font-size: 0.78rem; margin-left: 3px; }
+.costs-section .add-headcount + .add-headcount { margin-left: 8px; }
 
 .cc-name-input:hover { border-color: var(--panel-border); }
 .cc-name-input:focus { outline: none; border-color: var(--accent); background: var(--bg); }

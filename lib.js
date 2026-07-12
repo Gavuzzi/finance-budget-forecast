@@ -204,6 +204,17 @@ function helpMark(key) {
   return `<button class="help-mark" type="button" data-help="${key}" aria-label="?">?</button>`;
 }
 document.addEventListener("click", (e) => {
+  // Page-level help-mode toggle (SAC-style, Felix's #5): all marks are
+  // invisible until the page's ? is switched on — the normal view carries
+  // zero help chrome. Persists across pages until toggled off.
+  const toggle = e.target.closest(".help-toggle");
+  if (toggle) {
+    const on = document.body.classList.toggle("help-on");
+    localStorage.setItem("almgren-help-on", on ? "true" : "false");
+    if (!on) { const p = document.querySelector(".help-pop"); if (p) p.remove(); }
+    return;
+  }
+
   const open = document.querySelector(".help-pop");
   const wasFor = open && open.dataset.for;
   if (open) open.remove();
@@ -218,6 +229,7 @@ document.addEventListener("click", (e) => {
   pop.style.top = `${r.bottom + window.scrollY + 6}px`;
   pop.style.left = `${Math.max(8, Math.min(r.left + window.scrollX, window.innerWidth - 320))}px`;
 });
+if (localStorage.getItem("almgren-help-on") === "true") document.body.classList.add("help-on");
 
 // ---- Client error logging (DIY Sentry — errors must not vanish silently) ----
 // window errors + unhandled promise rejections → write-only client_errors
