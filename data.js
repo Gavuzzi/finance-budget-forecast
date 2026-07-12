@@ -1432,7 +1432,9 @@ const BUSINESS_PRESETS = {
     hint: t("preset_manufacturer_hint"),
     roles: [["Manager", 55000], ["Specialist", 42000], ["Associate", 33000], ["Support", 30000]],
     costCenters: [
-      { name: "Production", budget: 12000000, other: 300000, hc: [["Manager", 1], ["Specialist", 4], ["Associate", 6]] },
+      // Production is a profit centre — the factory sells what it makes, so it
+      // carries per-line revenue (→ margin). Shows the per-line-revenue style.
+      { name: "Production", budget: 12000000, other: 300000, hc: [["Manager", 1], ["Specialist", 4], ["Associate", 6]], revenue: 22000000 },
       { name: "Sales & Marketing", budget: 6000000, other: 150000, hc: [["Manager", 1], ["Associate", 4]] },
       { name: "Administration", budget: 3000000, other: 120000, hc: [["Support", 2]] },
     ],
@@ -1442,7 +1444,11 @@ const BUSINESS_PRESETS = {
     hint: t("preset_consultancy_hint"),
     roles: [["Partner", 75000], ["Senior Consultant", 55000], ["Consultant", 42000], ["Ops & Admin", 33000]],
     costCenters: [
-      { name: "Client Delivery", budget: 14000000, other: 100000, hc: [["Senior Consultant", 3], ["Consultant", 5]] },
+      // Client Delivery is planned by the utilization driver (billable hours →
+      // revenue, and → the delivery headcount needed), not manual headcount —
+      // the services/consulting planning style. BD + Ops stay manual overhead.
+      { name: "Client Delivery", budget: 14000000, other: 100000, hc: [],
+        util: { billRate: 1250, utilizationPct: 72, hoursPerHead: 160, roleLabel: "Consultant", billableHours: 1350 } },
       { name: "Business Development", budget: 2500000, other: 80000, hc: [["Partner", 1]] },
       { name: "Operations", budget: 2000000, other: 90000, hc: [["Ops & Admin", 2]] },
     ],
@@ -1529,13 +1535,39 @@ async function seedPreset(presetKey) {
     if (error) { flagWriteError(error); return false; }
     const ccId = ccRow.id;
 
-    const hcRows = cc.hc.map(([label, count]) => ({ org_id: CURRENT_ORG_ID, version_id: ACTIVE_VERSION_ID, reporting_line_id: ccId, role_id: roleIds[label], count, start_month: 1, end_month: 24 }));
-    const hcRes = await sb.from("headcount_lines").insert(hcRows);
-    if (hcRes.error) { flagWriteError(hcRes.error); return false; }
+    // Utilization-planned lines carry no manual headcount (hc: []) — skip the
+    // insert entirely rather than sending an empty array.
+    if (cc.hc.length) {
+      const hcRows = cc.hc.map(([label, count]) => ({ org_id: CURRENT_ORG_ID, version_id: ACTIVE_VERSION_ID, reporting_line_id: ccId, role_id: roleIds[label], count, start_month: 1, end_month: 24 }));
+      const hcRes = await sb.from("headcount_lines").insert(hcRows);
+      if (hcRes.error) { flagWriteError(hcRes.error); return false; }
+    }
 
     const rcRes = await sb.from("recurring_costs")
       .insert({ org_id: CURRENT_ORG_ID, version_id: ACTIVE_VERSION_ID, reporting_line_id: ccId, label: "Other costs", amount: cc.other, start_month: 1, end_month: 24, escalation_pct: 0 });
     if (rcRes.error) { flagWriteError(rcRes.error); return false; }
+
+    // Utilization driver (consulting-style delivery lines) — hours × rate is the
+    // revenue and derives the delivery headcount, so no manual hc is seeded.
+    if (cc.util) {
+      const hoursArr = Array.isArray(cc.util.billableHours) ? cc.util.billableHours : Array(12).fill(cc.util.billableHours);
+      const udRes = await sb.from("utilization_drivers").insert({
+        org_id: CURRENT_ORG_ID, version_id: ACTIVE_VERSION_ID, reporting_line_id: ccId,
+        bill_rate: cc.util.billRate, utilization_pct: cc.util.utilizationPct, hours_per_head: cc.util.hoursPerHead,
+        role_id: roleIds[cc.util.roleLabel] || null, billable_hours: hoursArr,
+      });
+      if (udRes.error) { flagWriteError(udRes.error); return false; }
+    }
+
+    // Per-line revenue (profit-centre lines) — flat annual spread; makes the
+    // line show a margin. Versioned, on the active version.
+    if (cc.revenue) {
+      const revArr = Array.isArray(cc.revenue) ? cc.revenue : Array(12).fill(Math.round(cc.revenue / 12));
+      const vlrRes = await sb.from("version_line_revenue").insert({
+        org_id: CURRENT_ORG_ID, version_id: ACTIVE_VERSION_ID, reporting_line_id: ccId, revenue_plan: revArr,
+      });
+      if (vlrRes.error) { flagWriteError(vlrRes.error); return false; }
+    }
 
     // Believable 6 months of actuals derived from the monthly budget run-rate
     // (small variation), so the example shows a real actual/forecast split.
