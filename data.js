@@ -108,8 +108,93 @@ function recurringCostForMonth(cc, month) {
   }, 0);
 }
 
+// ---- Utilization / capacity driver (the services/consulting way to plan) ----
+// A BOUNDED optional driver on a line (cc.utilization), not a general formula
+// engine. It captures the consulting planning identity in one object:
+//   billableHours[12] · billRate · utilizationPct · hoursPerHead · roleId
+// and derives BOTH sides of that line:
+//   revenue(m)        = billableHours(m) × billRate
+//   requiredHeads(m)  = billableHours(m) ÷ (utilizationPct% × hoursPerHead)
+//   cost(m)           = requiredHeads(m) × fully-loaded role cost
+// So "we plan to bill N hours" flows to both the top line and the headcount
+// needed to deliver it. It COMPOSES with the manual drivers (adds to them), so
+// a line can mix a retainer (revenuePlan) or fixed costs with billable work.
+
+function hasUtilization(cc) {
+  return !!(cc.utilization && (Number(cc.utilization.billRate) > 0 || (Array.isArray(cc.utilization.billableHours) && cc.utilization.billableHours.some((h) => h > 0))));
+}
+
+function utilBillableHours(cc, month) {
+  const u = cc.utilization;
+  if (!u || !Array.isArray(u.billableHours) || u.billableHours.length !== 12) return 0;
+  return Number(u.billableHours[(month - 1) % 12]) || 0;
+}
+
+// Heads needed to deliver the billable hours at the target utilization. 0 when
+// the capacity assumptions are unset (avoids divide-by-zero → a line with a
+// bill rate but no capacity model is still valid: revenue only, no derived cost).
+function utilizationRequiredHeads(cc, month) {
+  const u = cc.utilization;
+  if (!u) return 0;
+  const capacityPerHead = (Number(u.utilizationPct) / 100) * Number(u.hoursPerHead);
+  if (!(capacityPerHead > 0)) return 0;
+  return utilBillableHours(cc, month) / capacityPerHead;
+}
+
+function utilizationCostForMonth(cc, month) {
+  const u = cc.utilization;
+  if (!u || !u.roleId) return 0; // no role to cost the derived heads against
+  return utilizationRequiredHeads(cc, month) * monthlyCostForRole(u.roleId);
+}
+
+function utilizationRevenueForMonth(cc, month) {
+  const u = cc.utilization;
+  if (!u) return 0;
+  return utilBillableHours(cc, month) * (Number(u.billRate) || 0);
+}
+
+// FY-average required heads / FY revenue / FY derived cost — the read-only
+// numbers the Planning UI shows back so "we plan to bill N hours" is legible as
+// heads, top line and cost.
+function utilizationAvgHeads(cc) {
+  if (!cc.utilization) return 0;
+  let s = 0;
+  for (let m = 1; m <= FY_MONTHS; m++) s += utilizationRequiredHeads(cc, m);
+  return s / FY_MONTHS;
+}
+function utilizationFyRevenue(cc) {
+  let s = 0;
+  for (let m = 1; m <= FY_MONTHS; m++) s += utilizationRevenueForMonth(cc, m);
+  return s;
+}
+function utilizationFyCost(cc) {
+  let s = 0;
+  for (let m = 1; m <= FY_MONTHS; m++) s += utilizationCostForMonth(cc, m);
+  return s;
+}
+
+// A fresh driver with sensible SME-consulting defaults (75% utilization, 160
+// working hours/month). Not persisted until the user edits something.
+function defaultUtilization() {
+  return { billRate: 0, utilizationPct: 75, hoursPerHead: 160, roleId: (ROLE_CATALOG[0] || {}).id || null, billableHours: Array(12).fill(0) };
+}
+
+// DB row (snake_case) → in-memory driver (camelCase). billable_hours is a [12]
+// jsonb; anything malformed becomes a flat-zero array so the shape is stable.
+function utilizationFromRow(u) {
+  const hrs = Array.isArray(u.billable_hours) && u.billable_hours.length === 12
+    ? u.billable_hours.map((h) => Number(h) || 0) : Array(12).fill(0);
+  return {
+    billRate: Number(u.bill_rate) || 0,
+    utilizationPct: Number(u.utilization_pct) || 0,
+    hoursPerHead: Number(u.hours_per_head) || 0,
+    roleId: u.role_id || null,
+    billableHours: hrs,
+  };
+}
+
 function forecastForMonth(cc, month) {
-  return headcountCostForMonth(cc, month) + oneOffCostForMonth(cc, month) + recurringCostForMonth(cc, month);
+  return headcountCostForMonth(cc, month) + oneOffCostForMonth(cc, month) + recurringCostForMonth(cc, month) + utilizationCostForMonth(cc, month);
 }
 
 function monthAmount(cc, month) {
@@ -167,7 +252,7 @@ function companyFySummary() {
 // of the drivers (there's nothing to "walk" from budget in named steps; what
 // a controller actually wants first is "what's IN this number").
 function fyComposition(cc) {
-  let actual = 0, overridden = 0, headcount = 0, oneOff = 0, recurring = 0;
+  let actual = 0, overridden = 0, headcount = 0, oneOff = 0, recurring = 0, utilization = 0;
   for (let m = 1; m <= FY_MONTHS; m++) {
     const a = monthAmount(cc, m);
     if (a.isActual) { actual += a.value; continue; }
@@ -175,8 +260,9 @@ function fyComposition(cc) {
     headcount += headcountCostForMonth(cc, m);
     oneOff += oneOffCostForMonth(cc, m);
     recurring += recurringCostForMonth(cc, m);
+    utilization += utilizationCostForMonth(cc, m);
   }
-  return { actual, overridden, headcount, oneOff, recurring, total: actual + overridden + headcount + oneOff + recurring };
+  return { actual, overridden, headcount, oneOff, recurring, utilization, total: actual + overridden + headcount + oneOff + recurring + utilization };
 }
 
 // ---- Simple allocation (corporate/shared costs → the rest) -----------------
@@ -301,8 +387,14 @@ function revenuePlanFyTotal() {
 // P&L). This is the SMB "profit centre" pattern (Jirav/Fathom-style), not a
 // second planning dimension: a line is still a line, it can just also earn.
 
-function lineHasRevenue(cc) {
+function lineHasManualRevenue(cc) {
   return Array.isArray(cc.revenuePlan) && cc.revenuePlan.length === 12 && cc.revenuePlan.some((v) => v > 0);
+}
+
+// A line earns if it has a manual revenue plan OR a billable utilization driver
+// (they compose — a line can carry both a retainer and billable hours).
+function lineHasRevenue(cc) {
+  return lineHasManualRevenue(cc) || hasUtilization(cc);
 }
 
 function anyLineHasRevenue() {
@@ -310,8 +402,8 @@ function anyLineHasRevenue() {
 }
 
 function lineRevenueForMonth(cc, m) {
-  if (!lineHasRevenue(cc)) return 0;
-  return Number(cc.revenuePlan[(m - 1) % 12]) || 0;
+  const manual = lineHasManualRevenue(cc) ? (Number(cc.revenuePlan[(m - 1) % 12]) || 0) : 0;
+  return manual + utilizationRevenueForMonth(cc, m);
 }
 
 function lineRevenueFyTotal(cc) {
@@ -486,7 +578,7 @@ async function copyActiveVersion(name, { locked = false } = {}) {
     revenue_budget: srcV.revenueBudget || 0, revenue_plan: srcV.revenuePlan || null,
   }).select("id").single();
   if (error) { flagWriteError(error); return null; }
-  for (const tbl of ["headcount_lines", "one_offs", "recurring_costs", "forecast_overrides", "version_line_revenue"]) {
+  for (const tbl of ["headcount_lines", "one_offs", "recurring_costs", "forecast_overrides", "version_line_revenue", "utilization_drivers"]) {
     const { data: srcRows, error: se } = await sb.from(tbl).select("*").eq("org_id", CURRENT_ORG_ID).eq("version_id", src);
     if (se) { flagWriteError(se); return null; }
     if (srcRows && srcRows.length) {
@@ -539,11 +631,13 @@ async function dbDeleteVersion(id) {
 // lines); otherwise the version's own org-level plan / flat budget. Mirrors
 // revenuePlanForMonth but reads the passed version + alt centres, not globals.
 function versionRevenueFyTotal(ver, altCenters) {
-  const anyLine = altCenters.some((cc) => Array.isArray(cc.revenuePlan) && cc.revenuePlan.length === 12 && cc.revenuePlan.some((v) => v > 0));
+  // Per-line revenue wins (manual plan OR utilization billable) — lineRevenueForMonth
+  // composes both and takes only the cc, so it's correct on alt centres too.
+  const anyLine = altCenters.some(lineHasRevenue);
   const plan = ver && Array.isArray(ver.revenuePlan) && ver.revenuePlan.length === 12 && ver.revenuePlan.some((v) => v > 0) ? ver.revenuePlan : null;
   let total = 0;
   for (let m = 1; m <= FY_MONTHS; m++) {
-    if (anyLine) total += altCenters.reduce((s, cc) => s + (Array.isArray(cc.revenuePlan) ? (Number(cc.revenuePlan[(m - 1) % 12]) || 0) : 0), 0);
+    if (anyLine) total += altCenters.reduce((s, cc) => s + lineRevenueForMonth(cc, m), 0);
     else if (plan) total += Number(plan[(m - 1) % 12]) || 0;
     else total += ((ver && ver.revenueBudget) || 0) / 12;
   }
@@ -561,18 +655,22 @@ async function computeVersionSummary(versionId) {
     return { total, byName, monthly, revenue, result: revenue - total };
   }
   const ver = PLAN_VERSIONS.find((v) => v.id === versionId);
-  const [hcRes, ooRes, rcRes, foRes, vlrRes] = await Promise.all([
+  const [hcRes, ooRes, rcRes, foRes, vlrRes, udRes] = await Promise.all([
     sb.from("headcount_lines").select("*").eq("org_id", CURRENT_ORG_ID).eq("version_id", versionId),
     sb.from("one_offs").select("*").eq("org_id", CURRENT_ORG_ID).eq("version_id", versionId),
     sb.from("recurring_costs").select("*").eq("org_id", CURRENT_ORG_ID).eq("version_id", versionId),
     sb.from("forecast_overrides").select("*").eq("org_id", CURRENT_ORG_ID).eq("version_id", versionId),
     sb.from("version_line_revenue").select("reporting_line_id, revenue_plan").eq("org_id", CURRENT_ORG_ID).eq("version_id", versionId),
+    sb.from("utilization_drivers").select("*").eq("org_id", CURRENT_ORG_ID).eq("version_id", versionId),
   ]);
   const lineRev = {};
   if (!vlrRes.error) (vlrRes.data || []).forEach((r) => { lineRev[r.reporting_line_id] = r.revenue_plan; });
+  const utilByLine = {};
+  if (!udRes.error) (udRes.data || []).forEach((u) => { utilByLine[u.reporting_line_id] = utilizationFromRow(u); });
   const alt = COST_CENTERS.map((base) => ({
     id: base.id, name: base.name, annualBudget: base.annualBudget,
     isShared: base.isShared, actualMonthly: base.actualMonthly, // shared — actuals aren't versioned
+    utilization: utilByLine[base.id] || null,
     revenuePlan: Array.isArray(lineRev[base.id]) && lineRev[base.id].length === 12 ? lineRev[base.id].map((v) => Number(v) || 0) : null,
     headcount: (hcRes.data || []).filter((h) => h.reporting_line_id === base.id)
       .map((h) => ({ roleId: h.role_id, count: h.count, startMonth: h.start_month, endMonth: h.end_month })),
@@ -696,6 +794,7 @@ async function loadData(orgId) {
           .map((o) => ({ id: o.id, label: o.label, amount: Number(o.amount), month: o.month })),
         recurringCosts: [],
         overrides: {},
+        utilization: null, // optional capacity driver, loaded below
         actualMonthly,
       });
     });
@@ -720,6 +819,16 @@ async function loadData(orgId) {
     foRes.data.forEach((o) => {
       const cc = COST_CENTERS.find((c) => c.id === o.reporting_line_id);
       if (cc) cc.overrides[o.month] = Number(o.amount);
+    });
+  }
+
+  // Utilization / capacity drivers — tolerant load (table may not exist on an
+  // older DB). At most one per line, for the active version.
+  const udRes = await sb.from("utilization_drivers").select("*").eq("org_id", CURRENT_ORG_ID).eq("version_id", ACTIVE_VERSION_ID);
+  if (!udRes.error) {
+    udRes.data.forEach((u) => {
+      const cc = COST_CENTERS.find((c) => c.id === u.reporting_line_id);
+      if (cc) cc.utilization = utilizationFromRow(u);
     });
   }
 
@@ -830,6 +939,18 @@ function loadPreviewData() {
     if (new URLSearchParams(location.search).has("revgrid")) {
       const prod = COST_CENTERS.find((c) => c.name === "Production");
       if (prod) { prod.revenuePlan = [2.4, 2.4, 3.0, 3.2, 3.0, 2.6, 1.8, 2.2, 3.4, 3.6, 4.0, 3.4].map((v) => v * 1e6); prod._showRevMonthly = true; }
+    }
+  }
+
+  // Dev hook: &consulting plans a line via the utilization/capacity driver
+  // (billable hours × rate → revenue; hours → required heads → cost) so the
+  // services way of planning is screenshot-verifiable.
+  if (new URLSearchParams(location.search).has("consulting")) {
+    const line = COST_CENTERS.find((c) => c.name === "R&D") || COST_CENTERS[0];
+    if (line) {
+      line.utilization = { billRate: 1200, utilizationPct: 75, hoursPerHead: 160, roleId: "r3",
+        billableHours: [900, 950, 1000, 1050, 1000, 900, 600, 800, 1100, 1150, 1200, 1000] };
+      line._showUtil = true; line._showUtilMonthly = true;
     }
   }
 
@@ -1016,7 +1137,7 @@ async function dbInsertCostCenter() {
     .insert({ org_id: CURRENT_ORG_ID, name: t("new_reporting_line_name"), annual_budget: 0, other_monthly: 0 })
     .select().single();
   if (error) { flagWriteError(error); return null; }
-  return { id: data.id, name: data.name, annualBudget: Number(data.annual_budget), otherMonthly: Number(data.other_monthly), isShared: false, headcount: [], oneOffs: [], recurringCosts: [], overrides: {}, actualMonthly: [] };
+  return { id: data.id, name: data.name, annualBudget: Number(data.annual_budget), otherMonthly: Number(data.other_monthly), isShared: false, headcount: [], oneOffs: [], recurringCosts: [], overrides: {}, utilization: null, actualMonthly: [] };
 }
 
 async function dbDeleteCostCenter(id) {
@@ -1045,6 +1166,27 @@ async function dbSetLineRevenue(cc) {
     if (error) flagWriteError(error);
   } else {
     const { error } = await sb.from("version_line_revenue").delete()
+      .eq("version_id", ACTIVE_VERSION_ID).eq("reporting_line_id", cc.id);
+    if (error) flagWriteError(error);
+  }
+}
+
+// Utilization / capacity driver — versioned, at most one per line. Upserts
+// cc.utilization for the active version; null clears it (line reverts to
+// manual planning). camelCase in-memory → snake_case row.
+async function dbSetUtilization(cc) {
+  if (!assertEditable()) return;
+  const u = cc.utilization;
+  if (u) {
+    const { error } = await sb.from("utilization_drivers").upsert({
+      version_id: ACTIVE_VERSION_ID, org_id: CURRENT_ORG_ID, reporting_line_id: cc.id,
+      bill_rate: Number(u.billRate) || 0, utilization_pct: Number(u.utilizationPct) || 0,
+      hours_per_head: Number(u.hoursPerHead) || 0, role_id: u.roleId || null,
+      billable_hours: Array.isArray(u.billableHours) ? u.billableHours : null,
+    }, { onConflict: "version_id,reporting_line_id" });
+    if (error) flagWriteError(error);
+  } else {
+    const { error } = await sb.from("utilization_drivers").delete()
       .eq("version_id", ACTIVE_VERSION_ID).eq("reporting_line_id", cc.id);
     if (error) flagWriteError(error);
   }

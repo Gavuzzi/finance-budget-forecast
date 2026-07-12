@@ -244,6 +244,28 @@ alter table reporting_lines drop column if exists revenue_plan;
 alter table assumptions     drop column if exists revenue_budget;
 alter table assumptions     drop column if exists revenue_plan;
 
+-- Utilization / capacity driver (the services/consulting way to plan) —
+-- versioned, at most one per reporting line. Billable hours × bill_rate drives
+-- the line's revenue; hours ÷ (utilization_pct% × hours_per_head) drives the
+-- required headcount, costed against role_id's fully-loaded rate. A bounded
+-- driver (fixed fields), not a formula engine. Composes with the manual drivers.
+create table if not exists utilization_drivers (
+  version_id        uuid not null references plan_versions(id) on delete cascade,
+  org_id            uuid not null references organizations(id) on delete cascade,
+  reporting_line_id uuid not null references reporting_lines(id) on delete cascade,
+  bill_rate         numeric not null default 0,      -- SEK per billable hour
+  utilization_pct   numeric not null default 75,     -- target billable share of capacity
+  hours_per_head    numeric not null default 160,    -- monthly working hours per consultant
+  role_id           uuid references roles(id) on delete set null, -- costs the derived heads; null = revenue-only
+  billable_hours    jsonb,                            -- [12] monthly billable hours (FY-relative)
+  primary key (version_id, reporting_line_id)
+);
+alter table utilization_drivers enable row level security;
+drop policy if exists utilization_drivers_read on utilization_drivers;
+drop policy if exists utilization_drivers_write on utilization_drivers;
+create policy utilization_drivers_read on utilization_drivers for select using (is_org_member(org_id));
+create policy utilization_drivers_write on utilization_drivers for all using (can_edit_org(org_id)) with check (can_edit_org(org_id));
+
 -- Sync noise filters: excluded voucher series (e.g. a correction/adjustment
 -- series) or excluded accounts (e.g. opening-balance postings) — rows matching
 -- these are fully ignored by the sync, not just left unmapped.

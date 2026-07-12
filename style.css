@@ -1730,6 +1730,27 @@ html[data-theme="light"] .panel {
 .line-rev-grid { margin-top: 10px; }
 .rev-grid-hint { margin-top: 6px; }
 
+/* Utilization / capacity driver */
+.utilization-section { margin-top: 4px; }
+.util-head { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
+.util-head h3 { margin: 0; }
+.util-fields {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px 16px; margin: 8px 0 10px;
+}
+.util-fields label { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; color: var(--text-dim); }
+.util-fields input, .util-fields select {
+  background: var(--bg); border: 1px solid var(--panel-border); color: var(--text);
+  border-radius: 8px; padding: 7px 10px; font-size: 0.9rem; font-family: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.util-fields input:focus, .util-fields select:focus { outline: none; border-color: var(--accent); }
+.util-hours-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.util-derived {
+  margin-top: 10px; font-size: 0.9rem; font-weight: 600; color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
 .bridge-toggle {
   background: none; border: 1px solid var(--panel-border); color: var(--accent-soft);
   font-size: 0.8rem; font-weight: 600; padding: 4px 10px; border-radius: 999px;

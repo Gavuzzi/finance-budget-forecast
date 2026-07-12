@@ -97,6 +97,33 @@ eq("line revenue: org FY total = 36.0M (per-line), not 50.0M (org plan)", revenu
 prod.revenuePlan = null;
 eq("line revenue: cleared → org-level plan restored (50.0M)", revenuePlanFyTotal(), 50000000);
 
+// ---- Utilization / capacity driver (services/consulting) --------------------
+// Hand-derived: 1000 billable hrs/mo × 1200 SEK = 1,200,000 revenue; heads =
+// 1000 ÷ (0.75 × 160) = 8.3333; cost = 8.3333 × Engineer 65486 = 545,716.67.
+const consult = {
+  name: "Consulting", headcount: [], oneOffs: [], recurringCosts: [], overrides: {}, revenuePlan: null,
+  utilization: { billableHours: Array(12).fill(1000), billRate: 1200, utilizationPct: 75, hoursPerHead: 160, roleId: "r3" },
+};
+eq("util: driver detected", hasUtilization(consult), true);
+eq("util: line earns via the driver", lineHasRevenue(consult), true);
+approx("util: required heads = 1000/(0.75×160) = 8.333", utilizationRequiredHeads(consult, 3), 8.33333, 0.0001);
+approx("util: revenue = 1000×1200", utilizationRevenueForMonth(consult, 3), 1200000, 0.5);
+approx("util: cost = 8.333×65486", utilizationCostForMonth(consult, 3), 545716.67, 1);
+approx("util: forecast = derived cost (no other drivers)", forecastForMonth(consult, 3), 545716.67, 1);
+approx("util: line revenue = billable revenue", lineRevenueForMonth(consult, 3), 1200000, 0.5);
+approx("util: FY revenue = 12 × 1.2M", lineRevenueFyTotal(consult), 14400000, 5);
+// Revenue-only driver (no role): revenue still flows, no derived cost.
+const revOnly = { ...consult, utilization: { ...consult.utilization, roleId: null } };
+approx("util: no role → no derived cost", utilizationCostForMonth(revOnly, 3), 0, 0.001);
+approx("util: revenue-only driver still earns", lineRevenueForMonth(revOnly, 3), 1200000, 0.5);
+// Composes with a manual retainer (revenuePlan) on the same line.
+const both = { ...consult, revenuePlan: Array(12).fill(500000) };
+approx("util: composes with a manual retainer (0.5M + 1.2M)", lineRevenueForMonth(both, 3), 1700000, 0.5);
+// Zero-capacity guard: no divide-by-zero, no phantom cost.
+const noCap = { ...consult, utilization: { ...consult.utilization, utilizationPct: 0 } };
+eq("util: zero utilization → 0 required heads (no divide-by-zero)", utilizationRequiredHeads(noCap, 3), 0);
+approx("util: zero-capacity → 0 derived cost", utilizationCostForMonth(noCap, 3), 0, 0.001);
+
 // ---- Skatteverket due-date rules ---------------------------------------------
 eq("tax: payroll m6 due 12th of month+1", taxDueDate("payroll", 6), "2026-07-12");
 eq("tax: payroll m12 rolls year AND hits the Jan-17 rule", taxDueDate("payroll", 12), "2027-01-17");

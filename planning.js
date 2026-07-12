@@ -145,6 +145,8 @@ function renderCcBlock(i) {
         <button class="add-headcount" data-addrecurring="${i}">${t("add_recurring_btn")}</button>
       </div>
 
+      <div class="utilization-section">${utilizationHtml(cc, i)}</div>
+
       <div class="cc-note-row">
         <label>${t("comment_note_label")} <span class="cc-note-hint">${t("comment_note_hint")}</span>
           <input type="text" data-ccfield="note" value="${escapeHtml(cc.note || "")}" placeholder="${t("comment_note_placeholder")}">
@@ -165,14 +167,17 @@ function renderCcBlock(i) {
 // of #12, since project/milestone billing is lumpy, not flat. Stored as the
 // [12] revenuePlan either way, so the cost side and revenue side now match.
 function revenueRowHtml(cc, i) {
-  if (!lineHasRevenue(cc) && !cc._showRevenue) {
+  // Only the MANUAL revenue plan controls this row's visibility + value — a
+  // utilization-driven line's billable revenue is shown in the capacity section
+  // and must never leak into this box (editing it would double-count).
+  if (!lineHasManualRevenue(cc) && !cc._showRevenue) {
     return `<button class="add-revenue-link" data-addrevenue="${i}" type="button">${t("add_revenue_btn")}</button>`;
   }
-  // annual is reconstructed from the [12] monthly plan — round it for a clean
-  // display (storage stays exact).
-  const annual = lineRevenueFyTotal(cc);
-  const margin = lineMargin(cc);
   const plan = Array.isArray(cc.revenuePlan) && cc.revenuePlan.length === 12 ? cc.revenuePlan : null;
+  // annual is reconstructed from the MANUAL [12] plan only (not lineRevenueFyTotal,
+  // which composes in utilization revenue); margin is still the true total.
+  const annual = plan ? plan.reduce((s, v) => s + (Number(v) || 0), 0) : 0;
+  const margin = lineMargin(cc);
   // "Custom" once the months aren't all equal — the visible signal that this
   // line is shaped (a ramp / milestones), not a flat 1/12 spread.
   const isCustom = plan && plan.some((v) => Math.abs((Number(v) || 0) - (Number(plan[0]) || 0)) > 0.5);
@@ -192,6 +197,46 @@ function revenueRowHtml(cc, i) {
     ${cc._showRevMonthly ? `<div class="line-rev-grid rev-plan-grid">${cells}</div><p class="rate-hint rev-grid-hint">${t("rev_monthly_hint")}</p>` : ""}`;
 }
 
+// Utilization / capacity driver (styles 4–5): the consulting way to plan a
+// line. Cost-only/manual lines stay clean — a quiet "+ Plan by billable hours"
+// link; a line that uses it shows the capacity inputs and the derived heads /
+// revenue / cost read back. Billable hours mirror the revenue editor (flat
+// input + a monthly grid for ramp/seasonality).
+function utilizationHtml(cc, i) {
+  if (!hasUtilization(cc) && !cc._showUtil) {
+    return `<button class="add-revenue-link" data-addutil="${i}" type="button">${t("add_util_btn")}</button>`;
+  }
+  const u = cc.utilization || defaultUtilization();
+  const hrs = Array.isArray(u.billableHours) && u.billableHours.length === 12 ? u.billableHours : Array(12).fill(0);
+  const flatHrs = Math.round(hrs.reduce((s, h) => s + (Number(h) || 0), 0) / 12);
+  const isCustom = hrs.some((h) => Math.abs((Number(h) || 0) - (Number(hrs[0]) || 0)) > 0.5);
+  const roleOpts = ROLE_CATALOG.map((r) => `<option value="${r.id}" ${r.id === u.roleId ? "selected" : ""}>${escapeHtml(r.label)}</option>`).join("");
+  const monthCells = Array.from({ length: 12 }, (_, m) => `
+    <label>${monthLabel(m + 1)}
+      <input type="number" step="10" data-utilmonth="${i}" data-m="${m}" value="${hrs[m] ? Math.round(Number(hrs[m]) || 0) : ""}" placeholder="${flatHrs || 0}">
+    </label>`).join("");
+  return `
+    <div class="util-head">
+      <h3>${t("util_h3")}</h3>
+      <button class="row-remove" data-removeutil="${i}" title="${t("util_remove_title")}">✕</button>
+    </div>
+    <p class="line-hint">${t("util_hint")}</p>
+    <div class="util-fields">
+      <label>${t("util_bill_rate")}<input type="number" step="50" data-utilfield="${i}" data-uf="billRate" value="${u.billRate || ""}" placeholder="0"></label>
+      <label>${t("util_utilization")}<input type="number" step="5" data-utilfield="${i}" data-uf="utilizationPct" value="${u.utilizationPct || ""}" placeholder="75"></label>
+      <label>${t("util_hours_head")}<input type="number" step="5" data-utilfield="${i}" data-uf="hoursPerHead" value="${u.hoursPerHead || ""}" placeholder="160"></label>
+      <label>${t("util_cost_role")}<select data-utilfield="${i}" data-uf="roleId"><option value="">${t("util_role_none")}</option>${roleOpts}</select></label>
+    </div>
+    <div class="util-hours-row">
+      <label class="line-revenue-label">${t("util_billable_hours")}
+        <input type="number" step="10" data-utilhours="${i}" value="${flatHrs || ""}" placeholder="0">
+      </label>
+      <button class="rev-monthly-toggle" data-utiltoggle="${i}" type="button">${t("rev_monthly_toggle")}${isCustom ? ` <span class="rev-custom-tag">${t("rev_custom_tag")}</span>` : ""} ${cc._showUtilMonthly ? "▴" : "▾"}</button>
+    </div>
+    ${cc._showUtilMonthly ? `<div class="line-rev-grid rev-plan-grid">${monthCells}</div><p class="rate-hint rev-grid-hint">${t("util_monthly_hint")}</p>` : ""}
+    <div class="util-derived">${t("util_derived", utilizationAvgHeads(cc).toFixed(1), fmtMkr(utilizationFyRevenue(cc)), fmtMkr(utilizationFyCost(cc)))}</div>`;
+}
+
 // Live update of one month of a line's revenue while typing. Seeds the [12]
 // plan from the current flat annual so untouched months keep their value, then
 // sets the edited month. Clears back to null once every month is 0 (= no
@@ -209,6 +254,30 @@ function updateLineRevMonth(input) {
   if (!cc.revenuePlan.some((v) => (Number(v) || 0) > 0)) cc.revenuePlan = null;
   const annualInput = document.querySelector(`[data-revenue="${i}"]`);
   if (annualInput) annualInput.value = cc.revenuePlan ? Math.round(lineRevenueFyTotal(cc)) : "";
+}
+
+// Live in-memory update of a utilization scalar field while typing (bill rate,
+// utilization %, hours/head, role). Persist + derived-readout refresh happen on
+// change (blur → dbSetUtilization + rebuild), so typing doesn't drop focus.
+function updateUtilField(target) {
+  const cc = COST_CENTERS[Number(target.dataset.utilfield)];
+  if (!cc.utilization) cc.utilization = defaultUtilization();
+  const uf = target.dataset.uf;
+  cc.utilization[uf] = uf === "roleId" ? (target.value || null) : (Number(target.value) || 0);
+}
+
+// Live update of one month of billable hours; seeds the [12] array, sets the
+// month, and syncs the flat input display in place (persist on blur).
+function updateUtilMonth(target) {
+  const i = Number(target.dataset.utilmonth), m = Number(target.dataset.m);
+  const cc = COST_CENTERS[i];
+  if (!cc.utilization) cc.utilization = defaultUtilization();
+  if (!Array.isArray(cc.utilization.billableHours) || cc.utilization.billableHours.length !== 12) {
+    cc.utilization.billableHours = Array(12).fill(0);
+  }
+  cc.utilization.billableHours[m] = Number(target.value) || 0;
+  const flatInput = document.querySelector(`[data-utilhours="${i}"]`);
+  if (flatInput) flatInput.value = Math.round(cc.utilization.billableHours.reduce((s, h) => s + (Number(h) || 0), 0) / 12) || "";
 }
 
 // The composition breakdown behind a cost centre's FY total — "what's this
@@ -348,14 +417,37 @@ function initPlanningGrid() {
   }
 
   ccBlocks.addEventListener("input", (e) => {
-    // A month cell updates the in-memory plan + annual total live (no rebuild,
-    // so typing stays smooth); persistence happens on change (blur).
+    // A month cell updates the in-memory plan + total live (no rebuild, so
+    // typing stays smooth); persistence happens on change (blur).
     if (e.target.dataset.revmonthline !== undefined) { updateLineRevMonth(e.target); return; }
+    if (e.target.dataset.utilmonth !== undefined) { updateUtilMonth(e.target); return; }
+    if (e.target.dataset.utilfield !== undefined) { updateUtilField(e.target); return; }
     handleCcFieldChange(e.target);
   });
   // <select> elements don't reliably fire "input" on every browser, so handle
   // dropdown changes (role, start/end month, one-off month) via "change" too.
   ccBlocks.addEventListener("change", (e) => {
+    // Utilization fields first — the roleId <select> must not fall through to
+    // the generic SELECT handler below.
+    if (e.target.dataset.utilfield !== undefined) {
+      updateUtilField(e.target); // applies the roleId select too
+      dbSetUtilization(COST_CENTERS[Number(e.target.dataset.utilfield)]);
+      buildPlanningGrid(); // refresh derived heads / revenue / cost
+      return;
+    }
+    if (e.target.dataset.utilhours !== undefined) {
+      const cc = COST_CENTERS[Number(e.target.dataset.utilhours)];
+      if (!cc.utilization) cc.utilization = defaultUtilization();
+      cc.utilization.billableHours = Array(12).fill(Number(e.target.value) || 0); // flat spread
+      dbSetUtilization(cc);
+      buildPlanningGrid();
+      return;
+    }
+    if (e.target.dataset.utilmonth !== undefined) {
+      dbSetUtilization(COST_CENTERS[Number(e.target.dataset.utilmonth)]);
+      buildPlanningGrid();
+      return;
+    }
     if (e.target.tagName === "SELECT") { handleCcFieldChange(e.target); return; }
     if (e.target.dataset.revmonthline !== undefined) {
       const cc = COST_CENTERS[Number(e.target.dataset.revmonthline)];
@@ -399,6 +491,34 @@ function initPlanningGrid() {
     if (revToggle) {
       const cc = COST_CENTERS[Number(revToggle.dataset.revtoggle)];
       cc._showRevMonthly = !cc._showRevMonthly; // transient reveal of the 12-month grid
+      buildPlanningGrid();
+      return;
+    }
+
+    const addUtilBtn = e.target.closest("[data-addutil]");
+    if (addUtilBtn) {
+      const cc = COST_CENTERS[Number(addUtilBtn.dataset.addutil)];
+      cc._showUtil = true;
+      cc.utilization = cc.utilization || defaultUtilization(); // seeded; persists on first edit
+      buildPlanningGrid();
+      const input = document.querySelector(`[data-utilfield="${addUtilBtn.dataset.addutil}"][data-uf="billRate"]`);
+      if (input) input.focus();
+      return;
+    }
+
+    const removeUtilBtn = e.target.closest("[data-removeutil]");
+    if (removeUtilBtn) {
+      const cc = COST_CENTERS[Number(removeUtilBtn.dataset.removeutil)];
+      cc.utilization = null; cc._showUtil = false;
+      dbSetUtilization(cc); // deletes the row
+      buildPlanningGrid();
+      return;
+    }
+
+    const utilToggle = e.target.closest("[data-utiltoggle]");
+    if (utilToggle) {
+      const cc = COST_CENTERS[Number(utilToggle.dataset.utiltoggle)];
+      cc._showUtilMonthly = !cc._showUtilMonthly;
       buildPlanningGrid();
       return;
     }
