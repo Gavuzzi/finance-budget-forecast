@@ -973,10 +973,6 @@ td.mt-drill:hover { background: rgba(77,124,199,0.12); border-radius: 4px; }
 .stats-row.stats-compact { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .stats-row.stats-compact .stat-value { font-size: 1.5rem; }
 
-/* "This month" — the loop block (signals + review + re-forecast) */
-.this-month-panel .reforecast-block { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--panel-border); }
-.this-month-panel .reforecast-block h3 { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; margin: 0 0 4px; font-weight: 600; }
-
 /* Collapsed secondary sections (TEARDOWN C6) */
 details.collapse-panel { padding: 0; }
 details.collapse-panel > summary {
@@ -1000,15 +996,20 @@ details.collapse-panel > *:not(summary) { margin-left: 24px; margin-right: 24px;
 details.collapse-panel > *:last-child:not(summary) { margin-bottom: 20px; }
 .bv-status { margin-left: 4px; font-size: 0.85rem; text-transform: none; letter-spacing: 0; }
 
-/* Re-forecast suggestions */
-.rf-row {
-  display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  padding: 10px 0; border-bottom: 1px solid var(--panel-border); flex-wrap: wrap;
+/* Re-forecast — per-line row on Planning (it edits the plan) */
+.cc-reforecast {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--panel-border);
 }
-.rf-row:last-child { border-bottom: none; }
-.rf-row strong { color: var(--text); }
-.rf-detail, .rf-badge { display: block; font-size: 0.85rem; color: var(--text-dim); margin-top: 2px; }
+.cc-reforecast:empty { display: none; }
+.rf-label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim); }
+.rf-detail, .rf-badge { font-size: 0.85rem; color: var(--text-dim); }
 .rf-badge { color: var(--accent-soft); }
+.rf-source {
+  background: var(--bg); border: 1px solid var(--panel-border); color: var(--text);
+  border-radius: 8px; padding: 6px 8px; font-size: 0.82rem; font-family: inherit;
+}
+.rf-source:focus { outline: none; border-color: var(--accent); }
 
 /* Signals — proactive variance flags */
 .signal-row { display: flex; align-items: baseline; gap: 10px; padding: 7px 0; font-size: 0.92rem; color: var(--text); border-bottom: 1px solid var(--panel-border); }

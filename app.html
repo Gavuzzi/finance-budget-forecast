@@ -37,16 +37,12 @@
 
       <section class="stats-row stats-compact" id="statsRow"></section>
 
-      <!-- The loop, front and center: signals + review + re-forecast (TEARDOWN C6) -->
+      <!-- The loop, front and center: signals + review (TEARDOWN C6).
+           Re-forecast moved to Planning [#3] — it EDITS the plan; Overview monitors. -->
       <section class="panel this-month-panel" id="thisMonthPanel" hidden>
         <h2 data-i18n-html="this_month_h2">This month <span class="pnl-src">— what needs your attention</span></h2>
         <div id="signalsPanel" hidden>
           <div id="signalsList"></div>
-        </div>
-        <div id="reforecastPanel" class="reforecast-block" hidden>
-          <h3 data-i18n-html="reforecast_h2">Re-forecast <span class="pnl-src">— update the plan to match recent reality</span></h3>
-          <p class="table-hint" data-i18n="reforecast_hint">Never automatic — nothing changes until you click Apply, and it's always reversible.</p>
-          <div id="reforecastList"></div>
         </div>
       </section>
 

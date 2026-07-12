@@ -154,6 +154,7 @@ function renderCcBlock(i) {
       </div>
 
       <div class="cc-revenue">${revenueRowHtml(cc, i)}</div>
+      <div class="cc-reforecast">${reforecastHtml(cc, i)}</div>
       <div class="cc-summary">${summaryHtml(cc, i)}</div>
       <div class="cc-bridge" data-bridgepanel="${i}" hidden>${bridgeHtml(cc)}</div>
     </div>
@@ -235,6 +236,36 @@ function utilizationHtml(cc, i) {
     </div>
     ${cc._showUtilMonthly ? `<div class="line-rev-grid rev-plan-grid">${monthCells}</div><p class="rate-hint rev-grid-hint">${t("util_monthly_hint")}</p>` : ""}
     <div class="util-derived">${t("util_derived", utilizationAvgHeads(cc).toFixed(1), fmtMkr(utilizationFyRevenue(cc)), fmtMkr(utilizationFyCost(cc)))}</div>`;
+}
+
+// Re-forecast [#3/#24] — moved here from Overview because it EDITS the plan.
+// When a line has booked actuals, offer to replace its remaining months with a
+// run-rate from a source of the user's choice: recent actuals (default), the
+// monthly budget, or a custom figure. Never automatic, always reversible —
+// an override is a flagged, explicit layer on top of the driver plan.
+function reforecastHtml(cc, i) {
+  if (CLOSE_MONTH === 0) return ""; // nothing booked yet — nothing to re-forecast from
+  const hasOverride = cc.overrides && Object.keys(cc.overrides).length > 0;
+  if (hasOverride) {
+    return `
+      <span class="rf-label">${t("rf_label")}</span>
+      <span class="rf-badge">${t("rf_override_badge", fmtSek(cc.overrides[CLOSE_MONTH + 1] ?? Object.values(cc.overrides)[0]))}</span>
+      <button class="add-headcount" data-rfrevert="${i}" type="button">${t("rf_revert")}</button>`;
+  }
+  const recent = recentRunRate(cc);
+  if (recent == null || CLOSE_MONTH + 1 > TIMELINE_LENGTH) return "";
+  const planForecast = forecastForMonth(cc, CLOSE_MONTH + 1);
+  const pct = planForecast ? Math.abs(recent - planForecast) / planForecast * 100 : 0;
+  const detail = planForecast ? `<span class="rf-detail">${t("rf_detail", fmtSek(recent), fmtSek(planForecast), pct.toFixed(0))}</span>` : "";
+  return `
+    <span class="rf-label">${t("rf_label")}</span>
+    ${detail}
+    <select class="rf-source" data-rfsource="${i}">
+      <option value="recent">${t("rf_source_recent")}</option>
+      <option value="budget">${t("rf_source_budget")}</option>
+      <option value="manual">${t("rf_source_manual")}</option>
+    </select>
+    <button class="add-headcount" data-rfapply="${i}" type="button">${t("rf_apply")}</button>`;
 }
 
 // Live update of one month of a line's revenue while typing. Seeds the [12]
@@ -525,6 +556,33 @@ function initPlanningGrid() {
       const cc = COST_CENTERS[Number(utilToggle.dataset.utiltoggle)];
       cc._showUtilMonthly = !cc._showUtilMonthly;
       buildPlanningGrid();
+      return;
+    }
+
+    const rfApply = e.target.closest("[data-rfapply]");
+    if (rfApply) {
+      const i = Number(rfApply.dataset.rfapply);
+      const cc = COST_CENTERS[i];
+      if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast(t("toast_signin_reforecast")); return; }
+      const source = (document.querySelector(`[data-rfsource="${i}"]`) || {}).value || "recent";
+      let amount = null; // recent = dbApplyRunRate's default basis
+      if (source === "budget") amount = cc.annualBudget / 12;
+      if (source === "manual") {
+        const raw = prompt(t("prompt_rf_manual"));
+        if (raw == null || raw.trim() === "" || !isFinite(Number(raw))) return;
+        amount = Number(raw);
+      }
+      const rr = await dbApplyRunRate(cc, amount);
+      if (rr != null) { showToast(t("toast_applied_runrate", cc.name)); buildPlanningGrid(); }
+      return;
+    }
+
+    const rfRevert = e.target.closest("[data-rfrevert]");
+    if (rfRevert) {
+      const cc = COST_CENTERS[Number(rfRevert.dataset.rfrevert)];
+      if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast(t("toast_signin_reforecast")); return; }
+      const ok = await dbClearOverrides(cc);
+      if (ok) { showToast(t("toast_reverted", cc.name)); buildPlanningGrid(); }
       return;
     }
 

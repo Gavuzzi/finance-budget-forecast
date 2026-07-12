@@ -1284,20 +1284,27 @@ async function dbDeleteRecurringCost(id) {
   if (error) flagWriteError(error);
 }
 
-// Re-forecast: average the last up-to-3 CLOSED (actual) months for this cost
-// centre, and apply that run-rate as an explicit override for every remaining
-// month (CLOSE_MONTH+1 through the end of the timeline). Only ever called by
-// a user clicking "Apply" — never by a sync. Returns the run-rate, or null if
-// there's no actual data yet to base one on.
-async function dbApplyRunRate(cc) {
-  if (!assertEditable()) return null;
+// The default re-forecast basis: average of the last up-to-3 CLOSED (actual)
+// months. null when there's no actual data yet to base one on.
+function recentRunRate(cc) {
   const recent = [];
   for (let m = CLOSE_MONTH; m >= 1 && recent.length < 3; m--) {
     const v = cc.actualMonthly[m - 1];
     if (v != null) recent.push(v);
   }
-  if (recent.length === 0) return null;
-  const runRate = Math.round(recent.reduce((a, b) => a + b, 0) / recent.length);
+  return recent.length ? recent.reduce((a, b) => a + b, 0) / recent.length : null;
+}
+
+// Re-forecast: apply a monthly run-rate as an explicit override for every
+// remaining month (CLOSE_MONTH+1 through the end of the timeline). The amount
+// is the user's chosen source — recent actuals (default), the monthly budget,
+// or a custom figure [#24]. Only ever called by a user clicking Apply — never
+// by a sync. Returns the run-rate, or null if there's nothing to apply.
+async function dbApplyRunRate(cc, amount = null) {
+  if (!assertEditable()) return null;
+  const basis = amount != null ? amount : recentRunRate(cc);
+  if (basis == null || !isFinite(basis)) return null;
+  const runRate = Math.round(basis);
 
   const rows = [];
   for (let m = CLOSE_MONTH + 1; m <= TIMELINE_LENGTH; m++) rows.push({ org_id: CURRENT_ORG_ID, version_id: ACTIVE_VERSION_ID, reporting_line_id: cc.id, month: m, amount: runRate });
