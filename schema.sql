@@ -282,6 +282,25 @@ drop policy if exists sync_exclusions_write on sync_exclusions;
 create policy sync_exclusions_read on sync_exclusions for select using (is_org_member(org_id));
 create policy sync_exclusions_write on sync_exclusions for all using (can_edit_org(org_id)) with check (can_edit_org(org_id));
 
+-- Client error log (the "errors must not vanish silently" net — DIY Sentry).
+-- WRITE-ONLY from the browser: authenticated users can insert their own rows,
+-- nobody can select via the client (no select policy) — read via CLI/dashboard.
+-- No build step means stack traces are already readable file:line.
+create table if not exists client_errors (
+  id         uuid primary key default gen_random_uuid(),
+  org_id     uuid references organizations(id) on delete set null,
+  user_id    uuid not null,
+  message    text not null,
+  source     text,        -- file:line:col
+  stack      text,
+  page       text,
+  user_agent text,
+  created_at timestamptz not null default now()
+);
+alter table client_errors enable row level security;
+drop policy if exists client_errors_insert on client_errors;
+create policy client_errors_insert on client_errors for insert to authenticated with check (auth.uid() = user_id);
+
 -- Phase 5 (cash flow): current bank balance (from the SIE's #UB closing-balance
 -- lines for bank accounts) and open invoices (from Fortnox's Customer/Supplier
 -- Invoices API, filter=unpaid) — the two ingredients for a projected running

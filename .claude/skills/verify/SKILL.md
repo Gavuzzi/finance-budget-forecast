@@ -66,6 +66,27 @@ Never verify with data-modifying CTEs that SELECT their own inserts (they
 can't see each other); use separate statements, or a `begin; …; rollback;`
 transaction for shape-only validation.
 
+**6. Schema drift check** — after any DB-touching commit:
+
+```sh
+sh tools/schema-drift.sh    # must print "DRIFT CHECK OK"
+```
+
+Confirms every live table.column is mirrored in schema.sql /
+integration-schema.sql (name-level; catches forgotten tables and forgotten
+`add column`).
+
+## Error monitoring
+
+Client errors write themselves to the `client_errors` table (write-only RLS;
+handler at the bottom of lib.js — capped 5/page-load, deduped, silent in demo
+mode). Check it periodically and ALWAYS when Felix reports something odd:
+
+```sh
+/c/Users/felix/supabase-bin/supabase.exe db query --linked \
+  "select created_at, page, message, source from client_errors order by created_at desc limit 20;"
+```
+
 ## DB rules (non-negotiable)
 
 - Every live DB change is mirrored **idempotently** into `schema.sql` in the

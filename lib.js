@@ -218,3 +218,35 @@ document.addEventListener("click", (e) => {
   pop.style.top = `${r.bottom + window.scrollY + 6}px`;
   pop.style.left = `${Math.max(8, Math.min(r.left + window.scrollX, window.innerWidth - 320))}px`;
 });
+
+// ---- Client error logging (DIY Sentry — errors must not vanish silently) ----
+// window errors + unhandled promise rejections → write-only client_errors
+// table. Capped at 5 per page load, deduped by message, skipped in demo mode
+// (no session to attribute), and the logger itself can NEVER throw. No build
+// step means source is already readable file:line — no sourcemap machinery.
+let _errLogged = 0;
+const _errSeen = new Set();
+function logClientError(message, source, stack) {
+  try {
+    if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) return;
+    const msg = String(message || "unknown").slice(0, 500);
+    if (_errLogged >= 5 || _errSeen.has(msg)) return;
+    _errSeen.add(msg); _errLogged++;
+    sb.auth.getSession().then(({ data: { session } }) => {
+      if (!session) return;
+      return sb.from("client_errors").insert({
+        org_id: typeof CURRENT_ORG_ID !== "undefined" && CURRENT_ORG_ID ? CURRENT_ORG_ID : null,
+        user_id: session.user.id,
+        message: msg,
+        source: source ? String(source).slice(0, 300) : null,
+        stack: stack ? String(stack).slice(0, 2000) : null,
+        page: (location.pathname.split("/").pop() || "index.html") + location.search,
+        user_agent: navigator.userAgent.slice(0, 200),
+      });
+    }).catch(() => {});
+  } catch (_) { /* the error logger must never itself throw */ }
+}
+window.addEventListener("error", (e) =>
+  logClientError(e.message, e.filename ? `${e.filename.split("/").pop()}:${e.lineno}:${e.colno}` : null, e.error && e.error.stack));
+window.addEventListener("unhandledrejection", (e) =>
+  logClientError((e.reason && e.reason.message) || String(e.reason), null, e.reason && e.reason.stack));
