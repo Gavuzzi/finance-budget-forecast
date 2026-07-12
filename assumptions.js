@@ -63,6 +63,7 @@ function renderRevenueBlock() {
     <div class="cc-block rate-block revenue-block">
       <h2>${t("revenue_plan_h2")}</h2>
       <p class="rate-hint">${t("revenue_plan_hint")}</p>
+      ${anyLineHasRevenue() ? `<p class="rate-hint rev-ignored-note">${t("rev_org_ignored_note")}</p>` : ""}
       <div class="assumption-fields">
         <label>${t("annual_revenue_target")}
           <input type="number" data-assumption="revenueBudget" value="${ASSUMPTIONS.revenueBudget}" step="10000">

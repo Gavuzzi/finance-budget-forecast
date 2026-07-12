@@ -825,6 +825,19 @@ a.sync-badge:hover { text-decoration: underline; }
 
 .period-select:focus { outline: none; border-color: var(--accent); }
 
+/* Collapsed booked-through read-out [#7] — auto needs no control */
+.period-line {
+  display: flex; align-items: baseline; gap: 6px;
+  font-size: 0.8rem; color: var(--text-dim);
+}
+.period-line strong { color: var(--text); }
+.period-edit {
+  background: none; border: none; padding: 0; cursor: pointer;
+  font-family: inherit; font-size: 0.78rem; font-weight: 600;
+  color: var(--accent-soft); text-decoration: underline dotted; text-underline-offset: 3px;
+}
+.period-edit:hover { color: var(--accent); }
+
 /* Accounting integration panel (Monthly page) */
 .integration-card {
   background: var(--panel);
@@ -1867,12 +1880,14 @@ html[data-theme="light"] .panel {
   font-variant-numeric: tabular-nums;
 }
 
-/* Monthly revenue plan: 12 compact month cells (2 rows of 6 on desktop) */
+/* Monthly plan grids: 12 month cells in 3 columns, so each ROW is a quarter —
+   unambiguously a full year (2×6 read as "6 months"; #22). */
 .rev-plan-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px 12px;
   margin: 4px 0 12px;
+  max-width: 560px;
 }
 .rev-plan-grid label {
   display: flex;
@@ -1894,9 +1909,8 @@ html[data-theme="light"] .panel {
 }
 .rev-plan-grid input:focus { outline: none; border-color: var(--accent); }
 .rev-plan-actions { display: flex; gap: 14px; align-items: center; margin-bottom: 10px; }
+.rev-ignored-note { color: var(--amber); font-weight: 600; }
 .rev-plan-actions button[disabled] { opacity: 0.4; cursor: default; }
-@media (max-width: 900px) { .rev-plan-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-@media (max-width: 640px) { .rev-plan-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 
 /* Team (membership management) */
 .team-list { margin-bottom: 14px; }

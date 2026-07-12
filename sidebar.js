@@ -26,6 +26,10 @@ function currentPageId() {
   return "overview";
 }
 
+// Transient: the booked-through select stays visible after "change" is
+// clicked, until the user hands control back to auto. Not persisted.
+let _showPeriodSelect = false;
+
 function getTheme() {
   return document.documentElement.getAttribute("data-theme") || "light";
 }
@@ -75,6 +79,19 @@ function sidebarHtml() {
     )
     .join("");
 
+  // "Actuals booked through" [#7]: auto is the normal state and needs no
+  // control — show a one-line read-out with a quiet "change" affordance. The
+  // full select only appears while overriding (or after clicking change).
+  const periodControl = (CLOSE_MONTH_MANUAL || _showPeriodSelect)
+    ? `<div class="period-box">
+        <label class="period-label" for="closeMonthSelect">${t("period_label")}</label>
+        <select class="period-select" id="closeMonthSelect">${monthOptions}</select>
+      </div>`
+    : `<div class="period-line">
+        <span>${t("period_booked_through", CLOSE_MONTH ? monthLabel(CLOSE_MONTH) : t("period_none_yet"))}</span>
+        <button class="period-edit" id="periodEditBtn" type="button">${t("period_change")}</button>
+      </div>`;
+
   return `
     <div class="sidebar-brand">
       ${USER_ORGS.length > 1
@@ -86,10 +103,7 @@ function sidebarHtml() {
     <nav class="sidebar-nav">${nav}</nav>
     <div class="sidebar-footer">
       ${syncBadgeHtml()}
-      <div class="period-box">
-        <label class="period-label" for="closeMonthSelect">${t("period_label")}</label>
-        <select class="period-select" id="closeMonthSelect">${monthOptions}</select>
-      </div>
+      ${periodControl}
       <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle light/dark theme"></button>
       <div class="lang-seg" id="langToggle" role="group" aria-label="Language">
         <button class="lang-opt ${getLang() === "en" ? "active" : ""}" data-lang="en" type="button">EN</button>
@@ -139,11 +153,18 @@ function renderSidebar() {
     applyTheme(getTheme() === "light" ? "dark" : "light");
   });
 
+  const periodEditBtn = document.getElementById("periodEditBtn");
+  if (periodEditBtn) periodEditBtn.addEventListener("click", () => {
+    _showPeriodSelect = true;
+    renderSidebar();
+  });
+
   const closeSel = document.getElementById("closeMonthSelect");
   if (closeSel) {
     closeSel.addEventListener("change", () => {
       if (closeSel.value === "auto") {
         CLOSE_MONTH_MANUAL = false;      // hand control back to the sync
+        _showPeriodSelect = false;       // …and collapse back to the read-out
       } else {
         CLOSE_MONTH_MANUAL = true;       // manual override — syncs won't touch it
         setCloseMonth(parseInt(closeSel.value, 10));
