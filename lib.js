@@ -195,3 +195,26 @@ async function requireAuthAndLoad(initFn) {
   if (session) start();
   else renderLogin(start);
 }
+
+// ---- Contextual "?" help (SAC-style, Tier 3) --------------------------------
+// helpMark("key") renders a small ? button; clicking pops a one-liner from
+// i18n key `help_<key>` right under it. Discipline: a ? only where genuinely
+// non-obvious, ≤2 sentences — prefer a clearer label over a ? where possible.
+function helpMark(key) {
+  return `<button class="help-mark" type="button" data-help="${key}" aria-label="?">?</button>`;
+}
+document.addEventListener("click", (e) => {
+  const open = document.querySelector(".help-pop");
+  const wasFor = open && open.dataset.for;
+  if (open) open.remove();
+  const btn = e.target.closest("[data-help]");
+  if (!btn || wasFor === btn.dataset.help) return; // second click on the same ? just closes
+  const pop = document.createElement("div");
+  pop.className = "help-pop";
+  pop.dataset.for = btn.dataset.help;
+  pop.textContent = t("help_" + btn.dataset.help);
+  document.body.appendChild(pop);
+  const r = btn.getBoundingClientRect();
+  pop.style.top = `${r.bottom + window.scrollY + 6}px`;
+  pop.style.left = `${Math.max(8, Math.min(r.left + window.scrollX, window.innerWidth - 320))}px`;
+});

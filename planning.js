@@ -116,8 +116,7 @@ function renderCcBlock(i) {
           <tbody>${headcountRows}</tbody>
         </table>
       </div>
-      <button class="add-headcount" data-add="${i}">${t("add_line_btn")}</button>
-      <p class="line-hint">${t("headcount_hint")}</p>
+      <button class="add-headcount" data-add="${i}">${t("add_line_btn")}</button>${helpMark("headcount")}
 
       <div class="oneoffs-section">
         <h3>${t("oneoffs_h3")}</h3>
@@ -220,10 +219,9 @@ function utilizationHtml(cc, i) {
     </label>`).join("");
   return `
     <div class="util-head">
-      <h3>${t("util_h3")}</h3>
+      <h3>${t("util_h3")}${helpMark("util")}</h3>
       <button class="row-remove" data-removeutil="${i}" title="${t("util_remove_title")}">✕</button>
     </div>
-    <p class="line-hint">${t("util_hint")}</p>
     <div class="util-fields">
       <label>${t("util_bill_rate")}<input type="number" step="50" data-utilfield="${i}" data-uf="billRate" value="${u.billRate || ""}" placeholder="0"></label>
       <label>${t("util_utilization")}<input type="number" step="5" data-utilfield="${i}" data-uf="utilizationPct" value="${u.utilizationPct || ""}" placeholder="75"></label>
