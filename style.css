@@ -890,6 +890,30 @@ a.sync-badge:hover { text-decoration: underline; }
 /* Drill-down: what's inside an actual cell */
 td.mt-drill { cursor: pointer; }
 td.mt-drill:hover { background: rgba(77,124,199,0.12); border-radius: 4px; }
+/* "Build your company" wizard — same overlay pattern as the drill-down card */
+.wizard-overlay {
+  position: fixed; inset: 0; z-index: 1600;
+  background: rgba(8,12,20,0.6);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.wizard {
+  width: 560px; max-width: 100%; max-height: 88vh; overflow-y: auto;
+  background: var(--panel); border: 1px solid var(--panel-border);
+  border-radius: 14px; padding: 24px 26px;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.45);
+}
+.wizard h2 { font-size: 1.15rem; color: var(--text); margin: 0 0 14px; }
+.wizard-name { display: block; font-size: 0.82rem; color: var(--text-dim); margin-bottom: 14px; }
+.wizard-name input {
+  display: block; width: 100%; margin-top: 5px;
+  background: var(--bg); border: 1px solid var(--panel-border); color: var(--text);
+  border-radius: 8px; padding: 9px 10px; font-size: 0.95rem; font-family: inherit;
+}
+.wizard-name input:focus { outline: none; border-color: var(--accent); }
+.wizard-q { font-size: 0.82rem; font-weight: 700; color: var(--text-dim); margin: 14px 0 8px; }
+.wizard-actions { display: flex; justify-content: flex-end; gap: 14px; align-items: center; margin-top: 18px; }
+.planmode-people-q { margin-top: 14px; }
+
 .drill-overlay {
   position: fixed; inset: 0; z-index: 1600;
   background: rgba(8,12,20,0.6);

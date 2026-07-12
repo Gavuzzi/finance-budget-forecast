@@ -215,10 +215,84 @@ function renderSidebar() {
   });
 
   const newOrgBtn = document.getElementById("newOrgBtn");
-  if (newOrgBtn) newOrgBtn.addEventListener("click", createOrg);
+  if (newOrgBtn) newOrgBtn.addEventListener("click", openOrgWizard);
 
   document.getElementById("logoutBtn").addEventListener("click", async () => {
     await sb.auth.signOut();
+    location.reload();
+  });
+}
+
+// "Build your company" wizard (Felix round 2 #2/#6): creating an org asks HOW
+// it plans — revenue side and cost side — instead of burying the choice in
+// Assumptions after the fact. The answers become planning_config, which shapes
+// this org's whole UI from the first second. Demo users can open it (it sells
+// the per-org-UI idea) but the create itself is sign-in-gated.
+function openOrgWizard() {
+  if (document.getElementById("orgWizard")) return;
+  const opt = (group, val, label, desc, checked) => `
+    <label class="planmode-opt ${checked ? "active" : ""}">
+      <input type="radio" name="${group}" value="${val}" ${checked ? "checked" : ""}>
+      <strong>${label}</strong><span>${desc}</span>
+    </label>`;
+  const overlay = document.createElement("div");
+  overlay.className = "wizard-overlay";
+  overlay.id = "orgWizard";
+  overlay.innerHTML = `
+    <div class="wizard" role="dialog" aria-modal="true">
+      <h2>${t("wizard_h2")}</h2>
+      <label class="wizard-name">${t("wizard_name_label")}
+        <input type="text" id="wizName" maxlength="80" placeholder="${t("wizard_name_placeholder")}">
+      </label>
+      <p class="wizard-q">${t("wizard_rev_q")}</p>
+      <div class="planmode-opts">
+        ${opt("wizRev", "org", t("planmode_org"), t("planmode_org_desc"), true)}
+        ${opt("wizRev", "lines", t("planmode_lines"), t("planmode_lines_desc"), false)}
+        ${opt("wizRev", "hours", t("planmode_hours"), t("planmode_hours_desc"), false)}
+      </div>
+      <p class="wizard-q" id="wizPeopleQ">${t("planmode_people_q")}</p>
+      <div class="planmode-opts" id="wizPeopleOpts">
+        ${opt("wizPeople", "roles", t("planmode_people_roles"), t("planmode_people_roles_desc"), true)}
+        ${opt("wizPeople", "simple", t("planmode_people_simple"), t("planmode_people_simple_desc"), false)}
+      </div>
+      <div class="wizard-actions">
+        <button class="integ-link" id="wizCancel" type="button">${t("common_cancel")}</button>
+        <button class="empty-cta" id="wizCreate" type="button">${t("wizard_create_btn")}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.getElementById("wizName").focus();
+
+  // Card highlight + hours-mode hides the people question (roles are required
+  // there — the utilization driver costs its derived heads against a role).
+  overlay.addEventListener("change", (e) => {
+    if (!e.target.name) return;
+    overlay.querySelectorAll(`input[name="${e.target.name}"]`).forEach((r) =>
+      r.closest(".planmode-opt").classList.toggle("active", r.checked));
+    if (e.target.name === "wizRev") {
+      const hours = e.target.value === "hours";
+      document.getElementById("wizPeopleQ").hidden = hours;
+      document.getElementById("wizPeopleOpts").hidden = hours;
+    }
+  });
+
+  overlay.addEventListener("click", async (e) => {
+    if (e.target === overlay || e.target.id === "wizCancel") { overlay.remove(); return; }
+    if (e.target.id !== "wizCreate") return;
+    const name = document.getElementById("wizName").value.trim();
+    if (!name) { document.getElementById("wizName").focus(); return; }
+    if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast(t("toast_signin_create_org")); return; }
+    const rev = (overlay.querySelector('input[name="wizRev"]:checked') || {}).value || "org";
+    const people = (overlay.querySelector('input[name="wizPeople"]:checked') || {}).value || "roles";
+    const config = {
+      revenueMode: rev === "org" ? "org" : "lines",
+      billableHours: rev === "hours",
+      headcount: rev === "hours" ? true : people === "roles",
+    };
+    e.target.disabled = true;
+    const id = await dbCreateOrganization(name, config);
+    if (!id) { e.target.disabled = false; return; }
+    localStorage.setItem(ORG_STORAGE_KEY, id);
     location.reload();
   });
 }

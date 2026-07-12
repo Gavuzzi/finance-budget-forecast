@@ -49,9 +49,13 @@ let VERSION_SUMMARIES = {};
 // AFFORDANCES render — never the engine (it composes whatever data exists, so
 // switching modes can't silently change numbers), and never existing rows
 // (they always render so they can be seen and removed).
-let PLANNING_CONFIG = { revenueMode: "org", billableHours: false };
+let PLANNING_CONFIG = { revenueMode: "org", billableHours: false, headcount: true };
 function planRevenueOnLines() { return PLANNING_CONFIG.revenueMode === "lines"; }
 function planBillableHours() { return planRevenueOnLines() && !!PLANNING_CONFIG.billableHours; }
+// The cost-side choice (Felix round 2 #2): does this org model people (roles ×
+// salaries) or just plain cost amounts? Billable-hours orgs always keep roles —
+// the utilization driver costs its derived heads against a role.
+function planHeadcount() { return PLANNING_CONFIG.headcount !== false || planBillableHours(); }
 let CASH_POSITION = null; // { bankBalance, asOf } — from the last sync's SIE #UB lines
 let OPEN_INVOICES = [];   // [{ kind: 'customer'|'supplier', amount, dueDate, description, counterparty }]
 // VAT/payroll-tax closing balances by FY-relative month, from the sync's #IB +
@@ -740,8 +744,10 @@ async function loadData(orgId) {
   FY_START_MONTH = org.fy_start_month || 1; // broken fiscal years — set by the Fortnox sync
   FY_START_YEAR = org.fy_start_year || 2026;
   PLANNING_CONFIG = (org.planning_config && typeof org.planning_config === "object")
-    ? { revenueMode: org.planning_config.revenueMode === "lines" ? "lines" : "org", billableHours: !!org.planning_config.billableHours }
-    : { revenueMode: "org", billableHours: false }; // pre-config orgs default to the simplest mode
+    ? { revenueMode: org.planning_config.revenueMode === "lines" ? "lines" : "org",
+        billableHours: !!org.planning_config.billableHours,
+        headcount: org.planning_config.headcount !== false } // absent (pre-Phase-8c rows) = true
+    : { revenueMode: "org", billableHours: false, headcount: true }; // pre-config orgs default to the simplest mode
   localStorage.setItem(ORG_STORAGE_KEY, CURRENT_ORG_ID);
 
   // Resolve the active plan version (the driver copy we load/edit). Ensures a
@@ -910,10 +916,12 @@ function loadPreviewData() {
   // &consulting shows billable hours. Mirrors what real configs produce.
   const _pv = new URLSearchParams(location.search);
   PLANNING_CONFIG = _pv.has("consulting")
-    ? { revenueMode: "lines", billableHours: true }
+    ? { revenueMode: "lines", billableHours: true, headcount: true }
     : _pv.has("profit") || _pv.has("revgrid")
-      ? { revenueMode: "lines", billableHours: false }
-      : { revenueMode: "org", billableHours: false };
+      ? { revenueMode: "lines", billableHours: false, headcount: true }
+      : _pv.has("simplecosts") // dev hook: no-headcount org (costs are plain amounts)
+        ? { revenueMode: "org", billableHours: false, headcount: false }
+        : { revenueMode: "org", billableHours: false, headcount: true };
   DISPLAY_UNIT = "mkr"; // demo figures are millions-scale — keep the portfolio clean
   // Dev hook: ?preview&fystart=5 renders a broken fiscal year (May–Apr) to verify labels.
   FY_START_MONTH = parseInt(new URLSearchParams(location.search).get("fystart"), 10) || 1;
@@ -986,6 +994,14 @@ function loadPreviewData() {
         billableHours: [900, 950, 1000, 1050, 1000, 900, 600, 800, 1100, 1150, 1200, 1000] };
       line._showUtil = true; line._showUtilMonthly = true;
     }
+  }
+
+  // Dev hook: &simplecosts renders the no-headcount shape (planning_config
+  // headcount:false set above) — cost-only lines, no roles, so the People
+  // sections and the salary/role engine are verifiably absent.
+  if (_pv.has("simplecosts")) {
+    ROLE_CATALOG.length = 0;
+    COST_CENTERS.forEach((cc) => { cc.headcount = []; });
   }
 
   // Cross-version summaries for the demo Overview panels. Monthly trajectories
@@ -1419,16 +1435,14 @@ function parseActualsCsv(text) {
 // Stand up a brand-new tenant via the locked-down server-side function — one
 // atomic call that creates the org, your owner membership, and default
 // assumptions. The client can't touch memberships directly (security).
-async function createOrg() {
-  if (DEMO_MODE) { showToast(t("toast_signin_create_org")); return; }
-  const name = prompt(t("prompt_new_org_name"));
-  if (!name || !name.trim()) return;
-
-  const { data, error } = await sb.rpc("create_organization", { org_name: name.trim() });
-  if (error) { flagWriteError(error); return; }
-
-  localStorage.setItem(ORG_STORAGE_KEY, data);
-  location.reload();
+// Create an org with its planning_config answered up front (the "build your
+// company" wizard in sidebar.js collects name + config; this is the data layer).
+async function dbCreateOrganization(name, config) {
+  const { data, error } = await sb.rpc("create_organization", { org_name: name });
+  if (error) { flagWriteError(error); return null; }
+  const upd = await sb.from("organizations").update({ planning_config: config }).eq("id", data);
+  if (upd.error) flagWriteError(upd.error); // org still usable — config falls back to defaults
+  return data;
 }
 
 // ---- Shared formatting -----------------------------------------------------
@@ -1474,13 +1488,14 @@ function varianceClass(variance, budget) {
 // prepared" — a controller shouldn't hear "never seen that before" from us).
 // Each maps to how that business type TYPICALLY tags its Fortnox bookings, so
 // picking one also sets expectations for the Fortnox mapping step later.
+// One working example PER PLANNING SHAPE, matched to the org's planning_config
+// (Felix round 2 #6: the old four industry presets were three identical shapes
+// with different labels — industry theater. The wizard answers HOW you plan;
+// the sample just fills that shape with believable numbers).
 const BUSINESS_PRESETS = {
-  // Each preset pre-answers "how do you plan?" (planning_config) so the org's
-  // UI is shaped from the first second — one revenue home, no unused options.
-  manufacturer: {
-    label: t("preset_manufacturer_label"),
-    hint: t("preset_manufacturer_hint"),
-    config: { revenueMode: "org", billableHours: false },
+  org_hc: {
+    label: t("preset_org_hc_label"),
+    hint: t("preset_org_hc_hint"),
     orgRevenue: 25000000, // one company-level target — the simplest mode
     roles: [["Manager", 55000], ["Specialist", 42000], ["Associate", 33000], ["Support", 30000]],
     costCenters: [
@@ -1489,10 +1504,33 @@ const BUSINESS_PRESETS = {
       { name: "Administration", budget: 3000000, other: 120000, hc: [["Support", 2]] },
     ],
   },
-  consultancy: {
-    label: t("preset_consultancy_label"),
-    hint: t("preset_consultancy_hint"),
-    config: { revenueMode: "lines", billableHours: true },
+  org_simple: {
+    label: t("preset_org_simple_label"),
+    hint: t("preset_org_simple_hint"),
+    orgRevenue: 6500000,
+    roles: [],
+    costCenters: [
+      // No headcount modelling — each line is plain monthly amounts (salaries
+      // included as a lump sum), the smallest-SME way of planning.
+      { name: "Operations", budget: 4400000, other: 365000, hc: [] },
+      { name: "Admin & premises", budget: 1100000, other: 90000, hc: [] },
+    ],
+  },
+  lines: {
+    label: t("preset_lines_label"),
+    hint: t("preset_lines_hint"),
+    roles: [["Manager", 55000], ["Specialist", 42000], ["Associate", 33000], ["Support", 30000]],
+    costCenters: [
+      // Two business areas that each earn their own revenue (line P&L + margin),
+      // plus a cost-only admin line — the profit-centre way of planning.
+      { name: "Product A", budget: 12000000, other: 300000, revenue: 18000000, hc: [["Manager", 1], ["Specialist", 4], ["Associate", 6]] },
+      { name: "Product B", budget: 6000000, other: 150000, revenue: 9500000, hc: [["Manager", 1], ["Associate", 4]] },
+      { name: "Administration", budget: 3000000, other: 120000, hc: [["Support", 2]] },
+    ],
+  },
+  hours: {
+    label: t("preset_hours_label"),
+    hint: t("preset_hours_hint"),
     costCenters: [
       // Client Delivery is planned by the utilization driver (billable hours →
       // revenue, and → the delivery headcount needed), not manual headcount —
@@ -1504,29 +1542,14 @@ const BUSINESS_PRESETS = {
     ],
     roles: [["Partner", 75000], ["Senior Consultant", 55000], ["Consultant", 42000], ["Ops & Admin", 33000]],
   },
-  retail: {
-    label: t("preset_retail_label"),
-    hint: t("preset_retail_hint"),
-    config: { revenueMode: "org", billableHours: false },
-    orgRevenue: 32000000,
-    roles: [["Store/Ops Manager", 45000], ["Warehouse Staff", 32000], ["E-com & Marketing", 38000], ["Support", 29000]],
-    costCenters: [
-      { name: "COGS & Merchandising", budget: 18000000, other: 400000, hc: [["Store/Ops Manager", 1]] },
-      { name: "Logistics & Fulfilment", budget: 4000000, other: 250000, hc: [["Warehouse Staff", 4]] },
-      { name: "Marketing", budget: 3000000, other: 120000, hc: [["E-com & Marketing", 2]] },
-    ],
-  },
-  service: {
-    label: t("preset_service_label"),
-    hint: t("preset_service_hint"),
-    config: { revenueMode: "org", billableHours: false },
-    orgRevenue: 6500000,
-    roles: [["Owner/Manager", 45000], ["Staff", 32000]],
-    costCenters: [
-      { name: "Operations", budget: 4000000, other: 150000, hc: [["Owner/Manager", 1], ["Staff", 3]] },
-    ],
-  },
 };
+
+// Which sample fits this org? Follows the org's own declared planning shape.
+function presetKeyForConfig() {
+  if (planBillableHours()) return "hours";
+  if (planRevenueOnLines()) return "lines";
+  return planHeadcount() ? "org_hc" : "org_simple";
+}
 
 // Shown on Overview/Monthly when an organization has no reporting lines yet.
 // Three ranked paths to real numbers (TEARDOWN C11: connect-the-ledger comes
@@ -1536,11 +1559,15 @@ const BUSINESS_PRESETS = {
 // reusing the exact same connect flow already shipped on Monthly — no new
 // OAuth code, just a second place it's offered.
 function emptyOrgHtml() {
-  const presetButtons = Object.entries(BUSINESS_PRESETS).map(([key, p]) =>
+  // ONE sample, matched to how this org said it plans (the wizard's answers) —
+  // not a picker of industry stereotypes that were mostly the same shape.
+  const key = presetKeyForConfig();
+  const p = BUSINESS_PRESETS[key];
+  const presetButtons =
     `<button class="preset-card" data-loadpreset="${key}" type="button">
        <strong>${p.label}</strong>
        <span>${p.hint}</span>
-     </button>`).join("");
+     </button>`;
   return `
     <div class="empty-state">
       <h2>${t("empty_org_h2")}</h2>
@@ -1626,7 +1653,9 @@ async function seedPreset(presetKey) {
 
     // Believable 6 months of actuals derived from the monthly budget run-rate
     // (small variation), so the example shows a real actual/forecast split.
-    const monthlyBudget = (cc.budget + cc.other * 12) / 12;
+    // Cost-only lines (no headcount/util) run at their recurring amount — the
+    // headcount formula would double-count their budget.
+    const monthlyBudget = (cc.hc.length || cc.util) ? (cc.budget + cc.other * 12) / 12 : cc.other;
     const factors = [0.93, 0.97, 1.02, 0.99, 1.01, 0.98];
     const actRows = factors.map((f, i) => ({
       org_id: CURRENT_ORG_ID, reporting_line_id: ccId, month: i + 1,
@@ -1636,13 +1665,10 @@ async function seedPreset(presetKey) {
     if (actRes.error) { flagWriteError(actRes.error); return false; }
   }
 
-  // The preset's planning mode shapes this org's UI from the first second
-  // (one revenue home). Book actuals through month 6 so the example shows a
-  // real actual/forecast split.
-  await sb.from("organizations").update({
-    close_month: 6,
-    planning_config: preset.config || { revenueMode: "org", billableHours: false },
-  }).eq("id", CURRENT_ORG_ID);
+  // Book actuals through month 6 so the example shows a real actual/forecast
+  // split. planning_config is NOT touched — the wizard's answers are the
+  // authority; the sample only fills the shape the org already declared.
+  await sb.from("organizations").update({ close_month: 6 }).eq("id", CURRENT_ORG_ID);
 
   // Org-mode presets get a company-level revenue target (on the Main version,
   // where org revenue lives) so the Overview P&L works out of the box.

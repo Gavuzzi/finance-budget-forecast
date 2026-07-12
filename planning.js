@@ -115,6 +115,7 @@ function renderCcBlock(i) {
         <span class="note-saved" data-notesaved="${i}" hidden>${t("note_saved")}</span>
       </div>` : ""}
 
+      ${planHeadcount() || cc.headcount.length ? `
       <h3 class="cc-section-label">${t("people_h3")}${helpMark("headcount")}</h3>
       <div class="driver-table-wrap">
         <table class="driver-table">
@@ -131,7 +132,7 @@ function renderCcBlock(i) {
           <tbody>${headcountRows}</tbody>
         </table>
       </div>
-      <button class="add-headcount" data-add="${i}">${t("add_line_btn")}</button>
+      <button class="add-headcount" data-add="${i}">${t("add_line_btn")}</button>` : ""}
 
       <div class="costs-section">
         <h3 class="cc-section-label">${t("costs_h3")}${helpMark("costs")}</h3>
@@ -380,6 +381,12 @@ function refreshCcComputed(ccIndex) {
 }
 
 function initPlanningGrid() {
+  // Subtitle follows the org's cost-side shape — a no-headcount org shouldn't
+  // be greeted with "headcount drivers".
+  if (!planHeadcount()) {
+    const sub = document.querySelector(".page-sub");
+    if (sub) sub.textContent = t("planning_subtitle_simple");
+  }
   buildPlanningGrid();
   const ccBlocks = document.getElementById("ccBlocks");
 

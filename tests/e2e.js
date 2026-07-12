@@ -124,9 +124,40 @@ function check(name, ok, detail = "") {
   await page.goto(url("assumptions.html", "&profit"));
   await page.waitForSelector(".planmode-block");
   check("assumptions (lines mode): no org revenue panel (one home)", await page.locator(".revenue-block").count() === 0);
-  check("assumptions: How-you-plan picker present", await page.locator(".planmode-opt").count() === 3);
+  check("assumptions: How-you-plan picker present (3 revenue + 2 people cards)",
+    await page.locator(".planmode-opt").count() === 5);
   check("assumptions: Manage plans panel with unlock on the budget",
     await page.locator("[data-planunlock]").count() === 1);
+
+  // Planning-mode gating, cost side (Phase 8c): a no-headcount org has no
+  // People sections and no role/salary engine — costs are plain amounts.
+  await page.goto(url("planning.html", "&simplecosts"));
+  await page.waitForSelector(".cc-block");
+  check("planning (simple costs): no People sections", await page.locator("[data-add]").count() === 0);
+  check("planning (simple costs): costs tables still render", await page.locator(".costs-table").count() >= 2);
+  await page.goto(url("assumptions.html", "&simplecosts"));
+  await page.waitForSelector(".planmode-block");
+  check("assumptions (simple costs): role/salary engine hidden", await page.locator("#roleTableBody").count() === 0);
+  check("assumptions: people-cost question with 2 cards", await page.locator(".planmode-people .planmode-opt").count() === 2);
+
+  // ---- Org-creation wizard (build your company) ----------------------------------
+  await page.goto(url("app.html"));
+  await page.waitForSelector("#newOrgBtn");
+  await page.click("#newOrgBtn");
+  await page.waitForSelector("#orgWizard");
+  check("wizard: build-your-company modal opens", true);
+  check("wizard: 3 revenue cards + 2 people cards",
+    await page.locator('#orgWizard input[name="wizRev"]').count() === 3 &&
+    await page.locator('#orgWizard input[name="wizPeople"]').count() === 2);
+  await page.click('#orgWizard .planmode-opt:has(input[value="hours"])');
+  check("wizard: hours mode hides the people question", await page.locator("#wizPeopleOpts").isHidden());
+  await page.click("#wizCancel");
+  check("wizard: cancel closes it", await page.locator("#orgWizard").count() === 0);
+
+  // Empty org: ONE sample matched to the org's declared shape, not 4 stereotypes
+  await page.goto(url("app.html", "&empty"));
+  await page.waitForSelector(".empty-state");
+  check("empty org: exactly one matched sample card", await page.locator(".preset-card").count() === 1);
 
   // ---- Cash Flow -----------------------------------------------------------------
   await page.goto(url("cashflow.html"));

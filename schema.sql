@@ -251,14 +251,19 @@ alter table assumptions     drop column if exists revenue_plan;
 --   revenueMode: 'org'   → one company revenue plan, lives on Assumptions
 --                'lines' → revenue per reporting line, lives on Planning
 --   billableHours: true  → the utilization/capacity driver is offered (lines mode)
--- Set by presets / the "How you plan" panel; backfilled from existing data.
+--   headcount: false     → no people modelling (roles / People tables hidden);
+--                          absent means true (pre-Phase-8c orgs)
+-- Set by the creation wizard / the "How you plan" panel; backfilled from data.
 alter table organizations add column if not exists planning_config jsonb;
 update organizations o set planning_config = jsonb_build_object(
   'revenueMode', case when exists(select 1 from utilization_drivers u where u.org_id = o.id)
                         or exists(select 1 from version_line_revenue v where v.org_id = o.id)
                   then 'lines' else 'org' end,
-  'billableHours', exists(select 1 from utilization_drivers u where u.org_id = o.id))
+  'billableHours', exists(select 1 from utilization_drivers u where u.org_id = o.id),
+  'headcount', true)
 where planning_config is null;
+update organizations set planning_config = planning_config || '{"headcount": true}'::jsonb
+where planning_config is not null and not planning_config ? 'headcount';
 
 -- Utilization / capacity driver (the services/consulting way to plan) —
 -- versioned, at most one per reporting line. Billable hours × bill_rate drives

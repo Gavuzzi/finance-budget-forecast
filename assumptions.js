@@ -267,6 +267,15 @@ function renderPlanningModeBlock() {
       <input type="radio" name="planMode" value="${val}" ${mode === val ? "checked" : ""}>
       <strong>${label}</strong><span>${desc}</span>
     </label>`;
+  // The cost-side question (people as roles×headcount, or plain amounts).
+  // Hidden in hours mode: the utilization driver needs roles to cost its
+  // derived heads, so the choice would be a lie there.
+  const people = planHeadcount() ? "roles" : "simple";
+  const popt = (val, label, desc) => `
+    <label class="planmode-opt ${people === val ? "active" : ""}">
+      <input type="radio" name="peopleMode" value="${val}" ${people === val ? "checked" : ""}>
+      <strong>${label}</strong><span>${desc}</span>
+    </label>`;
   return `
     <div class="cc-block rate-block planmode-block">
       <h2>${t("planmode_h2")}</h2>
@@ -276,6 +285,12 @@ function renderPlanningModeBlock() {
         ${opt("lines", t("planmode_lines"), t("planmode_lines_desc"))}
         ${opt("hours", t("planmode_hours"), t("planmode_hours_desc"))}
       </div>
+      ${mode === "hours" ? "" : `
+      <p class="rate-hint planmode-people-q">${t("planmode_people_q")}</p>
+      <div class="planmode-opts planmode-people">
+        ${popt("roles", t("planmode_people_roles"), t("planmode_people_roles_desc"))}
+        ${popt("simple", t("planmode_people_simple"), t("planmode_people_simple_desc"))}
+      </div>`}
     </div>`;
 }
 
@@ -305,9 +320,13 @@ function renderPlansBlock() {
 function buildRateEngine() {
   // The revenue panel exists only for org-mode companies — lines-mode orgs
   // plan revenue on Planning, so this page shows no second revenue home.
+  // Same one-home rule for the cost side: a no-headcount org gets no salary
+  // assumptions / role catalog (unless roles already exist — data always renders).
+  const showRoles = planHeadcount() || ROLE_CATALOG.length > 0;
   document.getElementById("rateEngine").innerHTML =
     (planRevenueOnLines() ? "" : renderRevenueBlock())
-    + renderRateEngineBlock() + renderTaxBlock() + renderPlanningModeBlock() + renderPlansBlock() + renderTeamBlock() + renderDataBlock();
+    + (showRoles ? renderRateEngineBlock() : "")
+    + renderTaxBlock() + renderPlanningModeBlock() + renderPlansBlock() + renderTeamBlock() + renderDataBlock();
   updateRateFormula();
   renderTeamPanel();
 }
@@ -379,11 +398,15 @@ function initAssumptions() {
   // only the affordances change), then persist + reload so every page
   // re-renders under the new mode.
   rateEngine.addEventListener("change", async (e) => {
-    if (e.target.name !== "planMode") return;
+    if (e.target.name !== "planMode" && e.target.name !== "peopleMode") return;
     const val = e.target.value;
     if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast(t("toast_signin_save_data")); buildRateEngine(); return; }
     if (!confirm(t("planmode_confirm"))) { buildRateEngine(); return; }
-    PLANNING_CONFIG = { revenueMode: val === "org" ? "org" : "lines", billableHours: val === "hours" };
+    if (e.target.name === "planMode") {
+      PLANNING_CONFIG = { ...PLANNING_CONFIG, revenueMode: val === "org" ? "org" : "lines", billableHours: val === "hours" };
+    } else {
+      PLANNING_CONFIG = { ...PLANNING_CONFIG, headcount: val === "roles" };
+    }
     await dbUpdatePlanningConfig();
     location.reload();
   });
