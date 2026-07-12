@@ -79,16 +79,17 @@ function sidebarHtml() {
     )
     .join("");
 
-  // "Actuals booked through" [#7]: auto is the normal state and needs no
-  // control — show a one-line read-out with a quiet "change" affordance. The
-  // full select only appears while overriding (or after clicking change).
-  const periodControl = (CLOSE_MONTH_MANUAL || _showPeriodSelect)
+  // "Actuals booked through" [#7]: the read-out is the ONLY resting state —
+  // the select appears just while choosing and collapses again on every pick
+  // (it used to stay open for manual overrides, which read as a stuck control).
+  // A manual override is flagged with a small tag instead.
+  const periodControl = _showPeriodSelect
     ? `<div class="period-box">
         <label class="period-label" for="closeMonthSelect">${t("period_label")}</label>
         <select class="period-select" id="closeMonthSelect">${monthOptions}</select>
       </div>`
     : `<div class="period-line">
-        <span>${t("period_booked_through", CLOSE_MONTH ? monthLabel(CLOSE_MONTH) : t("period_none_yet"))}</span>
+        <span>${t("period_booked_through", CLOSE_MONTH ? monthLabel(CLOSE_MONTH) : t("period_none_yet"))}${CLOSE_MONTH_MANUAL ? ` <span class="period-manual">${t("period_manual_tag")}</span>` : ""}</span>
         <button class="period-edit" id="periodEditBtn" type="button">${t("period_change")}</button>
       </div>`;
 
@@ -171,11 +172,11 @@ function renderSidebar() {
     closeSel.addEventListener("change", () => {
       if (closeSel.value === "auto") {
         CLOSE_MONTH_MANUAL = false;      // hand control back to the sync
-        _showPeriodSelect = false;       // …and collapse back to the read-out
       } else {
         CLOSE_MONTH_MANUAL = true;       // manual override — syncs won't touch it
         setCloseMonth(parseInt(closeSel.value, 10));
       }
+      _showPeriodSelect = false;         // every pick collapses back to the read-out
       dbUpdateCloseMonth();
       renderSidebar();                    // refresh the Auto label/selection
       if (typeof window.refreshAfterPeriodChange === "function") window.refreshAfterPeriodChange();

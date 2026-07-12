@@ -52,11 +52,17 @@ function check(name, ok, detail = "") {
   await page.waitForFunction(() => document.querySelector(".nav-item") && document.querySelector(".nav-item").textContent.includes("Overview"));
   check("sidebar: EN segment switches back", true);
 
-  // Booked-through read-out expands to the select on "change"
+  // Booked-through read-out expands to the select on "change" — and collapses
+  // back to the read-out after ANY pick, manual picks tagged (Felix: the open
+  // select "stays in that kind of view… feels buggy")
   check("sidebar: booked-through is a read-out by default", await page.locator(".period-line").count() === 1);
   await page.click("#periodEditBtn");
   await page.waitForSelector("#closeMonthSelect");
   check("sidebar: 'change' reveals the period select", true);
+  await page.selectOption("#closeMonthSelect", "4");
+  await page.waitForSelector(".period-line");
+  check("sidebar: picking a month collapses back to the read-out", true);
+  check("sidebar: manual override shows the (manual) tag", await page.locator(".period-manual").count() === 1);
 
   // ---- Planning ----------------------------------------------------------------
   await page.goto(url("planning.html", "&consulting"));
@@ -92,9 +98,12 @@ function check(name, ok, detail = "") {
   const derived = (await page.textContent(".util-derived")).trim();
   check("planning: utilization derives heads/revenue/cost", /8\.1|8,1/.test(derived), derived);
 
-  // Re-forecast row: source select present with 3 sources
-  check("planning: re-forecast source select has 3 options",
-    await page.locator('[data-rfsource="1"] option').count() === 3);
+  // Re-forecast: one plain-language action, no source dropdown (the dropdown
+  // was the confusion); R&D's fixtures diverge >3% so the row must render
+  check("planning: re-forecast is one action, no source select",
+    await page.locator(".rf-source").count() === 0 && await page.locator('[data-rfapply="1"]').count() === 1);
+  check("planning: re-forecast states the divergence in words",
+    /above|below/.test(await page.textContent('.cc-block[data-cc="1"] .rf-detail')));
 
   // Monthly billable-hours grid toggles open/closed
   const gridsBefore = await page.locator(".line-rev-grid").count();

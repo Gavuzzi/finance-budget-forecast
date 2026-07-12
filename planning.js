@@ -243,34 +243,38 @@ function utilizationHtml(cc, i) {
     <div class="util-derived">${t("util_derived", utilizationAvgHeads(cc).toFixed(1), fmtMkr(utilizationFyRevenue(cc)), fmtMkr(utilizationFyCost(cc)))}</div>`;
 }
 
-// Re-forecast [#3/#24] — moved here from Overview because it EDITS the plan.
-// When a line has booked actuals, offer to replace its remaining months with a
-// run-rate from a source of the user's choice: recent actuals (default), the
-// monthly budget, or a custom figure. Never automatic, always reversible —
-// an override is a flagged, explicit layer on top of the driver plan.
+// Re-forecast [#3/#24, reworked after Felix's feedback: "I don't understand
+// it… revert just sits there"]. Two legible states, nothing else:
+//   1. Silent — actuals are within 3% of the driver plan (or nothing booked
+//      yet): the row doesn't render at all. This is the answer to "when does
+//      it go away": when plan and reality agree.
+//   2. Divergence — one plain sentence (actuals run N% above/below plan) and
+//      ONE action: set the remaining months to the actual run-rate. The old
+//      source dropdown (budget / custom amount) is gone — if you want a
+//      different number, edit the drivers; that's what they're for.
+//   3. Override active — a state line saying exactly what the months are set
+//      to, plus the undo. The undo stays as long as the override exists
+//      (nothing may change silently), which is why it never "goes away" on
+//      its own — reverting or agreeing with plan is what clears the row.
 function reforecastHtml(cc, i) {
   if (CLOSE_MONTH === 0) return ""; // nothing booked yet — nothing to re-forecast from
   const hasOverride = cc.overrides && Object.keys(cc.overrides).length > 0;
   if (hasOverride) {
     return `
-      <span class="rf-label">${t("rf_label")}</span>
       <span class="rf-badge">${t("rf_override_badge", fmtSek(cc.overrides[CLOSE_MONTH + 1] ?? Object.values(cc.overrides)[0]))}</span>
-      <button class="integ-link" data-rfrevert="${i}" type="button">${t("rf_revert")}</button>`;
+      <button class="integ-link" data-rfrevert="${i}" type="button">${t("rf_revert")}</button>
+      ${helpMark("rf")}`;
   }
   const recent = recentRunRate(cc);
   if (recent == null || CLOSE_MONTH + 1 > TIMELINE_LENGTH) return "";
   const planForecast = forecastForMonth(cc, CLOSE_MONTH + 1);
-  const pct = planForecast ? Math.abs(recent - planForecast) / planForecast * 100 : 0;
-  const detail = planForecast ? `<span class="rf-detail">${t("rf_detail", fmtSek(recent), fmtSek(planForecast), pct.toFixed(0))}</span>` : "";
+  if (!planForecast) return "";
+  const pct = ((recent - planForecast) / planForecast) * 100;
+  if (Math.abs(pct) < 3) return ""; // in line with plan — no noise
   return `
-    <span class="rf-label">${t("rf_label")}</span>
-    ${detail}
-    <select class="rf-source" data-rfsource="${i}">
-      <option value="recent">${t("rf_source_recent")}</option>
-      <option value="budget">${t("rf_source_budget")}</option>
-      <option value="manual">${t("rf_source_manual")}</option>
-    </select>
-    <button class="integ-link" data-rfapply="${i}" type="button">${t("rf_apply")}</button>`;
+    <span class="rf-detail">${t("rf_diverge", Math.abs(pct).toFixed(0), t(pct > 0 ? "rf_above" : "rf_below"), fmtSek(recent), fmtSek(planForecast))}</span>
+    <button class="integ-link" data-rfapply="${i}" type="button">${t("rf_apply", fmtSek(recent))}</button>
+    ${helpMark("rf")}`;
 }
 
 // Live update of one month of a line's revenue while typing. Seeds the [12]
@@ -590,16 +594,10 @@ function initPlanningGrid() {
       const i = Number(rfApply.dataset.rfapply);
       const cc = COST_CENTERS[i];
       if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast(t("toast_signin_reforecast")); return; }
-      const source = (document.querySelector(`[data-rfsource="${i}"]`) || {}).value || "recent";
-      let amount = null; // recent = dbApplyRunRate's default basis
-      if (source === "budget") amount = cc.annualBudget / 12;
-      if (source === "manual") {
-        const raw = prompt(t("prompt_rf_manual"));
-        if (raw == null || raw.trim() === "" || !isFinite(Number(raw))) return;
-        amount = Number(raw);
-      }
-      const rr = await dbApplyRunRate(cc, amount);
-      if (rr != null) { showToast(t("toast_applied_runrate", cc.name)); buildPlanningGrid(); }
+      const rr = await dbApplyRunRate(cc);
+      // The toast states the concrete effect (which months, what amount) —
+      // "applied" alone left users unsure anything happened at all.
+      if (rr != null) { showToast(t("toast_applied_runrate", cc.name, monthLabel(CLOSE_MONTH + 1), monthLabel(TIMELINE_LENGTH), fmtSek(rr))); buildPlanningGrid(); }
       return;
     }
 
