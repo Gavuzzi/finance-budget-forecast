@@ -244,6 +244,22 @@ alter table reporting_lines drop column if exists revenue_plan;
 alter table assumptions     drop column if exists revenue_budget;
 alter table assumptions     drop column if exists revenue_plan;
 
+-- How this org plans (Phase 8b — "breadth in the engine, narrowness in each
+-- org's UI"). Gates which planning AFFORDANCES the UI shows — never the
+-- engine, and never data that already exists (existing rows always render, so
+-- switching modes hides nothing silently):
+--   revenueMode: 'org'   → one company revenue plan, lives on Assumptions
+--                'lines' → revenue per reporting line, lives on Planning
+--   billableHours: true  → the utilization/capacity driver is offered (lines mode)
+-- Set by presets / the "How you plan" panel; backfilled from existing data.
+alter table organizations add column if not exists planning_config jsonb;
+update organizations o set planning_config = jsonb_build_object(
+  'revenueMode', case when exists(select 1 from utilization_drivers u where u.org_id = o.id)
+                        or exists(select 1 from version_line_revenue v where v.org_id = o.id)
+                  then 'lines' else 'org' end,
+  'billableHours', exists(select 1 from utilization_drivers u where u.org_id = o.id))
+where planning_config is null;
+
 -- Utilization / capacity driver (the services/consulting way to plan) —
 -- versioned, at most one per reporting line. Billable hours × bill_rate drives
 -- the line's revenue; hours ÷ (utilization_pct% × hours_per_head) drives the

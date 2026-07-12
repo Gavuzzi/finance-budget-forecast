@@ -173,7 +173,13 @@ function revenueRowHtml(cc, i) {
   // utilization-driven line's billable revenue is shown in the capacity section
   // and must never leak into this box (editing it would double-count).
   if (!lineHasManualRevenue(cc) && !cc._showRevenue) {
-    return `<button class="add-revenue-link" data-addrevenue="${i}" type="button">${t("add_revenue_btn")}</button>`;
+    // The "+ Add revenue" affordance exists only for orgs that plan revenue on
+    // lines (PLANNING_CONFIG) — org-mode companies plan one number on
+    // Assumptions and never see per-line revenue UI. Existing revenue (the
+    // branch below) always renders regardless, so no data is ever hidden.
+    return planRevenueOnLines()
+      ? `<button class="add-revenue-link" data-addrevenue="${i}" type="button">${t("add_revenue_btn")}</button>`
+      : "";
   }
   const plan = Array.isArray(cc.revenuePlan) && cc.revenuePlan.length === 12 ? cc.revenuePlan : null;
   // annual is reconstructed from the MANUAL [12] plan only (not lineRevenueFyTotal,
@@ -206,7 +212,11 @@ function revenueRowHtml(cc, i) {
 // input + a monthly grid for ramp/seasonality).
 function utilizationHtml(cc, i) {
   if (!hasUtilization(cc) && !cc._showUtil) {
-    return `<button class="add-revenue-link" data-addutil="${i}" type="button">${t("add_util_btn")}</button>`;
+    // Offered only to orgs that plan by billable hours (PLANNING_CONFIG);
+    // an existing driver (below) always renders regardless of mode.
+    return planBillableHours()
+      ? `<button class="add-revenue-link" data-addutil="${i}" type="button">${t("add_util_btn")}</button>`
+      : "";
   }
   const u = cc.utilization || defaultUtilization();
   const hrs = Array.isArray(u.billableHours) && u.billableHours.length === 12 ? u.billableHours : Array(12).fill(0);

@@ -1942,6 +1942,18 @@ html[data-theme="light"] .panel {
 .rev-plan-grid input:focus { outline: none; border-color: var(--accent); }
 .rev-plan-actions { display: flex; gap: 14px; align-items: center; margin-bottom: 10px; }
 .rev-ignored-note { color: var(--amber); font-weight: 600; }
+
+/* "How you plan" mode picker (Assumptions) */
+.planmode-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.planmode-opt {
+  display: flex; flex-direction: column; gap: 4px; cursor: pointer;
+  border: 1px solid var(--panel-border); border-radius: 12px; padding: 14px 16px;
+  background: var(--bg); font-size: 0.85rem; color: var(--text-dim); line-height: 1.5;
+}
+.planmode-opt strong { color: var(--text); font-size: 0.95rem; }
+.planmode-opt input { position: absolute; opacity: 0; }
+.planmode-opt:hover { border-color: var(--accent); }
+.planmode-opt.active { border-color: var(--accent); background: var(--panel); box-shadow: 0 0 0 1px var(--accent); }
 .rev-plan-actions button[disabled] { opacity: 0.4; cursor: default; }
 
 /* Team (membership management) */

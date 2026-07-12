@@ -256,9 +256,35 @@ function renderDataBlock() {
   `;
 }
 
+// "How you plan" — the org's planning mode (one revenue home). Presets set it
+// at creation; this panel is the quiet place to change it later. Switching
+// gates AFFORDANCES only: existing data keeps rendering and keeps counting
+// (the honest warning below says exactly that).
+function renderPlanningModeBlock() {
+  const mode = planBillableHours() ? "hours" : planRevenueOnLines() ? "lines" : "org";
+  const opt = (val, label, desc) => `
+    <label class="planmode-opt ${mode === val ? "active" : ""}">
+      <input type="radio" name="planMode" value="${val}" ${mode === val ? "checked" : ""}>
+      <strong>${label}</strong><span>${desc}</span>
+    </label>`;
+  return `
+    <div class="cc-block rate-block planmode-block">
+      <h2>${t("planmode_h2")}</h2>
+      <p class="rate-hint">${t("planmode_hint")}</p>
+      <div class="planmode-opts">
+        ${opt("org", t("planmode_org"), t("planmode_org_desc"))}
+        ${opt("lines", t("planmode_lines"), t("planmode_lines_desc"))}
+        ${opt("hours", t("planmode_hours"), t("planmode_hours_desc"))}
+      </div>
+    </div>`;
+}
+
 function buildRateEngine() {
+  // The revenue panel exists only for org-mode companies — lines-mode orgs
+  // plan revenue on Planning, so this page shows no second revenue home.
   document.getElementById("rateEngine").innerHTML =
-    renderRevenueBlock() + renderRateEngineBlock() + renderTaxBlock() + renderTeamBlock() + renderDataBlock();
+    (planRevenueOnLines() ? "" : renderRevenueBlock())
+    + renderRateEngineBlock() + renderTaxBlock() + renderPlanningModeBlock() + renderTeamBlock() + renderDataBlock();
   updateRateFormula();
   renderTeamPanel();
 }
@@ -288,6 +314,19 @@ function refreshRoleRatesDisplay() {
 function initAssumptions() {
   buildRateEngine();
   const rateEngine = document.getElementById("rateEngine");
+
+  // Planning-mode switch: honest confirm (existing numbers keep counting;
+  // only the affordances change), then persist + reload so every page
+  // re-renders under the new mode.
+  rateEngine.addEventListener("change", async (e) => {
+    if (e.target.name !== "planMode") return;
+    const val = e.target.value;
+    if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast(t("toast_signin_save_data")); buildRateEngine(); return; }
+    if (!confirm(t("planmode_confirm"))) { buildRateEngine(); return; }
+    PLANNING_CONFIG = { revenueMode: val === "org" ? "org" : "lines", billableHours: val === "hours" };
+    await dbUpdatePlanningConfig();
+    location.reload();
+  });
 
   rateEngine.addEventListener("input", (e) => {
     const target = e.target;

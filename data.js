@@ -44,6 +44,14 @@ let ACTIVE_VERSION_ID = null;
 // the Overview panels can compare Main / scenarios / locked budgets without an
 // async call per render. The active version is always the live in-memory model.
 let VERSION_SUMMARIES = {};
+
+// How this org plans (organizations.planning_config). Gates which planning
+// AFFORDANCES render — never the engine (it composes whatever data exists, so
+// switching modes can't silently change numbers), and never existing rows
+// (they always render so they can be seen and removed).
+let PLANNING_CONFIG = { revenueMode: "org", billableHours: false };
+function planRevenueOnLines() { return PLANNING_CONFIG.revenueMode === "lines"; }
+function planBillableHours() { return planRevenueOnLines() && !!PLANNING_CONFIG.billableHours; }
 let CASH_POSITION = null; // { bankBalance, asOf } — from the last sync's SIE #UB lines
 let OPEN_INVOICES = [];   // [{ kind: 'customer'|'supplier', amount, dueDate, description, counterparty }]
 // VAT/payroll-tax closing balances by FY-relative month, from the sync's #IB +
@@ -717,6 +725,9 @@ async function loadData(orgId) {
   CURRENCY = org.currency || "SEK";
   FY_START_MONTH = org.fy_start_month || 1; // broken fiscal years — set by the Fortnox sync
   FY_START_YEAR = org.fy_start_year || 2026;
+  PLANNING_CONFIG = (org.planning_config && typeof org.planning_config === "object")
+    ? { revenueMode: org.planning_config.revenueMode === "lines" ? "lines" : "org", billableHours: !!org.planning_config.billableHours }
+    : { revenueMode: "org", billableHours: false }; // pre-config orgs default to the simplest mode
   localStorage.setItem(ORG_STORAGE_KEY, CURRENT_ORG_ID);
 
   // Resolve the active plan version (the driver copy we load/edit). Ensures a
@@ -880,6 +891,15 @@ function loadPreviewData() {
   ];
   ACTIVE_VERSION_ID = "pv-main";
   CLOSE_MONTH = 6;
+  // Planning mode in preview follows the dev hooks: the plain demo is the
+  // simplest org (company-level revenue); &profit shows per-line revenue;
+  // &consulting shows billable hours. Mirrors what real configs produce.
+  const _pv = new URLSearchParams(location.search);
+  PLANNING_CONFIG = _pv.has("consulting")
+    ? { revenueMode: "lines", billableHours: true }
+    : _pv.has("profit") || _pv.has("revgrid")
+      ? { revenueMode: "lines", billableHours: false }
+      : { revenueMode: "org", billableHours: false };
   DISPLAY_UNIT = "mkr"; // demo figures are millions-scale — keep the portfolio clean
   // Dev hook: ?preview&fystart=5 renders a broken fiscal year (May–Apr) to verify labels.
   FY_START_MONTH = parseInt(new URLSearchParams(location.search).get("fystart"), 10) || 1;
@@ -1326,6 +1346,12 @@ async function dbClearOverrides(cc) {
   return true;
 }
 
+async function dbUpdatePlanningConfig() {
+  const { error } = await sb.from("organizations")
+    .update({ planning_config: PLANNING_CONFIG }).eq("id", CURRENT_ORG_ID);
+  if (error) flagWriteError(error);
+}
+
 async function dbUpdateCloseMonth() {
   const { error } = await sb.from("organizations")
     .update({ close_month: CLOSE_MONTH, close_month_manual: CLOSE_MONTH_MANUAL })
@@ -1435,14 +1461,16 @@ function varianceClass(variance, budget) {
 // Each maps to how that business type TYPICALLY tags its Fortnox bookings, so
 // picking one also sets expectations for the Fortnox mapping step later.
 const BUSINESS_PRESETS = {
+  // Each preset pre-answers "how do you plan?" (planning_config) so the org's
+  // UI is shaped from the first second — one revenue home, no unused options.
   manufacturer: {
     label: t("preset_manufacturer_label"),
     hint: t("preset_manufacturer_hint"),
+    config: { revenueMode: "org", billableHours: false },
+    orgRevenue: 25000000, // one company-level target — the simplest mode
     roles: [["Manager", 55000], ["Specialist", 42000], ["Associate", 33000], ["Support", 30000]],
     costCenters: [
-      // Production is a profit centre — the factory sells what it makes, so it
-      // carries per-line revenue (→ margin). Shows the per-line-revenue style.
-      { name: "Production", budget: 12000000, other: 300000, hc: [["Manager", 1], ["Specialist", 4], ["Associate", 6]], revenue: 22000000 },
+      { name: "Production", budget: 12000000, other: 300000, hc: [["Manager", 1], ["Specialist", 4], ["Associate", 6]] },
       { name: "Sales & Marketing", budget: 6000000, other: 150000, hc: [["Manager", 1], ["Associate", 4]] },
       { name: "Administration", budget: 3000000, other: 120000, hc: [["Support", 2]] },
     ],
@@ -1450,7 +1478,7 @@ const BUSINESS_PRESETS = {
   consultancy: {
     label: t("preset_consultancy_label"),
     hint: t("preset_consultancy_hint"),
-    roles: [["Partner", 75000], ["Senior Consultant", 55000], ["Consultant", 42000], ["Ops & Admin", 33000]],
+    config: { revenueMode: "lines", billableHours: true },
     costCenters: [
       // Client Delivery is planned by the utilization driver (billable hours →
       // revenue, and → the delivery headcount needed), not manual headcount —
@@ -1460,10 +1488,13 @@ const BUSINESS_PRESETS = {
       { name: "Business Development", budget: 2500000, other: 80000, hc: [["Partner", 1]] },
       { name: "Operations", budget: 2000000, other: 90000, hc: [["Ops & Admin", 2]] },
     ],
+    roles: [["Partner", 75000], ["Senior Consultant", 55000], ["Consultant", 42000], ["Ops & Admin", 33000]],
   },
   retail: {
     label: t("preset_retail_label"),
     hint: t("preset_retail_hint"),
+    config: { revenueMode: "org", billableHours: false },
+    orgRevenue: 32000000,
     roles: [["Store/Ops Manager", 45000], ["Warehouse Staff", 32000], ["E-com & Marketing", 38000], ["Support", 29000]],
     costCenters: [
       { name: "COGS & Merchandising", budget: 18000000, other: 400000, hc: [["Store/Ops Manager", 1]] },
@@ -1474,6 +1505,8 @@ const BUSINESS_PRESETS = {
   service: {
     label: t("preset_service_label"),
     hint: t("preset_service_hint"),
+    config: { revenueMode: "org", billableHours: false },
+    orgRevenue: 6500000,
     roles: [["Owner/Manager", 45000], ["Staff", 32000]],
     costCenters: [
       { name: "Operations", budget: 4000000, other: 150000, hc: [["Owner/Manager", 1], ["Staff", 3]] },
@@ -1589,8 +1622,20 @@ async function seedPreset(presetKey) {
     if (actRes.error) { flagWriteError(actRes.error); return false; }
   }
 
-  // Book actuals through month 6 so the example shows an actual/forecast split.
-  await sb.from("organizations").update({ close_month: 6 }).eq("id", CURRENT_ORG_ID);
+  // The preset's planning mode shapes this org's UI from the first second
+  // (one revenue home). Book actuals through month 6 so the example shows a
+  // real actual/forecast split.
+  await sb.from("organizations").update({
+    close_month: 6,
+    planning_config: preset.config || { revenueMode: "org", billableHours: false },
+  }).eq("id", CURRENT_ORG_ID);
+
+  // Org-mode presets get a company-level revenue target (on the Main version,
+  // where org revenue lives) so the Overview P&L works out of the box.
+  if (preset.orgRevenue) {
+    await sb.from("plan_versions").update({ revenue_budget: preset.orgRevenue })
+      .eq("id", ACTIVE_VERSION_ID);
+  }
   return true;
 }
 
