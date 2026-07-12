@@ -78,9 +78,8 @@ function sidebarHtml() {
   return `
     <div class="sidebar-brand">
       ${USER_ORGS.length > 1
-        ? `<select class="org-switcher" id="orgSwitcher">${USER_ORGS.map((o) => `<option value="${o.id}" ${o.id === CURRENT_ORG_ID ? "selected" : ""}>${escapeHtml(o.name)}</option>`).join("")}</select>`
-        : `<span class="sb-name">${escapeHtml((USER_ORGS[0] && USER_ORGS[0].name) || "—")}</span>`}
-      <span class="sb-sub">${t("brand_sub")}</span>
+        ? `<select class="org-switcher" id="orgSwitcher" title="${escapeHtml((USER_ORGS.find((o) => o.id === CURRENT_ORG_ID) || {}).name || "")}">${USER_ORGS.map((o) => `<option value="${o.id}" ${o.id === CURRENT_ORG_ID ? "selected" : ""}>${escapeHtml(o.name)}</option>`).join("")}</select>`
+        : `<span class="sb-name" title="${escapeHtml((USER_ORGS[0] && USER_ORGS[0].name) || "")}">${escapeHtml((USER_ORGS[0] && USER_ORGS[0].name) || "—")}</span>`}
     </div>
     <button class="new-org-btn" id="newOrgBtn" type="button">${t("new_org_btn")}</button>
     ${versionSwitcherHtml()}
@@ -92,7 +91,10 @@ function sidebarHtml() {
         <select class="period-select" id="closeMonthSelect">${monthOptions}</select>
       </div>
       <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle light/dark theme"></button>
-      <button class="lang-toggle" id="langToggle" type="button">${t("lang_toggle")}</button>
+      <div class="lang-seg" id="langToggle" role="group" aria-label="Language">
+        <button class="lang-opt ${getLang() === "en" ? "active" : ""}" data-lang="en" type="button">EN</button>
+        <button class="lang-opt ${getLang() === "sv" ? "active" : ""}" data-lang="sv" type="button">SV</button>
+      </div>
       <button class="logout-btn" id="logoutBtn" type="button">${t("sign_out")}</button>
     </div>
   `;
@@ -121,8 +123,10 @@ function renderSidebar() {
   document.getElementById("sidebar").innerHTML = sidebarHtml();
   document.getElementById("themeToggle").textContent = getTheme() === "light" ? t("theme_light") : t("theme_dark");
 
-  document.getElementById("langToggle").addEventListener("click", () => {
-    setLang(getLang() === "sv" ? "en" : "sv");
+  // Segmented EN/SV — click the inactive one to switch (clearer than a single
+  // button that showed the target language and read as if it were the current).
+  document.querySelectorAll("#langToggle .lang-opt").forEach((btn) => {
+    btn.addEventListener("click", () => { if (btn.dataset.lang !== getLang()) setLang(btn.dataset.lang); });
   });
 
   // Reflect the live tenant in the tab title so multiple orgs/tabs are distinguishable

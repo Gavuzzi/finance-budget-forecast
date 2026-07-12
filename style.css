@@ -1074,6 +1074,30 @@ details.collapse-panel > *:last-child:not(summary) { margin-bottom: 20px; }
 }
 .lang-toggle:hover { border-color: var(--accent); }
 
+/* Sidebar segmented EN/SV language control (the landing page keeps the single
+   .lang-toggle button above). */
+.lang-seg {
+  display: flex;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.lang-opt {
+  flex: 1;
+  background: var(--bg);
+  border: none;
+  color: var(--text-dim);
+  padding: 8px 0;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.lang-opt + .lang-opt { border-left: 1px solid var(--panel-border); }
+.lang-opt:hover { color: var(--text); }
+.lang-opt.active { background: var(--accent); color: #fff; cursor: default; }
+
 .app-main {
   flex: 1;
   min-width: 0;
