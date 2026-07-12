@@ -37,7 +37,11 @@ function check(name, ok, detail = "") {
   check("overview: switcher groups Budgets + Scenarios", await page.locator("#versionSwitcher optgroup").count() === 2);
   check("overview: working plan displays as Forecast",
     (await page.textContent('#versionSwitcher option[selected], #versionSwitcher option:checked')).trim() === "Forecast");
-  check("overview: lock-as-budget button present", await page.locator("#lockBudgetBtn").count() === 1);
+  // Budgets are created (for a fiscal year) from the Plans panel / budget
+  // panel — no global freeze-now lock button on the Forecast anymore
+  check("overview: no lock button while the Forecast is active", await page.locator("#lockBudgetBtn").count() === 0);
+  check("overview: approved budget read-out with live drift",
+    /Budget 2026/.test(await page.textContent("#budgetVersionPanel")));
 
   // Demo guard: branching a scenario while signed out shows the sign-in toast
   await page.click("#newScenarioBtn");
@@ -128,6 +132,29 @@ function check(name, ok, detail = "") {
     await page.locator(".planmode-opt").count() === 5);
   check("assumptions: Manage plans panel with unlock on the budget",
     await page.locator("[data-planunlock]").count() === 1);
+  check("assumptions: New-budget control with a fiscal-year choice",
+    await page.locator("#newBudgetBtn").count() === 1 && await page.locator("#newBudgetFy option").count() === 2);
+
+  // ---- FY-scoped budgets (&fy27: a draft Budget 2027 is the active version) ----
+  await page.goto(url("app.html", "&fy27"));
+  await page.waitForSelector(".hero-verdict");
+  check("fy27: Overview subtitle says FY2027", /FY2027/.test(await page.textContent(".page-sub")));
+  check("fy27: sidebar offers contextual 'Lock Budget 2027'",
+    /Budget 2027/.test((await page.textContent("#lockBudgetBtn")) || ""));
+  check("fy27: switcher marks the draft", /draft|utkast/.test(await page.textContent("#versionSwitcher")));
+  await page.goto(url("planning.html", "&fy27"));
+  await page.waitForSelector(".cc-block");
+  check("fy27: Planning totals read FY2027", /FY2027/.test(await page.textContent(".cc-summary, .cc-block")));
+  await page.goto(url("monthly.html", "&fy27"));
+  await page.waitForSelector(".mt-table, table");
+  const monthlyHead = await page.textContent("table");
+  check("fy27: Monthly grid shows Jan 27–Dec 27", /Jan 27/.test(monthlyHead) && !/Jan 26/.test(monthlyHead));
+
+  // No budget yet (fresh real org): the panel offers to create next year's
+  // (the panel lives in a collapsed <details>, so count — don't wait for visible)
+  await page.goto(url("app.html", "&nobudget"));
+  await page.waitForSelector(".hero-verdict");
+  check("no budget yet: create-Budget-2027 CTA offered", await page.locator("[data-createbudget]").count() === 1);
 
   // Planning-mode gating, cost side (Phase 8c): a no-headcount org has no
   // People sections and no role/salary engine — costs are plain amounts.

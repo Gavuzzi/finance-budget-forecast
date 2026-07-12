@@ -69,6 +69,24 @@ delete prod.overrides[8];
 // ---- FY summary -------------------------------------------------------------
 approx("company FY total = booked 21.8M + forecast 19,967,436", companyFySummary().total, 41767436);
 
+// ---- FY window (Phase 8d: a budget belongs to a fiscal year) ----------------
+// Simulate an active "Budget 2027": window = months 13–24. Hand-derived:
+//   Production  = (18×46351 + 58652 + 1 350 000) × 12 = 26 915 640
+//                 (Sep-26 hire active all of FY27; Sep-26 one-off NOT in window)
+//   R&D         = (6×65486 + 283 000) × 12            =  8 110 992
+//   IT          = (2×50452 + 166 000) × 12            =  3 202 848
+//   Company FY2027 total                              = 38 229 480
+FY_WINDOW_START = 13;
+eq("fy27 window: no actuals bleed in — m13 is pure forecast", monthAmount(prod, 13).isActual, false);
+eq("fy27 window: Production FY2027 total", fySummary(prod).total, 26915640);
+approx("fy27 window: company FY2027 total", companyFySummary().total, 38229480);
+eq("fy27 window: line target covers only its own year (m7 → null)", monthlyBudgetFor(prod, 7), null);
+approx("fy27 window: m15 monthly budget = 28M/12", monthlyBudgetFor(prod, 15), 28000000 / 12, 0.01);
+eq("fy27 window: revenue profile repeats into the budget year", revenuePlanFyTotal(), 50000000);
+eq("fy27 window: fyName reads FY2027", fyName(), "FY2027");
+FY_WINDOW_START = 1;
+eq("fy window restored: fyName reads FY2026", fyName(), "FY2026");
+
 // ---- Revenue plan -----------------------------------------------------------
 eq("revenue plan: July trough", revenuePlanForMonth(7), 3000000);
 eq("revenue plan: repeats into next FY (m13 = Jan)", revenuePlanForMonth(13), 4200000);

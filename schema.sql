@@ -96,18 +96,25 @@ drop table if exists budget_versions cascade;
 -- Phase 8 — the versioning spine. A "plan version" is a named copy of the
 -- driver plan (headcount/one-offs/recurring/overrides carry version_id). Every
 -- org has exactly one is_main version (the working forecast, R12). Scenarios
--- are additional versions (full copies you branch + edit); a locked version
--- (locked_at set) is a budget. Actuals, reporting lines, mappings and rates
--- stay org-shared (reality/identity, never versioned). Supersedes the
+-- are additional versions (full copies you branch + edit). A BUDGET is a
+-- version carrying budget_fy — the fiscal year it is FOR (Phase 8d: "budget
+-- 2027" covers Jan–Dec 27, not whenever lock was pressed) — editable draft
+-- until locked_at is set (approved). Actuals, reporting lines, mappings and
+-- rates stay org-shared (reality/identity, never versioned). Supersedes the
 -- read-only scenarios/budget_versions snapshot tables above (retired later).
 create table if not exists plan_versions (
   id         uuid primary key default gen_random_uuid(),
   org_id     uuid not null references organizations(id) on delete cascade,
   name       text not null,
   is_main    boolean not null default false,
-  locked_at  timestamptz,                 -- null = editable; set = locked (a budget)
+  locked_at  timestamptz,                 -- null = editable; set = locked/approved
   created_at timestamptz not null default now()
 );
+alter table plan_versions add column if not exists budget_fy int; -- FY start year the budget is for; null = scenario/forecast
+-- Pre-8d locked versions were freeze-now current-FY budgets — tag them so.
+update plan_versions pv set budget_fy = o.fy_start_year
+  from organizations o
+ where pv.org_id = o.id and pv.locked_at is not null and pv.budget_fy is null;
 alter table plan_versions enable row level security;
 drop policy if exists plan_versions_read on plan_versions;
 drop policy if exists plan_versions_write on plan_versions;

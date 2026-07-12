@@ -913,6 +913,13 @@ td.mt-drill:hover { background: rgba(77,124,199,0.12); border-radius: 4px; }
 .wizard-q { font-size: 0.82rem; font-weight: 700; color: var(--text-dim); margin: 14px 0 8px; }
 .wizard-actions { display: flex; justify-content: flex-end; gap: 14px; align-items: center; margin-top: 18px; }
 .planmode-people-q { margin-top: 14px; }
+.plan-state.plan-draft { color: var(--warn, #b6841f); }
+.plan-newbudget { display: flex; align-items: center; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.plan-newbudget select {
+  background: var(--bg); border: 1px solid var(--panel-border); color: var(--text);
+  border-radius: 8px; padding: 6px 8px; font-size: 0.82rem; font-family: inherit;
+}
+.plan-newbudget-hint { margin: 0; }
 
 .drill-overlay {
   position: fixed; inset: 0; z-index: 1600;

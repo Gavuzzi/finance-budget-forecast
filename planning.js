@@ -9,13 +9,13 @@ function summaryHtml(cc, i) {
   const pct = fy.budget ? (fy.variance / fy.budget) * 100 : 0;
   if (!fullyLoadedView) {
     return `
-      <span>${t("fy_total_label", fmtMkr(fy.total))}</span>
+      <span>${t("fy_total_label", fyName(), fmtMkr(fy.total))}</span>
       <span class="variance ${cls}">${t("vs_budget_label", `${fmtMkrSigned(fy.variance)} (${pct > 0 ? "+" : ""}${pct.toFixed(1)}%)`)}</span>
       <button class="bridge-toggle" data-bridge="${i}" type="button">${t("why_btn")}</button>
     `;
   }
   if (cc.isShared) {
-    return `<span>${t("fy_total_label", fmtMkr(fy.total))}</span><span class="alloc-out">${t("alloc_out")}</span>`;
+    return `<span>${t("fy_total_label", fyName(), fmtMkr(fy.total))}</span><span class="alloc-out">${t("alloc_out")}</span>`;
   }
   const loaded = fullyLoadedTotal(cc);
   const share = allocatedShare(cc);
@@ -95,7 +95,7 @@ function renderCcBlock(i) {
       <div class="cc-header">
         <input class="cc-name-input" data-ccfield="name" value="${escapeHtml(cc.name)}" aria-label="${t("reporting_line_name_label")}">
         <div class="cc-header-right">
-          <label class="budget-field">${t("annual_budget_label")}
+          <label class="budget-field">${t("annual_budget_label", fyName())}
             <input type="number" data-ccfield="annualBudget" value="${cc.annualBudget}" step="10000">
           </label>
           <label class="shared-toggle" title="${t("shared_toggle_title")}">
@@ -187,7 +187,7 @@ function revenueRowHtml(cc, i) {
   const isCustom = plan && plan.some((v) => Math.abs((Number(v) || 0) - (Number(plan[0]) || 0)) > 0.5);
   const flat = plan ? Math.round(annual / 12) : 0;
   const cells = Array.from({ length: 12 }, (_, m) => `
-    <label>${monthLabel(m + 1)}
+    <label>${monthLabel(FY_WINDOW_START + m)}
       <input type="number" step="10000" data-revmonthline="${i}" data-m="${m}" value="${plan ? Math.round(Number(plan[m]) || 0) : ""}" placeholder="${flat || 0}">
     </label>`).join("");
   return `
@@ -220,7 +220,7 @@ function utilizationHtml(cc, i) {
   const isCustom = hrs.some((h) => Math.abs((Number(h) || 0) - (Number(hrs[0]) || 0)) > 0.5);
   const roleOpts = ROLE_CATALOG.map((r) => `<option value="${r.id}" ${r.id === u.roleId ? "selected" : ""}>${escapeHtml(r.label)}</option>`).join("");
   const monthCells = Array.from({ length: 12 }, (_, m) => `
-    <label>${monthLabel(m + 1)}
+    <label>${monthLabel(FY_WINDOW_START + m)}
       <input type="number" step="10" data-utilmonth="${i}" data-m="${m}" value="${hrs[m] ? Math.round(Number(hrs[m]) || 0) : ""}" placeholder="${flatHrs || 0}">
     </label>`).join("");
   return `
@@ -336,7 +336,7 @@ function bridgeHtml(cc) {
   return `
     <p class="bridge-hint">${t("bridge_hint")}</p>
     ${rows.map(([label, v]) => `<div class="bridge-row"><span>${label}</span><span class="num">${fmtMkr(v)}</span></div>`).join("")}
-    <div class="bridge-row bridge-total"><span>${t("bridge_total_label")}</span><span class="num">${fmtMkr(b.total)}</span></div>
+    <div class="bridge-row bridge-total"><span>${t("bridge_total_label", fyName())}</span><span class="num">${fmtMkr(b.total)}</span></div>
   `;
 }
 

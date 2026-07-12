@@ -13,7 +13,7 @@ const THEME_COLORS = {
 const SCENARIO_PALETTE = ["#d9a647", "#c86bd6", "#5aa8d9", "#e07a5f", "#8fbf5f"];
 
 function companyMonthlyBudget(month) {
-  if (month < 1 || month > FY_MONTHS) return null;
+  if (month < FY_WINDOW_START || month > fyWindowEnd()) return null;
   return COST_CENTERS.reduce((s, cc) => s + monthlyBudgetFor(cc, month), 0);
 }
 
@@ -25,7 +25,7 @@ function lensMonthRange() {
     return months;
   }
   const months = [];
-  for (let m = 1; m <= FY_MONTHS; m++) months.push(m);
+  for (let m = FY_WINDOW_START; m <= fyWindowEnd(); m++) months.push(m);
   return months;
 }
 
@@ -39,8 +39,8 @@ function renderStats() {
 
   if (currentLens === "fy") {
     const fy = companyFySummary();
-    let bookedActual = 0;
-    for (let m = 1; m <= CLOSE_MONTH; m++) bookedActual += companyMonthAmount(m);
+    let bookedActual = 0; // booked months INSIDE the active FY window (a next-year budget has none yet)
+    for (let m = FY_WINDOW_START; m <= Math.min(CLOSE_MONTH, fyWindowEnd()); m++) bookedActual += companyMonthAmount(m);
     const pct = fy.budget ? (fy.variance / fy.budget) * 100 : 0;
     const cls = varianceClass(fy.variance, fy.budget);
     const onPlan = Math.abs(pct) <= 1;
@@ -57,7 +57,7 @@ function renderStats() {
       const margin = Math.round((result / revenue) * 100);
       const rcls = result >= 0 ? "under" : "over";
       const hasPlan = Array.isArray(ASSUMPTIONS.revenuePlan) && ASSUMPTIONS.revenuePlan.some((v) => v > 0);
-      projHtml = `<p class="hero-sub"><strong>${t("forecast_pnl_title")}:</strong> ${t("forecast_pnl_body", `<strong class="${rcls}">${fmtMkrSigned(result)}</strong>`, fmtMkr(revenue), fmtMkr(fy.total), margin)}${hasPlan ? "" : ` · ${t("forecast_pnl_flat_note")}`}</p>`;
+      projHtml = `<p class="hero-sub"><strong>${t("forecast_pnl_title", fyName())}:</strong> ${t("forecast_pnl_body", `<strong class="${rcls}">${fmtMkrSigned(result)}</strong>`, fmtMkr(revenue), fmtMkr(fy.total), margin)}${hasPlan ? "" : ` · ${t("forecast_pnl_flat_note")}`}</p>`;
     }
 
     hero.innerHTML = `
@@ -75,13 +75,13 @@ function renderStats() {
 
     statsRow.innerHTML = `
       <div class="stat-card">
-        <span class="stat-label">${t("stat_annual_budget")}</span>
+        <span class="stat-label">${t("stat_annual_budget", fyName())}</span>
         <span class="stat-value">${fmtMkr(fy.budget)}</span>
       </div>
       <div class="stat-card">
         <span class="stat-label">${t("stat_booked_actuals")}</span>
         <span class="stat-value">${fmtMkr(bookedActual)}</span>
-        <span class="stat-sub">${t("stat_through", monthLabel(CLOSE_MONTH))}</span>
+        <span class="stat-sub">${CLOSE_MONTH >= FY_WINDOW_START ? t("stat_through", monthLabel(CLOSE_MONTH)) : t("period_none_yet")}</span>
       </div>
       <div class="stat-card">
         <span class="stat-label">${t("stat_fy_total")}</span>
@@ -91,7 +91,7 @@ function renderStats() {
   } else {
     const { start, end } = rollingWindow();
     const rolling = companyRollingSummary();
-    const monthsBeyondBudget = lensMonthRange().filter((m) => m > FY_MONTHS).length;
+    const monthsBeyondBudget = lensMonthRange().filter((m) => m < FY_WINDOW_START || m > fyWindowEnd()).length;
 
     hero.innerHTML = `
       <div class="hero-main">
@@ -130,7 +130,7 @@ function renderTable() {
       <div class="budget-row header">
         <span class="cc-name">${t("col_reporting_line")}</span>
         <span class="num">${t("col_budget")}</span>
-        <span class="num">${t("col_fy_total")}</span>
+        <span class="num">${t("col_fy_total", fyName())}</span>
         <span class="num">${t("col_variance")}</span>
       </div>
     `;
@@ -144,7 +144,7 @@ function renderTable() {
         <div class="budget-row">
           <span class="cc-name">${escapeHtml(cc.name)}${cc.note ? `<span class="cc-note">${escapeHtml(cc.note)}</span>` : ""}</span>
           <span class="num" data-label="${t("col_budget")}">${fmtMkr(fy.budget)}</span>
-          <span class="num" data-label="${t("col_fy_total")}">${fmtMkr(fy.total)}</span>
+          <span class="num" data-label="${t("col_fy_total", fyName())}">${fmtMkr(fy.total)}</span>
           <span class="variance-cell ${cls}" data-label="${t("col_variance")}">
             ${fmtMkrSigned(fy.variance)}
             <span class="variance-pill ${cls}">${pct > 0 ? "+" : ""}${pct.toFixed(1)}%</span>
@@ -160,7 +160,7 @@ function renderTable() {
       <div class="budget-row total">
         <span class="cc-name">${t("col_total")}</span>
         <span class="num" data-label="${t("col_budget")}">${fmtMkr(ft.budget)}</span>
-        <span class="num" data-label="${t("col_fy_total")}">${fmtMkr(ft.total)}</span>
+        <span class="num" data-label="${t("col_fy_total", fyName())}">${fmtMkr(ft.total)}</span>
         <span class="variance-cell ${totalCls}" data-label="${t("col_variance")}">
           ${fmtMkrSigned(ft.variance)}
           <span class="variance-pill ${totalCls}">${totalPct > 0 ? "+" : ""}${totalPct.toFixed(1)}%</span>
@@ -210,7 +210,7 @@ function renderChart() {
   });
 
   document.getElementById("chartTitle").textContent =
-    currentLens === "fy" ? t("chart_title_fy") : t("chart_title_rolling");
+    currentLens === "fy" ? t("chart_title_fy", fyName()) : t("chart_title_rolling");
 
   const ctx = document.getElementById("trendChart");
   const datasets = [
@@ -270,7 +270,7 @@ function roleFyTotals() {
   const totals = {};
   COST_CENTERS.forEach((cc) => {
     cc.headcount.forEach((h) => {
-      const activeFy = Math.max(0, Math.min(h.endMonth, FY_MONTHS) - Math.max(h.startMonth, 1) + 1);
+      const activeFy = Math.max(0, Math.min(h.endMonth, fyWindowEnd()) - Math.max(h.startMonth, FY_WINDOW_START) + 1);
       const cost = h.count * monthlyCostForRole(h.roleId) * activeFy;
       const role = getRole(h.roleId);
       if (!totals[h.roleId]) totals[h.roleId] = { label: role ? role.label : "—", count: 0, cost: 0 };
@@ -326,10 +326,14 @@ function renderScenarioDetail(scen, currentByName) {
 
 // Scenarios are now real plan versions (branches), compared LIVE against the
 // active plan via VERSION_SUMMARIES — not frozen snapshots. Lists every
-// non-locked version other than the one you're on; locked budgets get their
-// own panel. Branch a new one from the sidebar (+ Scenario).
+// non-locked, non-budget version other than the one you're on AND in the same
+// fiscal year (comparing a FY2026 scenario's total against a FY2027 budget's
+// would be apples-to-oranges); budgets get their own panel. Branch a new one
+// from the sidebar (+ Scenario).
 function scenarioVersions() {
-  return PLAN_VERSIONS.filter((v) => !v.lockedAt && v.id !== ACTIVE_VERSION_ID);
+  return PLAN_VERSIONS.filter((v) =>
+    !v.lockedAt && v.budgetFy == null && v.id !== ACTIVE_VERSION_ID
+    && fyWindowStartFor(v) === FY_WINDOW_START);
 }
 
 function renderScenarios() {
@@ -394,7 +398,7 @@ function renderScenarioChart() {
 
   const colors = THEME_COLORS[getTheme()];
   const months = [];
-  for (let m = 1; m <= FY_MONTHS; m++) months.push(m);
+  for (let m = FY_WINDOW_START; m <= fyWindowEnd(); m++) months.push(m);
   const labels = months.map(monthLabel);
 
   const datasets = [
@@ -446,6 +450,22 @@ function initScenarios() {
     if (id) switchVersion(id); // branch + open it, same as the sidebar
   });
 
+  // Budget panel: create next year's budget from the current plan / jump into
+  // the existing draft to finish it.
+  const bvPanel = document.getElementById("budgetVersionPanel");
+  if (bvPanel) bvPanel.addEventListener("click", async (e) => {
+    const createBtn = e.target.closest("[data-createbudget]");
+    if (createBtn) {
+      if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast(t("toast_signin_save_data")); return; }
+      const fy = Number(createBtn.dataset.createbudget);
+      const id = await dbCreateBudget(fy);
+      if (id) { showToast(t("toast_budget_created", fy)); switchVersion(id); }
+      return;
+    }
+    const openBtn = e.target.closest("[data-openbudget]");
+    if (openBtn) switchVersion(openBtn.dataset.openbudget);
+  });
+
   document.getElementById("scenarioList").addEventListener("click", async (e) => {
     const delBtn = e.target.closest("[data-delscen]");
     if (delBtn) {
@@ -468,6 +488,11 @@ function initScenarios() {
 }
 
 function renderAll() {
+  // Subtitle carries the ACTIVE window's fiscal year (editing Budget 2027
+  // must read FY2027 everywhere, not the year baked into the static HTML).
+  const sub = document.querySelector(".page-sub");
+  if (sub) sub.textContent = t("overview_subtitle", fyName());
+
   const sections = document.querySelectorAll(".lens-controls, .hero-card, .stats-row, .main-row, .table-panel, .this-month-panel, .collapse-panel");
   let empty = document.getElementById("emptyState");
 
@@ -501,15 +526,16 @@ function renderAll() {
   if (wrap && sig) wrap.hidden = sig.hidden;
 }
 
-// Steal-list (Abacum): a budget is an approved, locked plan version — not a
-// live editable number. This panel shows the latest locked budget and whether
-// the live plan has since drifted from it (live cost vs the budget's cost,
-// both engine-computed via VERSION_SUMMARIES). Locking happens in the sidebar
-// (Lock as budget), so there's no button here — just the read-out.
+// A budget is a FISCAL-YEAR plan version (budget_fy): draft while you build
+// it from the current plan, approved once locked. Three states here:
+//   none    → the CTA to create next year's budget from the current plan
+//   draft   → "finish and lock" pointer (the draft is edited like any plan)
+//   locked  → the approved read-out + live drift over the BUDGET'S year
 function renderBudgetVersion() {
   const panel = document.getElementById("budgetVersionPanel");
   if (!panel) return;
   const v = latestBudgetVersion();
+  const draft = draftBudgetVersions()[0] || null;
   const drift = budgetDrift();
 
   const driftHtml = drift == null
@@ -521,8 +547,24 @@ function renderBudgetVersion() {
   const status = document.getElementById("bvStatus");
   if (status) status.innerHTML = !v ? "" : driftHtml;
 
-  if (!v) {
-    panel.innerHTML = `<div class="bv-row"><p class="table-hint">${t("budget_version_none")}</p></div>`;
+  if (!v && !draft) {
+    // Propose next FY — budgeting is next year's exercise (current FY is
+    // also offered where budgets are managed, on Assumptions).
+    const nextFy = FY_START_YEAR + 1;
+    panel.innerHTML = `
+      <div class="bv-row">
+        <p class="table-hint">${t("budget_none_yet", nextFy)}</p>
+        <button class="add-headcount" data-createbudget="${nextFy}" type="button">${t("create_budget_btn", nextFy)}</button>
+      </div>`;
+    return;
+  }
+  if (!v && draft) {
+    const sum = VERSION_SUMMARIES[draft.id] || { total: 0 };
+    panel.innerHTML = `
+      <div class="bv-row">
+        <p class="table-hint">${t("budget_draft_status", `<strong>${escapeHtml(draft.name)}</strong>`, fmtMkr(sum.total))}
+        <button class="integ-link" data-openbudget="${draft.id}" type="button">${t("budget_draft_open")}</button></p>
+      </div>`;
     return;
   }
   const sum = VERSION_SUMMARIES[v.id] || { total: 0 };
@@ -567,7 +609,7 @@ window.refreshAfterPeriodChange = renderAll;
 function initPrint() {
   const orgName = (USER_ORGS.find((o) => o.id === CURRENT_ORG_ID) || {}).name || "";
   const ph = document.getElementById("printHeader");
-  if (ph) ph.textContent = t("print_header", orgName, new Date().toLocaleDateString("sv-SE"));
+  if (ph) ph.textContent = t("print_header", orgName, new Date().toLocaleDateString("sv-SE"), fyName());
   document.getElementById("printBtn").addEventListener("click", () => window.print());
 }
 
@@ -600,6 +642,13 @@ function renderSignals() {
   const panel = document.getElementById("signalsPanel");
   const list = document.getElementById("signalsList");
   if (!panel || !list) return;
+
+  // "This month" is about booked reality — meaningless while editing a
+  // next-year budget whose window holds no booked months yet.
+  if (CLOSE_MONTH < FY_WINDOW_START || CLOSE_MONTH > fyWindowEnd()) {
+    panel.hidden = true;
+    return;
+  }
 
   const monthLbl = monthLabel(CLOSE_MONTH);
   const signals = [];

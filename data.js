@@ -26,6 +26,24 @@ function monthLabel(m) {
 const TIMELINE_LENGTH = 24; // FY2026 (1-12) + FY2027 (13-24)
 const FY_MONTHS = 12;
 
+// Active FY window (Phase 8d — a budget belongs to a FISCAL YEAR, not to
+// "whenever you pressed lock"): every plan version lives in one fiscal year
+// on the 24-month timeline. The Forecast and scenarios live in the current FY
+// (months 1–12); a budget carries budget_fy and a next-year budget lives in
+// months 13–24. Every "FY" total/grid/label follows the ACTIVE version's
+// window, so editing Budget 2027 shows 2027's months and 2027's totals.
+// Version 12-slot revenue profiles are FY-relative and engine month arithmetic
+// is absolute, so the whole shift is this one offset.
+let FY_WINDOW_START = 1;
+function fyWindowStartFor(v) {
+  if (!v || v.budgetFy == null) return 1;
+  const start = (Number(v.budgetFy) - FY_START_YEAR) * 12 + 1;
+  return start >= 1 && start + FY_MONTHS - 1 <= TIMELINE_LENGTH ? start : 1;
+}
+function fyWindowEnd() { return FY_WINDOW_START + FY_MONTHS - 1; }
+// "FY2026" / "FY2027" — for the active window unless another start is given.
+function fyName(start = FY_WINDOW_START) { return "FY" + (FY_START_YEAR + Math.floor((start - 1) / 12)); }
+
 // Populated by loadData() from the database.
 let CLOSE_MONTH = 6;
 let CLOSE_MONTH_MANUAL = false; // true = user picked the month; syncs won't touch it
@@ -171,17 +189,17 @@ function utilizationRevenueForMonth(cc, month) {
 function utilizationAvgHeads(cc) {
   if (!cc.utilization) return 0;
   let s = 0;
-  for (let m = 1; m <= FY_MONTHS; m++) s += utilizationRequiredHeads(cc, m);
+  for (let m = FY_WINDOW_START; m <= fyWindowEnd(); m++) s += utilizationRequiredHeads(cc, m);
   return s / FY_MONTHS;
 }
 function utilizationFyRevenue(cc) {
   let s = 0;
-  for (let m = 1; m <= FY_MONTHS; m++) s += utilizationRevenueForMonth(cc, m);
+  for (let m = FY_WINDOW_START; m <= fyWindowEnd(); m++) s += utilizationRevenueForMonth(cc, m);
   return s;
 }
 function utilizationFyCost(cc) {
   let s = 0;
-  for (let m = 1; m <= FY_MONTHS; m++) s += utilizationCostForMonth(cc, m);
+  for (let m = FY_WINDOW_START; m <= fyWindowEnd(); m++) s += utilizationCostForMonth(cc, m);
   return s;
 }
 
@@ -225,13 +243,14 @@ function monthAmount(cc, month) {
 }
 
 function monthlyBudgetFor(cc, month) {
-  if (month < 1 || month > FY_MONTHS) return null; // no budget set for next FY yet
+  // The annual line target covers the ACTIVE window's fiscal year only.
+  if (month < FY_WINDOW_START || month > fyWindowEnd()) return null;
   return cc.annualBudget / FY_MONTHS;
 }
 
 function fySummary(cc) {
   let total = 0;
-  for (let m = 1; m <= FY_MONTHS; m++) total += monthAmount(cc, m).value;
+  for (let m = FY_WINDOW_START; m <= fyWindowEnd(); m++) total += monthAmount(cc, m).value;
   return { total, budget: cc.annualBudget, variance: total - cc.annualBudget };
 }
 
@@ -265,7 +284,7 @@ function companyFySummary() {
 // a controller actually wants first is "what's IN this number").
 function fyComposition(cc) {
   let actual = 0, overridden = 0, headcount = 0, oneOff = 0, recurring = 0, utilization = 0;
-  for (let m = 1; m <= FY_MONTHS; m++) {
+  for (let m = FY_WINDOW_START; m <= fyWindowEnd(); m++) {
     const a = monthAmount(cc, m);
     if (a.isActual) { actual += a.value; continue; }
     if (a.isOverridden) { overridden += a.value; continue; }
@@ -289,7 +308,7 @@ function fyComposition(cc) {
 // FY-average active headcount for one cost centre — the allocation weight.
 function fyAverageHeadcount(cc) {
   return cc.headcount.reduce((sum, h) => {
-    const from = Math.max(1, h.startMonth), to = Math.min(FY_MONTHS, h.endMonth);
+    const from = Math.max(FY_WINDOW_START, h.startMonth), to = Math.min(fyWindowEnd(), h.endMonth);
     const activeMonths = Math.max(0, to - from + 1);
     return sum + h.count * (activeMonths / FY_MONTHS);
   }, 0);
@@ -388,7 +407,7 @@ function revenuePlanForMonth(m) {
 
 function revenuePlanFyTotal() {
   let total = 0;
-  for (let m = 1; m <= FY_MONTHS; m++) total += revenuePlanForMonth(m);
+  for (let m = FY_WINDOW_START; m <= fyWindowEnd(); m++) total += revenuePlanForMonth(m);
   return total;
 }
 
@@ -420,7 +439,7 @@ function lineRevenueForMonth(cc, m) {
 
 function lineRevenueFyTotal(cc) {
   let total = 0;
-  for (let m = 1; m <= FY_MONTHS; m++) total += lineRevenueForMonth(cc, m);
+  for (let m = FY_WINDOW_START; m <= fyWindowEnd(); m++) total += lineRevenueForMonth(cc, m);
   return total;
 }
 
@@ -497,23 +516,35 @@ function cashFlowProjection(monthsAhead = 6, fromIdx = null) {
 // cost vs the approved budget version's cost, both computed by the same engine
 // (VERSION_SUMMARIES). Most-recently-locked budget is the active baseline.
 
+// A BUDGET is a version carrying budget_fy (the fiscal year it's FOR) —
+// editable draft until locked_at is set (approved). Scenarios carry neither.
+function budgetVersions() {
+  return PLAN_VERSIONS.filter((v) => v.budgetFy != null);
+}
 function lockedBudgetVersions() {
-  return PLAN_VERSIONS.filter((v) => v.lockedAt)
+  return budgetVersions().filter((v) => v.lockedAt)
     .sort((a, b) => new Date(b.lockedAt) - new Date(a.lockedAt));
 }
 function latestBudgetVersion() {
   return lockedBudgetVersions()[0] || null;
 }
+function draftBudgetVersions() {
+  return budgetVersions().filter((v) => !v.lockedAt);
+}
 
-// null when there's no locked budget yet, or once one exists but the live plan
-// hasn't drifted from it (nothing to flag). Positive = live plan costs MORE
-// than the approved budget.
+// null when there's no approved budget yet, or the live plan hasn't drifted
+// from it. Positive = the live plan costs MORE than the approved budget.
+// Compared over the BUDGET'S fiscal-year window (a FY2027 budget is judged
+// against the plan's FY2027 months), on the live in-memory model.
 function budgetDrift() {
   const v = latestBudgetVersion();
-  if (!v) return null;
-  const budget = VERSION_SUMMARIES[v.id], live = VERSION_SUMMARIES[ACTIVE_VERSION_ID];
-  if (!budget || !live) return null;
-  const diff = live.total - budget.total;
+  if (!v || v.id === ACTIVE_VERSION_ID) return null; // a budget can't drift from itself
+  const budget = VERSION_SUMMARIES[v.id];
+  if (!budget) return null;
+  const win = fyWindowStartFor(v);
+  let live = 0;
+  for (let m = win; m <= win + FY_MONTHS - 1; m++) live += companyMonthAmount(m);
+  const diff = live - budget.total;
   return Math.abs(diff) < 1 ? null : diff;
 }
 
@@ -539,13 +570,13 @@ function setCloseMonth(m) {
 async function loadPlanVersions() {
   PLAN_VERSIONS = [];
   const { data, error } = await sb.from("plan_versions")
-    .select("id, name, is_main, locked_at, revenue_budget, revenue_plan").eq("org_id", CURRENT_ORG_ID).order("created_at");
+    .select("id, name, is_main, locked_at, budget_fy, revenue_budget, revenue_plan").eq("org_id", CURRENT_ORG_ID).order("created_at");
   let rows = error ? [] : (data || []);
   let main = rows.find((v) => v.is_main);
   if (!main) {
     const ins = await sb.from("plan_versions")
       .insert({ org_id: CURRENT_ORG_ID, name: "Main", is_main: true })
-      .select("id, name, is_main, locked_at, revenue_budget, revenue_plan").single();
+      .select("id, name, is_main, locked_at, budget_fy, revenue_budget, revenue_plan").single();
     if (!ins.error && ins.data) {
       main = ins.data;
       rows = [main, ...rows];
@@ -554,11 +585,12 @@ async function loadPlanVersions() {
       }
     }
   }
-  PLAN_VERSIONS = rows.map((v) => ({ id: v.id, name: v.name, isMain: !!v.is_main, lockedAt: v.locked_at, revenueBudget: Number(v.revenue_budget || 0), revenuePlan: v.revenue_plan }));
+  PLAN_VERSIONS = rows.map((v) => ({ id: v.id, name: v.name, isMain: !!v.is_main, lockedAt: v.locked_at, budgetFy: v.budget_fy != null ? Number(v.budget_fy) : null, revenueBudget: Number(v.revenue_budget || 0), revenuePlan: v.revenue_plan }));
   // Active = the saved choice for this org if it still exists, else Main.
   const saved = localStorage.getItem(activeVersionKey());
   const active = PLAN_VERSIONS.find((v) => v.id === saved) || PLAN_VERSIONS.find((v) => v.isMain);
   ACTIVE_VERSION_ID = active ? active.id : (main ? main.id : null);
+  FY_WINDOW_START = fyWindowStartFor(activeVersion()); // the active version decides which FY the app shows
 }
 
 function activeVersionKey() { return "almgren-active-version-" + CURRENT_ORG_ID; }
@@ -586,12 +618,13 @@ function assertEditable() {
 // Core: a full copy of the active version — drivers (cost) + per-line revenue
 // + the version's org-level revenue — under a new version. Optionally locked
 // (a budget). Returns the new id; does NOT switch.
-async function copyActiveVersion(name, { locked = false } = {}) {
+async function copyActiveVersion(name, { locked = false, budgetFy = null } = {}) {
   const src = ACTIVE_VERSION_ID;
   const srcV = activeVersion() || {};
   const { data: v, error } = await sb.from("plan_versions").insert({
     org_id: CURRENT_ORG_ID, name, is_main: false,
     locked_at: locked ? new Date().toISOString() : null,
+    budget_fy: budgetFy,
     revenue_budget: srcV.revenueBudget || 0, revenue_plan: srcV.revenuePlan || null,
   }).select("id").single();
   if (error) { flagWriteError(error); return null; }
@@ -615,11 +648,21 @@ async function dbCreateVersion(name) {
   return id;
 }
 
-// Lock the current plan as an approved budget: a frozen copy. Stays on the
-// current version (you keep forecasting); the budget is the immutable baseline.
-async function dbLockAsBudget(name) {
+// Create the budget for a FISCAL YEAR (Felix round 2 #3: a budget is "the
+// plan for FY2027", not "whatever was on screen when lock was pressed").
+// Starts as an editable DRAFT copied from the current plan — the starting
+// point Felix asked for — and is locked separately once approved.
+async function dbCreateBudget(fyYear) {
   if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast(t("toast_signin_save_data")); return null; }
-  return await copyActiveVersion(name, { locked: true });
+  return await copyActiveVersion(`Budget ${fyYear}`, { budgetFy: fyYear });
+}
+
+// Approve: freeze the draft budget. The reverse of dbUnlockVersion below.
+async function dbLockVersion(id) {
+  if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast(t("toast_signin_save_data")); return null; }
+  const { error } = await sb.from("plan_versions").update({ locked_at: new Date().toISOString() }).eq("id", id);
+  if (error) { flagWriteError(error); return false; }
+  return true;
 }
 
 async function dbRenameVersion(id, name) {
@@ -659,10 +702,13 @@ async function dbDeleteVersion(id) {
 function versionRevenueFyTotal(ver, altCenters) {
   // Per-line revenue wins (manual plan OR utilization billable) — lineRevenueForMonth
   // composes both and takes only the cc, so it's correct on alt centres too.
+  // Computed over the VERSION'S OWN fiscal-year window (12-slot profiles are
+  // FY-relative, so the same profile describes whichever year the version is for).
+  const win = fyWindowStartFor(ver);
   const anyLine = altCenters.some(lineHasRevenue);
   const plan = ver && Array.isArray(ver.revenuePlan) && ver.revenuePlan.length === 12 && ver.revenuePlan.some((v) => v > 0) ? ver.revenuePlan : null;
   let total = 0;
-  for (let m = 1; m <= FY_MONTHS; m++) {
+  for (let m = win; m <= win + FY_MONTHS - 1; m++) {
     if (anyLine) total += altCenters.reduce((s, cc) => s + lineRevenueForMonth(cc, m), 0);
     else if (plan) total += Number(plan[(m - 1) % 12]) || 0;
     else total += ((ver && ver.revenueBudget) || 0) / 12;
@@ -670,11 +716,14 @@ function versionRevenueFyTotal(ver, altCenters) {
   return total;
 }
 
+// Summaries are computed over each version's OWN fiscal-year window: a FY2027
+// budget's total means "FY2027", a scenario's means the current FY.
 async function computeVersionSummary(versionId) {
-  // Active version = the live model already in memory.
+  // Active version = the live model already in memory (FY_WINDOW_START is
+  // already this version's window, so fySummary & co are correct as-is).
   if (versionId === ACTIVE_VERSION_ID) {
     const monthly = [];
-    for (let m = 1; m <= FY_MONTHS; m++) monthly[m - 1] = companyMonthAmount(m);
+    for (let m = FY_WINDOW_START; m <= fyWindowEnd(); m++) monthly.push(companyMonthAmount(m));
     const byName = {};
     COST_CENTERS.forEach((cc) => { byName[cc.name] = fySummary(cc).total; });
     const total = companyFySummary().total, revenue = revenuePlanFyTotal();
@@ -708,11 +757,15 @@ async function computeVersionSummary(versionId) {
   }));
   if (!foRes.error) (foRes.data || []).forEach((o) => { const cc = alt.find((c) => c.id === o.reporting_line_id); if (cc) cc.overrides[o.month] = Number(o.amount); });
 
+  const win = fyWindowStartFor(ver);
   let total = 0; const byName = {}; const monthly = new Array(FY_MONTHS).fill(0);
   alt.forEach((cc) => {
-    const fy = fySummary(cc);
-    total += fy.total; byName[cc.name] = fy.total;
-    for (let m = 1; m <= FY_MONTHS; m++) monthly[m - 1] += monthAmount(cc, m).value;
+    let ccTotal = 0;
+    for (let i = 0; i < FY_MONTHS; i++) {
+      const v = monthAmount(cc, win + i).value;
+      ccTotal += v; monthly[i] += v;
+    }
+    total += ccTotal; byName[cc.name] = ccTotal;
   });
   const revenue = versionRevenueFyTotal(ver, alt);
   return { total, byName, monthly, revenue, result: revenue - total };
@@ -905,11 +958,23 @@ function loadPreviewData() {
   // Fake plan versions so the sidebar switcher renders in the demo (real writes
   // are blocked in demo mode, so branching just shows the sign-in toast).
   PLAN_VERSIONS = [
-    { id: "pv-main", name: "Main", isMain: true, lockedAt: null, revenueBudget: 50000000, revenuePlan: null },
-    { id: "pv-scen", name: "Hiring freeze", isMain: false, lockedAt: null, revenueBudget: 50000000, revenuePlan: null },
-    { id: "pv-budget", name: "Budget 2026", isMain: false, lockedAt: "2026-01-15T09:00:00Z", revenueBudget: 50000000, revenuePlan: null },
+    { id: "pv-main", name: "Main", isMain: true, lockedAt: null, budgetFy: null, revenueBudget: 50000000, revenuePlan: null },
+    { id: "pv-scen", name: "Hiring freeze", isMain: false, lockedAt: null, budgetFy: null, revenueBudget: 50000000, revenuePlan: null },
+    { id: "pv-budget", name: "Budget 2026", isMain: false, lockedAt: "2026-01-15T09:00:00Z", budgetFy: 2026, revenueBudget: 50000000, revenuePlan: null },
   ];
   ACTIVE_VERSION_ID = "pv-main";
+  // Dev hook: &nobudget drops the demo budget so the "create Budget 2027"
+  // CTA state (what a fresh real org sees) is verifiable.
+  if (new URLSearchParams(location.search).has("nobudget")) {
+    PLAN_VERSIONS = PLAN_VERSIONS.filter((v) => v.budgetFy == null);
+  }
+  // Dev hook: &fy27 adds a DRAFT next-year budget and makes it active, so the
+  // FY2027 window (months 13–24, Jan 27 labels, FY2027 totals) is verifiable.
+  if (new URLSearchParams(location.search).has("fy27")) {
+    PLAN_VERSIONS.push({ id: "pv-b27", name: "Budget 2027", isMain: false, lockedAt: null, budgetFy: 2027, revenueBudget: 50000000, revenuePlan: null });
+    ACTIVE_VERSION_ID = "pv-b27";
+  }
+  FY_WINDOW_START = fyWindowStartFor(PLAN_VERSIONS.find((v) => v.id === ACTIVE_VERSION_ID));
   CLOSE_MONTH = 6;
   // Planning mode in preview follows the dev hooks: the plain demo is the
   // simplest org (company-level revenue); &profit shows per-line revenue;
@@ -1019,6 +1084,8 @@ function loadPreviewData() {
       monthly: [3300000, 3300000, 3300000, 3300000, 3300000, 3300000, 3400000, 3400000, 3200000, 3200000, 3200000, 3300000] },
     "pv-budget": { total: 42000000, byName: { Production: 28000000, "R&D": 9000000, IT: 5000000 }, revenue: 50000000, result: 8000000,
       monthly: [3500000, 3500000, 3500000, 3500000, 3500000, 3500000, 3500000, 3500000, 3500000, 3500000, 3500000, 3500000] },
+    "pv-b27": { total: 43400000, byName: { Production: 29600000, "R&D": 9700000, IT: 4100000 }, revenue: 52000000, result: 8600000,
+      monthly: [3600000, 3600000, 3600000, 3600000, 3600000, 3600000, 3600000, 3600000, 3700000, 3700000, 3700000, 3700000] },
   };
 
   // Seasonal revenue profile summing to exactly the 50.0M annual target —
@@ -1429,7 +1496,7 @@ function parseActualsCsv(text) {
 
 // (Scenarios and budgets used to be immutable snapshots in their own tables.
 // They're now real, editable plan_versions — see copyActiveVersion /
-// dbCreateVersion / dbLockAsBudget above — so dbSaveScenario / dbDeleteScenario
+// dbCreateVersion / dbCreateBudget above — so dbSaveScenario / dbDeleteScenario
 // / dbLockBudgetVersion are gone. Comparison is live via VERSION_SUMMARIES.)
 
 // Stand up a brand-new tenant via the locked-down server-side function — one

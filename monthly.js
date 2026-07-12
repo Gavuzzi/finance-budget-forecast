@@ -16,7 +16,7 @@ function lensMonths() {
     return a;
   }
   const a = [];
-  for (let m = 1; m <= FY_MONTHS; m++) a.push(m);
+  for (let m = FY_WINDOW_START; m <= fyWindowEnd(); m++) a.push(m);
   return a;
 }
 
@@ -148,7 +148,7 @@ function downloadExport() {
   const blob = new Blob([buildExportCsv()], { type: "text/csv;charset=utf-8" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `monthly-pnl-${currentLens === "fy" ? "FY2026" : "rolling12"}.csv`;
+  a.download = `monthly-pnl-${currentLens === "fy" ? fyName() : "rolling12"}.csv`;
   a.click();
   URL.revokeObjectURL(a.href);
 }

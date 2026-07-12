@@ -56,7 +56,7 @@ function renderRevenueBlock() {
   const hasPlan = Array.isArray(plan) && plan.length === 12 && plan.some((v) => v > 0);
   const flat = Math.round((ASSUMPTIONS.revenueBudget || 0) / 12);
   const cells = Array.from({ length: 12 }, (_, i) => `
-    <label>${monthLabel(i + 1)}
+    <label>${monthLabel(FY_WINDOW_START + i)}
       <input type="number" step="10000" data-revmonth="${i}" value="${hasPlan ? Number(plan[i]) || 0 : ""}" placeholder="${flat || ""}">
     </label>`).join("");
   return `
@@ -294,26 +294,42 @@ function renderPlanningModeBlock() {
     </div>`;
 }
 
-// Manage plans — the quiet governance corner: rename/delete scenarios and,
-// with friction, unlock a budget (it becomes an editable scenario again).
+// Manage plans — the quiet governance corner: create the fiscal-year budget,
+// rename/delete scenarios and, with friction, lock/unlock budgets.
 // Deliberately here and not in the sidebar; day-to-day switching is enough
 // there. The Forecast can't be renamed/deleted — it's the org's spine.
 function renderPlansBlock() {
   const rows = PLAN_VERSIONS.map((v) => {
     const state = v.isMain ? `<span class="plan-state">${t("plan_state_forecast")}</span>`
+      : v.budgetFy != null
+        ? (v.lockedAt
+          ? `<span class="plan-state plan-locked">🔒 ${t("plan_state_locked", new Date(v.lockedAt).toLocaleDateString("sv-SE"))}</span>`
+          : `<span class="plan-state plan-draft">${t("plan_state_budget_draft")}</span>`)
       : v.lockedAt ? `<span class="plan-state plan-locked">🔒 ${t("plan_state_locked", new Date(v.lockedAt).toLocaleDateString("sv-SE"))}</span>`
       : `<span class="plan-state">${t("plan_state_scenario")}</span>`;
     const actions = v.isMain ? "" : `
       <button class="integ-link" data-planrename="${v.id}" type="button">${t("plan_rename_btn")}</button>
+      ${v.budgetFy != null && !v.lockedAt ? `<button class="integ-link" data-planlock="${v.id}" type="button">${t("plan_lock_btn")}</button>` : ""}
       ${v.lockedAt ? `<button class="integ-link" data-planunlock="${v.id}" type="button">${t("plan_unlock_btn")}</button>` : ""}
       <button class="integ-link" data-plandelete="${v.id}" type="button">${t("plan_delete_btn")}</button>`;
     return `<div class="plan-row"><span class="plan-name">${escapeHtml(versionDisplayName(v))}</span>${state}<span class="plan-actions">${actions}</span></div>`;
   }).join("");
+  // Create the budget for a chosen fiscal year, starting from the current
+  // plan (Felix: "fill what we have done… as a starting point"). Offers the
+  // two FYs the timeline covers; defaults to the next one — budgeting is
+  // usually next year's exercise.
+  const fyOpts = [FY_START_YEAR, FY_START_YEAR + 1]
+    .map((y) => `<option value="${y}" ${y === FY_START_YEAR + 1 ? "selected" : ""}>${t("budget_for_fy", y)}</option>`).join("");
   return `
     <div class="cc-block rate-block plans-block">
       <h2>${t("plans_h2")}</h2>
       <p class="rate-hint">${t("plans_hint")}</p>
       <div class="plan-list">${rows}</div>
+      <div class="plan-newbudget">
+        <select id="newBudgetFy">${fyOpts}</select>
+        <button class="add-headcount" id="newBudgetBtn" type="button">${t("new_budget_btn")}</button>
+        <span class="rate-hint plan-newbudget-hint">${t("new_budget_hint")}</span>
+      </div>
     </div>`;
 }
 
@@ -357,13 +373,32 @@ function initAssumptions() {
   buildRateEngine();
   const rateEngine = document.getElementById("rateEngine");
 
-  // Manage plans: rename / unlock (with friction) / delete.
+  // Manage plans: create budget / rename / lock / unlock (with friction) / delete.
   rateEngine.addEventListener("click", async (e) => {
     const renameBtn = e.target.closest("[data-planrename]");
     const unlockBtn = e.target.closest("[data-planunlock]");
     const deleteBtn = e.target.closest("[data-plandelete]");
-    if (!renameBtn && !unlockBtn && !deleteBtn) return;
+    const lockBtn = e.target.closest("[data-planlock]");
+    const newBudgetBtn = e.target.closest("#newBudgetBtn");
+    if (!renameBtn && !unlockBtn && !deleteBtn && !lockBtn && !newBudgetBtn) return;
     if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast(t("toast_signin_save_data")); return; }
+
+    if (newBudgetBtn) {
+      const fy = Number((document.getElementById("newBudgetFy") || {}).value) || FY_START_YEAR + 1;
+      const id = await dbCreateBudget(fy);
+      if (id) { showToast(t("toast_budget_created", fy)); switchVersion(id); } // jump into the draft to edit it
+      return;
+    }
+    if (lockBtn) {
+      const v = PLAN_VERSIONS.find((x) => x.id === lockBtn.dataset.planlock);
+      if (!v || !confirm(t("lock_budget_confirm", v.name))) return;
+      if (await dbLockVersion(v.id)) {
+        v.lockedAt = new Date().toISOString();
+        showToast(t("toast_budget_locked"));
+        buildRateEngine(); renderSidebar();
+      }
+      return;
+    }
 
     if (renameBtn) {
       const v = PLAN_VERSIONS.find((x) => x.id === renameBtn.dataset.planrename);

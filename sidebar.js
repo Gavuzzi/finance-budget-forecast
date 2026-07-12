@@ -115,15 +115,24 @@ function sidebarHtml() {
   `;
 }
 
-// The plan-version switcher (Phase 8): the FORECAST (working plan), locked
-// BUDGETS, and SCENARIOS — the industry's mental model, grouped so the three
-// concepts never blur. Hidden until versions are loaded.
+// The plan-version switcher (Phase 8): the FORECAST (working plan), BUDGETS
+// (fiscal-year plans — draft until locked), and SCENARIOS — the industry's
+// mental model, grouped so the three concepts never blur. Hidden until
+// versions are loaded. Budgets are CREATED from the Plans panel / Overview
+// (pick the fiscal year, start from the current plan); the only budget
+// control here is the contextual "Lock" while a draft budget is active.
 function versionSwitcherHtml() {
   if (!Array.isArray(PLAN_VERSIONS) || PLAN_VERSIONS.length === 0) return "";
-  const opt = (v) => `<option value="${v.id}" ${v.id === ACTIVE_VERSION_ID ? "selected" : ""}>${escapeHtml(versionDisplayName(v))}</option>`;
+  const opt = (v) => `<option value="${v.id}" ${v.id === ACTIVE_VERSION_ID ? "selected" : ""}>${escapeHtml(versionDisplayName(v))}${v.budgetFy != null && !v.lockedAt ? " " + t("version_draft_tag") : ""}</option>`;
   const forecast = PLAN_VERSIONS.filter((v) => v.isMain).map(opt).join("");
-  const budgets = PLAN_VERSIONS.filter((v) => !v.isMain && v.lockedAt).map(opt).join("");
-  const scenarios = PLAN_VERSIONS.filter((v) => !v.isMain && !v.lockedAt).map(opt).join("");
+  const budgets = PLAN_VERSIONS.filter((v) => v.budgetFy != null).map(opt).join("");
+  const scenarios = PLAN_VERSIONS.filter((v) => !v.isMain && v.budgetFy == null).map(opt).join("");
+  const av = activeVersion();
+  const lockControl = versionLocked()
+    ? `<span class="version-locked-note">${t("version_locked_note")}</span>`
+    : (av && av.budgetFy != null
+      ? `<button class="version-lock" id="lockBudgetBtn" type="button">${t("lock_budget_named", escapeHtml(av.name))}</button>`
+      : "");
   return `
     <div class="version-box">
       <label class="version-label" for="versionSwitcher">${t("plan_version_label")}</label>
@@ -135,9 +144,7 @@ function versionSwitcherHtml() {
         </select>
         <button class="version-new" id="newScenarioBtn" type="button" title="${t("new_scenario_title")}">${t("new_scenario_btn")}</button>
       </div>
-      ${versionLocked()
-        ? `<span class="version-locked-note">${t("version_locked_note")}</span>`
-        : `<button class="version-lock" id="lockBudgetBtn" type="button">${t("lock_budget_btn")}</button>`}
+      ${lockControl}
     </div>`;
 }
 
@@ -205,13 +212,15 @@ function renderSidebar() {
     if (id) switchVersion(id); // reloads into the new scenario, ready to edit
   });
 
+  // Contextual: only rendered while the ACTIVE version is a draft budget —
+  // locking approves THIS budget (it freezes; unlock lives in Plans & versions).
   const lockBudgetBtn = document.getElementById("lockBudgetBtn");
   if (lockBudgetBtn) lockBudgetBtn.addEventListener("click", async () => {
     if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast(t("toast_signin_save_data")); return; }
-    const name = prompt(t("prompt_lock_budget"), t("default_budget_name"));
-    if (!name || !name.trim()) return;
-    const id = await dbLockAsBudget(name.trim());
-    if (id) { showToast(t("toast_budget_locked")); location.reload(); } // stay on current version; dropdown gains the budget
+    const av = activeVersion();
+    if (!av || !confirm(t("lock_budget_confirm", av.name))) return;
+    const ok = await dbLockVersion(av.id);
+    if (ok) { showToast(t("toast_budget_locked")); location.reload(); }
   });
 
   const newOrgBtn = document.getElementById("newOrgBtn");
