@@ -1,0 +1,11 @@
+{
+  "name": "finance-budget-forecast",
+  "private": true,
+  "description": "Dev tooling only — the app itself is no-build vanilla JS, statically hosted. Playwright drives the e2e interaction tests (tests/e2e.js) against ?preview.",
+  "scripts": {
+    "e2e": "node tests/e2e.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.61.1"
+  }
+}

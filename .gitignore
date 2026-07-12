@@ -1,1 +1,3 @@
 test-data/sandbox-scale.sie
+node_modules/
+package-lock.json
