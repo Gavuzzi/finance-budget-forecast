@@ -489,9 +489,15 @@ Ordered by build sequence — each tier leans on the one above. `[B]` unless not
 - [x] **Surface shared/corporate allocation clearly** *(done 2026-07-12)* — "Overhead (whole
   company)" + "Show with overhead allocated" in plain language; the view toggle is hidden until a
   line is actually marked overhead. **[#14, #15]**
-- [ ] **Per-org model gating** — each org type shows only its relevant planning UI (the
-  "narrowness in each org's UI" half of the strategy). Open: needs an org-type config; best shaped
-  AFTER Felix's hands-on testing shows which surfaces feel noisy per type.
+- [x] **Per-org model gating** *(done 2026-07-12 — Phase 8b, from Felix's "build your company"
+  feedback)* — `organizations.planning_config` (revenueMode org/lines + billableHours): presets
+  pre-answer it at creation, a "How you plan" panel on Assumptions changes it later, and the UI
+  shapes itself — org-mode companies see zero revenue/capacity options on Planning; lines-mode orgs
+  have no Assumptions revenue panel (ONE revenue home, killing the two-places confusion
+  structurally). Config gates affordances only — never the engine, never existing data. Same batch
+  (Phase 8b): Forecast/Budget/Scenario vocabulary + grouped switcher + Manage plans with unlock
+  behind friction; merged one-table Costs section; note → closable ✎ icon; page-level help-mode
+  toggle replacing scattered ? marks; "? How this works" killed.
 
 **Tier 3 — progressive disclosure (breadth without clutter)**
 - [x] **Contextual `?` pattern (SAC-style)** *(done 2026-07-12)* — shared `helpMark(key)` primitive
