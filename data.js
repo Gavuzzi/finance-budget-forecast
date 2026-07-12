@@ -560,6 +560,11 @@ async function loadPlanVersions() {
 function activeVersionKey() { return "almgren-active-version-" + CURRENT_ORG_ID; }
 function activeVersion() { return PLAN_VERSIONS.find((v) => v.id === ACTIVE_VERSION_ID) || null; }
 
+// The industry vocabulary (Felix's #2): the working version is the FORECAST,
+// a locked version is a BUDGET, everything else is a SCENARIO. The main
+// version displays as "Forecast" regardless of its stored name ("Main").
+function versionDisplayName(v) { return v && v.isMain ? t("version_forecast") : (v ? v.name : ""); }
+
 // Switch which plan version is active (reloads to pull that version's drivers).
 function switchVersion(id) {
   localStorage.setItem(activeVersionKey(), id);
@@ -616,6 +621,15 @@ async function dbLockAsBudget(name) {
 async function dbRenameVersion(id, name) {
   const { error } = await sb.from("plan_versions").update({ name }).eq("id", id);
   if (error) flagWriteError(error);
+}
+
+// Unlock a budget → it becomes an editable scenario again. Deliberately NOT
+// offered in the sidebar — only from the Manage plans panel, behind a confirm
+// (unlocking an approved budget is rare and should feel like a decision).
+async function dbUnlockVersion(id) {
+  const { error } = await sb.from("plan_versions").update({ locked_at: null }).eq("id", id);
+  if (error) { flagWriteError(error); return false; }
+  return true;
 }
 
 // Delete a scenario (its drivers cascade). Never Main. If it was active, the

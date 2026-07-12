@@ -114,17 +114,24 @@ function sidebarHtml() {
   `;
 }
 
-// The plan-version switcher (Phase 8): pick Main / a scenario / a locked
-// budget, or branch a new scenario. Hidden until versions are loaded.
+// The plan-version switcher (Phase 8): the FORECAST (working plan), locked
+// BUDGETS, and SCENARIOS — the industry's mental model, grouped so the three
+// concepts never blur. Hidden until versions are loaded.
 function versionSwitcherHtml() {
   if (!Array.isArray(PLAN_VERSIONS) || PLAN_VERSIONS.length === 0) return "";
-  const opts = PLAN_VERSIONS.map((v) =>
-    `<option value="${v.id}" ${v.id === ACTIVE_VERSION_ID ? "selected" : ""}>${escapeHtml(v.name)}${v.lockedAt ? " 🔒" : ""}</option>`).join("");
+  const opt = (v) => `<option value="${v.id}" ${v.id === ACTIVE_VERSION_ID ? "selected" : ""}>${escapeHtml(versionDisplayName(v))}</option>`;
+  const forecast = PLAN_VERSIONS.filter((v) => v.isMain).map(opt).join("");
+  const budgets = PLAN_VERSIONS.filter((v) => !v.isMain && v.lockedAt).map(opt).join("");
+  const scenarios = PLAN_VERSIONS.filter((v) => !v.isMain && !v.lockedAt).map(opt).join("");
   return `
     <div class="version-box">
       <label class="version-label" for="versionSwitcher">${t("plan_version_label")}</label>
       <div class="version-row">
-        <select class="version-switcher" id="versionSwitcher">${opts}</select>
+        <select class="version-switcher" id="versionSwitcher">
+          ${forecast}
+          ${budgets ? `<optgroup label="${t("version_group_budgets")}">${budgets}</optgroup>` : ""}
+          ${scenarios ? `<optgroup label="${t("version_group_scenarios")}">${scenarios}</optgroup>` : ""}
+        </select>
         <button class="version-new" id="newScenarioBtn" type="button" title="${t("new_scenario_title")}">${t("new_scenario_btn")}</button>
       </div>
       ${versionLocked()

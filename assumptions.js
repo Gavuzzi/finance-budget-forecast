@@ -279,12 +279,35 @@ function renderPlanningModeBlock() {
     </div>`;
 }
 
+// Manage plans — the quiet governance corner: rename/delete scenarios and,
+// with friction, unlock a budget (it becomes an editable scenario again).
+// Deliberately here and not in the sidebar; day-to-day switching is enough
+// there. The Forecast can't be renamed/deleted — it's the org's spine.
+function renderPlansBlock() {
+  const rows = PLAN_VERSIONS.map((v) => {
+    const state = v.isMain ? `<span class="plan-state">${t("plan_state_forecast")}</span>`
+      : v.lockedAt ? `<span class="plan-state plan-locked">🔒 ${t("plan_state_locked", new Date(v.lockedAt).toLocaleDateString("sv-SE"))}</span>`
+      : `<span class="plan-state">${t("plan_state_scenario")}</span>`;
+    const actions = v.isMain ? "" : `
+      <button class="integ-link" data-planrename="${v.id}" type="button">${t("plan_rename_btn")}</button>
+      ${v.lockedAt ? `<button class="integ-link" data-planunlock="${v.id}" type="button">${t("plan_unlock_btn")}</button>` : ""}
+      <button class="integ-link" data-plandelete="${v.id}" type="button">${t("plan_delete_btn")}</button>`;
+    return `<div class="plan-row"><span class="plan-name">${escapeHtml(versionDisplayName(v))}</span>${state}<span class="plan-actions">${actions}</span></div>`;
+  }).join("");
+  return `
+    <div class="cc-block rate-block plans-block">
+      <h2>${t("plans_h2")}</h2>
+      <p class="rate-hint">${t("plans_hint")}</p>
+      <div class="plan-list">${rows}</div>
+    </div>`;
+}
+
 function buildRateEngine() {
   // The revenue panel exists only for org-mode companies — lines-mode orgs
   // plan revenue on Planning, so this page shows no second revenue home.
   document.getElementById("rateEngine").innerHTML =
     (planRevenueOnLines() ? "" : renderRevenueBlock())
-    + renderRateEngineBlock() + renderTaxBlock() + renderPlanningModeBlock() + renderTeamBlock() + renderDataBlock();
+    + renderRateEngineBlock() + renderTaxBlock() + renderPlanningModeBlock() + renderPlansBlock() + renderTeamBlock() + renderDataBlock();
   updateRateFormula();
   renderTeamPanel();
 }
@@ -314,6 +337,43 @@ function refreshRoleRatesDisplay() {
 function initAssumptions() {
   buildRateEngine();
   const rateEngine = document.getElementById("rateEngine");
+
+  // Manage plans: rename / unlock (with friction) / delete.
+  rateEngine.addEventListener("click", async (e) => {
+    const renameBtn = e.target.closest("[data-planrename]");
+    const unlockBtn = e.target.closest("[data-planunlock]");
+    const deleteBtn = e.target.closest("[data-plandelete]");
+    if (!renameBtn && !unlockBtn && !deleteBtn) return;
+    if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast(t("toast_signin_save_data")); return; }
+
+    if (renameBtn) {
+      const v = PLAN_VERSIONS.find((x) => x.id === renameBtn.dataset.planrename);
+      const name = prompt(t("prompt_rename_plan"), v ? v.name : "");
+      if (!name || !name.trim() || !v) return;
+      v.name = name.trim();
+      await dbRenameVersion(v.id, v.name);
+      buildRateEngine(); renderSidebar();
+      return;
+    }
+    if (unlockBtn) {
+      const v = PLAN_VERSIONS.find((x) => x.id === unlockBtn.dataset.planunlock);
+      if (!v || !confirm(t("plan_unlock_confirm", v.name))) return;
+      if (await dbUnlockVersion(v.id)) {
+        v.lockedAt = null;
+        showToast(t("toast_plan_unlocked", v.name));
+        buildRateEngine(); renderSidebar();
+      }
+      return;
+    }
+    if (deleteBtn) {
+      const v = PLAN_VERSIONS.find((x) => x.id === deleteBtn.dataset.plandelete);
+      if (!v || !confirm(t("confirm_delete_scenario", v.name))) return;
+      if (!(await dbDeleteVersion(v.id))) return;
+      if (v.id === ACTIVE_VERSION_ID) { localStorage.removeItem(activeVersionKey()); location.reload(); return; }
+      PLAN_VERSIONS.splice(PLAN_VERSIONS.indexOf(v), 1);
+      buildRateEngine(); renderSidebar();
+    }
+  });
 
   // Planning-mode switch: honest confirm (existing numbers keep counting;
   // only the affordances change), then persist + reload so every page

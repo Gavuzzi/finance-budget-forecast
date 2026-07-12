@@ -372,7 +372,7 @@ function renderScenarios() {
   const active = VERSION_SUMMARIES[ACTIVE_VERSION_ID] || { total: 0, byName: {} };
   const currentTotal = active.total;
   const currentByName = active.byName || {};
-  const activeName = (activeVersion() || {}).name || t("scenario_current_plan");
+  const activeName = activeVersion() ? versionDisplayName(activeVersion()) : t("scenario_current_plan");
 
   let html = `
     <div class="scenario-row current">
@@ -393,7 +393,7 @@ function renderScenarios() {
       const cls = delta > 0 ? "over" : delta < 0 ? "under" : "neutral";
       html += `
         <div class="scenario-row scenario-toggle" data-scen="${v.id}">
-          <span>${escapeHtml(v.name)}${v.isMain ? ` <span class="pnl-src">${t("scenario_main_tag")}</span>` : ""} <span class="scenario-caret">▾</span></span>
+          <span>${escapeHtml(versionDisplayName(v))} <span class="scenario-caret">▾</span></span>
           <span class="num">${fmtMkr(sum.total)}</span>
           <span class="num ${cls}">${fmtMkrSigned(delta)}</span>
           ${v.isMain ? "<span></span>" : `<button class="row-remove" data-delscen="${v.id}" title="${t("delete_scenario_title")}">✕</button>`}

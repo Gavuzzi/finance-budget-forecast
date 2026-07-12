@@ -1943,6 +1943,17 @@ html[data-theme="light"] .panel {
 .rev-plan-actions { display: flex; gap: 14px; align-items: center; margin-bottom: 10px; }
 .rev-ignored-note { color: var(--amber); font-weight: 600; }
 
+/* Manage plans (Assumptions) */
+.plan-row {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 9px 0; border-bottom: 1px solid var(--panel-border);
+}
+.plan-row:last-child { border-bottom: none; }
+.plan-name { font-weight: 600; color: var(--text); min-width: 140px; }
+.plan-state { font-size: 0.8rem; color: var(--text-dim); }
+.plan-state.plan-locked { color: var(--amber); }
+.plan-actions { margin-left: auto; display: flex; gap: 10px; }
+
 /* "How you plan" mode picker (Assumptions) */
 .planmode-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
 .planmode-opt {
