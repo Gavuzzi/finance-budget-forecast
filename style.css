@@ -1499,13 +1499,19 @@ html[data-theme="light"] .panel {
   padding: 20px 24px;
 }
 
+/* Planning hierarchy [#10/#11]: the line NAME is the container — its header
+   gets a separating rule and a larger name, while the driver sub-sections
+   below are demoted to quiet uppercase labels so they read as contents, not
+   competing headings. */
 .cc-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
-  margin-bottom: 4px;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--panel-border);
 }
 
 .cc-header h2 {
@@ -1519,13 +1525,24 @@ html[data-theme="light"] .panel {
   border: 1px solid transparent;
   color: var(--text);
   font-family: 'Inter', sans-serif;
-  font-size: 1.3rem;
+  font-size: 1.45rem;
   font-weight: 700;
   border-radius: 8px;
   padding: 4px 8px;
   min-width: 0;
   flex: 1;
 }
+
+/* Driver sub-sections inside a line block — quiet labels, not headings. */
+.oneoffs-section h3, .recurring-section h3, .util-head h3 {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+  margin: 16px 0 4px;
+}
+.note-saved { font-size: 0.82rem; font-weight: 600; color: var(--green); }
 
 .cc-name-input:hover { border-color: var(--panel-border); }
 .cc-name-input:focus { outline: none; border-color: var(--accent); background: var(--bg); }

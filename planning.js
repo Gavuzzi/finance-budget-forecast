@@ -147,11 +147,13 @@ function renderCcBlock(i) {
 
       <div class="utilization-section">${utilizationHtml(cc, i)}</div>
 
+      ${cc.note || cc._showNote ? `
       <div class="cc-note-row">
         <label>${t("comment_note_label")} <span class="cc-note-hint">${t("comment_note_hint")}</span>
           <input type="text" data-ccfield="note" value="${escapeHtml(cc.note || "")}" placeholder="${t("comment_note_placeholder")}">
         </label>
-      </div>
+        <span class="note-saved" data-notesaved="${i}" hidden>${t("note_saved")}</span>
+      </div>` : `<button class="add-revenue-link" data-addnote="${i}" type="button">${t("add_note_btn")}</button>`}
 
       <div class="cc-revenue">${revenueRowHtml(cc, i)}</div>
       <div class="cc-reforecast">${reforecastHtml(cc, i)}</div>
@@ -463,6 +465,14 @@ function initPlanningGrid() {
   // <select> elements don't reliably fire "input" on every browser, so handle
   // dropdown changes (role, start/end month, one-off month) via "change" too.
   ccBlocks.addEventListener("change", (e) => {
+    // Note save feedback [#13]: the text persists on every keystroke (input
+    // handler above); on blur, flash a brief "Saved ✓" so the user knows.
+    if (e.target.dataset.ccfield === "note") {
+      const block = e.target.closest(".cc-block");
+      const tick = block && document.querySelector(`[data-notesaved="${block.dataset.cc}"]`);
+      if (tick) { tick.hidden = false; setTimeout(() => { tick.hidden = true; }, 2000); }
+      return;
+    }
     // Utilization fields first — the roleId <select> must not fall through to
     // the generic SELECT handler below.
     if (e.target.dataset.utilfield !== undefined) {
@@ -519,6 +529,16 @@ function initPlanningGrid() {
       COST_CENTERS[ccIndex]._showRevenue = true; // transient reveal; persists only once an amount is saved
       buildPlanningGrid();
       const input = document.querySelector(`[data-revenue="${ccIndex}"]`);
+      if (input) input.focus();
+      return;
+    }
+
+    const addNoteBtn = e.target.closest("[data-addnote]");
+    if (addNoteBtn) {
+      const ccIndex = Number(addNoteBtn.dataset.addnote);
+      COST_CENTERS[ccIndex]._showNote = true; // transient reveal; persists once text is saved
+      buildPlanningGrid();
+      const input = document.querySelector(`.cc-block[data-cc="${ccIndex}"] [data-ccfield="note"]`);
       if (input) input.focus();
       return;
     }
