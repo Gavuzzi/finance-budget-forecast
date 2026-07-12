@@ -1045,10 +1045,11 @@ async function dbUpdateAssumptions() {
 // `oauth_states` — OAuth secrets/transient state, unreadable client-side by
 // design (RLS deny-all) and not the user's business data.
 const EXPORT_TABLES = [
-  "assumptions", "roles", "reporting_lines", "headcount_lines", "one_offs",
-  "recurring_costs", "monthly_actual", "forecast_overrides", "scenarios",
-  "budget_versions", "reporting_line_mappings", "sync_exclusions",
-  "cash_position", "open_invoices", "tax_liability_monthly", "actual_detail",
+  "assumptions", "roles", "reporting_lines", "plan_versions", "headcount_lines",
+  "one_offs", "recurring_costs", "monthly_actual", "forecast_overrides",
+  "version_line_revenue", "utilization_drivers", "reporting_line_mappings",
+  "sync_exclusions", "signal_reviews", "cash_position", "open_invoices",
+  "tax_liability_monthly", "actual_detail",
 ];
 
 async function exportAllData() {

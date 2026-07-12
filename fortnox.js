@@ -456,7 +456,23 @@ function handleFortnoxRedirect() {
   history.replaceState({}, "", location.pathname + (p.toString() ? "?" + p : ""));
 }
 
-// Manual CSV import of actuals — the no-Fortnox path. Lives with the other
+// A ready-to-fill template with the org's real reporting-line names [#21] —
+// SMEs live in Excel, so meet them there: download, fill the Amount column,
+// upload back. sep=; + BOM match the Monthly export's Excel conventions.
+function downloadImportTemplate() {
+  const month = Math.min((CLOSE_MONTH || 0) + 1, TIMELINE_LENGTH) || 1;
+  const lines = ["sep=;", `${t("import_tpl_col_line")};${t("import_tpl_col_month")};${t("import_tpl_col_amount")}`];
+  (COST_CENTERS.length ? COST_CENTERS : [{ name: t("fallback_line") }])
+    .forEach((cc) => lines.push(`${cc.name};${month};0`));
+  const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" }); // BOM: Excel needs it for åäö
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "actuals-template.csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// Manual import of actuals — the no-Fortnox path. Lives with the other
 // actuals-loading code (moved off Monthly onto the Data page). Self-contained:
 // only needs its own DOM + parseActualsCsv/dbUpsertActuals (data.js).
 function initImport() {
@@ -471,6 +487,9 @@ function initImport() {
   document.getElementById("importActualsBtn").addEventListener("click", () => {
     panel.hidden = !panel.hidden;
   });
+
+  const tplBtn = document.getElementById("downloadTemplateBtn");
+  if (tplBtn) tplBtn.addEventListener("click", downloadImportTemplate);
 
   function refreshPreview() {
     if (!textArea.value.trim()) {

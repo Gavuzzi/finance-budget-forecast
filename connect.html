@@ -23,10 +23,15 @@
 
       <section class="panel">
         <h2 data-i18n="import_csv_h2">Manual import</h2>
-        <p class="panel-legend" data-i18n="import_csv_sub">No Fortnox connection? Paste or upload your actuals as CSV.</p>
-        <button class="btn-secondary" id="importActualsBtn" type="button" data-i18n="import_csv_btn">Import actuals (CSV)</button>
+        <p class="panel-legend" data-i18n="import_csv_sub">No Fortnox connection? Fill in a spreadsheet and upload it here.</p>
+        <button class="btn-secondary" id="importActualsBtn" type="button" data-i18n="import_csv_btn">Import actuals from Excel</button>
         <div class="import-panel" id="importPanel" hidden>
-          <p class="import-help" data-i18n-html="import_help">One value per row: <code>Reporting Line; Month (1–24); Amount</code>, separated by <code>;</code>, comma, or tab. A header row is fine. Upload a file or paste below — reporting lines match by name.</p>
+          <ol class="import-steps">
+            <li><span data-i18n="import_step1">Download the template — it already has your reporting lines:</span> <button class="add-headcount" id="downloadTemplateBtn" type="button" data-i18n="download_template_btn">⬇ Download template</button></li>
+            <li data-i18n="import_step2">Open it in Excel, fill in the Amount column (one row per line and month), save.</li>
+            <li data-i18n="import_step3">Upload the saved file below — you'll see a preview before anything is written.</li>
+          </ol>
+          <p class="import-help" data-i18n-html="import_help">Format: <code>Reporting Line; Month (1–24); Amount</code> — separated by <code>;</code>, comma, or tab. Pasting rows into the box works too.</p>
           <input type="file" id="csvFile" accept=".csv,.txt,text/csv">
           <textarea id="csvText" rows="5" placeholder="Production; 1; 2380000&#10;R&amp;D; 1; 780000&#10;IT; 1; 360000"></textarea>
           <div class="import-preview" id="importPreview"></div>
