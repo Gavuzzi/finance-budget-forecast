@@ -445,7 +445,12 @@ for the likely Gothenburg/Fortnox services segment.
 Ordered by build sequence — each tier leans on the one above. `[B]` unless noted.
 
 **Tier 0 — the versioning spine (foundational, first, the genuinely big one)**
-- [ ] **One versioned driver-plan: Main forecast → scenarios (editable branches) → lock-as-budget.**
+- [x] **One versioned driver-plan** *(done 2026-07-12)* — `plan_versions` + `version_id` on all 5
+  versioned tables (incl. `version_line_revenue`; org revenue lives on the version), sidebar
+  Plan switcher + "+ Scenario" branch + 🔒 Lock as budget (read-only guard on all 13 write paths),
+  cross-version engine (`computeVersionSummary`/`VERSION_SUMMARIES`) driving live scenario compare +
+  budget drift on Overview; old `scenarios`/`budget_versions` snapshot tables + legacy revenue
+  columns dropped (live DB in sync). Full-copy-per-version as decided below.
   Replaces all three of today's half-overlapping notions at once: the typed `annual_budget` number
   (divorced from drivers), the dead-end read-only `scenarios.snapshot`, and the buried
   `budget_versions.snapshot`. Target UX (copy Runway): a **Main** working forecast (rolling R12); a
@@ -463,60 +468,74 @@ Ordered by build sequence — each tier leans on the one above. `[B]` unless not
     the whole model; not a one-sitting job. Hand-derived engine tests per step (the suite exists).
 
 **Tier 1 — org-creation ergonomics (the test harness; can start early, in parallel with Tier 0)**
-- [ ] **Fast create/switch between org *types*** (extend presets) so Felix can spin up a
-  manufacturer / consultancy / agency org in seconds to test every mode. This is his QA harness — it
-  earns its keep immediately. (The *"show only the relevant model's UI"* gating is NOT here — that
-  interleaves with Tier 2 below, since it can only hide primitives once they exist.)
+- [x] **Fast create/switch between org *types*** *(done 2026-07-12)* — presets now exercise the
+  planning styles: consultancy's Client Delivery is utilization-driven (billable hours → revenue +
+  derived heads, no manual hc), manufacturer's Production is a profit centre (per-line revenue →
+  margin). One click from the empty-org screen = a real test org of that style. (The "show only the
+  relevant model's UI" gating remains open below.)
 
 **Tier 2 — the ways of planning (the driver primitives → "support all")**
-- [ ] **Per-line revenue → monthly** (today it's a single annual number spread flat — wrong for
-  milestone/project billing; make it monthly like the cost side). **[#12]**
-- [ ] **Utilization / capacity driver** — billable hours × rate → revenue, AND hours ÷ utilization ÷
-  hours-per-head → required headcount → cost. The services/consulting unlock. A *bounded* driver
-  type (optional per line), NOT a general formula engine. **[#26 styles 4–5]**
-- [ ] **Formalize account-level line planning** (revenue / travel / marketing as structured
-  categories; today it's manual one-offs/recurring). Assess how much is already covered. **[#26 style 2]**
-- [ ] **Surface shared/corporate allocation clearly** — the capability exists (a "Shared / corporate"
-  checkbox per line + "Fully-loaded view" toggle) but it's undiscoverable and mislabelled; most SMEs
-  won't need it → make it clear AND tuck it under "advanced". **[#14, #15]**
-- [ ] **Per-org model gating** — each org type shows only its relevant planning UI (interleaves here
-  as the primitives above land; this is the "narrowness in each org's UI" half of the strategy).
+- [x] **Per-line revenue → monthly** *(done 2026-07-12)* — "Monthly" toggle on each revenue line
+  expands a 12-cell grid (quarter rows) for milestone/ramp billing; annual box stays the flat-spread
+  quick path; "custom" tag flags shaped lines. **[#12]**
+- [x] **Utilization / capacity driver** *(done 2026-07-12)* — `utilization_drivers` (versioned, one
+  per line): billableHours[12] × billRate → revenue; hours ÷ utilization% ÷ hoursPerHead → required
+  heads → cost via the role's loaded rate. Bounded driver, composes with manual drivers (retainer +
+  billable on one line), zero-capacity guarded, revenue-only mode (no role), 13 hand-derived tests.
+  Planning UI reads back "≈ N heads needed · Revenue X · Cost Y". **[#26 styles 4–5]**
+- [x] **Account-level line planning** *(assessed 2026-07-12: already covered)* — a line + labeled
+  recurring costs/one-offs IS account-category planning (Ads/Travel/Tools each a named row), and
+  Fortnox account ranges map actuals to it. No new primitive built — deliberately. **[#26 style 2]**
+- [x] **Surface shared/corporate allocation clearly** *(done 2026-07-12)* — "Overhead (whole
+  company)" + "Show with overhead allocated" in plain language; the view toggle is hidden until a
+  line is actually marked overhead. **[#14, #15]**
+- [ ] **Per-org model gating** — each org type shows only its relevant planning UI (the
+  "narrowness in each org's UI" half of the strategy). Open: needs an org-type config; best shaped
+  AFTER Felix's hands-on testing shows which surfaces feel noisy per type.
 
 **Tier 3 — progressive disclosure (breadth without clutter)**
-- [ ] **Contextual `?` pattern (SAC-style)** — a `?` next to a specific thing pops its own
-  explanation; delete the inline explanatory paragraphs. Discipline: ruthless — a `?` only where
-  genuinely non-obvious, ≤2 sentences, and prefer a clearer label over a `?` where possible.
-  **[#2, #5, #18]**
-- [ ] **Hide advanced features** (sync exclusions, allocation, account-range mapping) behind an
-  "advanced" affordance. Keep them (they're legit) but off the default surface. **[#20]**
+- [x] **Contextual `?` pattern (SAC-style)** *(done 2026-07-12)* — shared `helpMark(key)` primitive
+  (lib.js) pops a ≤2-sentence one-liner under a small circled ?. Deployed ruthlessly: Planning
+  headcount hint, Capacity explainer, Cash Flow method — each replacing an always-on paragraph.
+  Extend only where genuinely non-obvious. **[#2, #5, #18]**
+- [x] **Hide advanced features** *(done 2026-07-12)* — account ranges + sync exclusions behind an
+  "Advanced" disclosure on the Data page; allocation toggle hidden until an overhead line exists.
+  **[#20]**
 
 **Tier 4 — IA / placement**
-- [ ] **Re-forecast → Planning** (it *edits the plan*; doesn't belong on Overview), + **selectable
-  run-rate source** (recent actuals / budget / manual, user's choice). **[#3, #24]**
-- [ ] **Import → auto-link + auto-reflect** — importing a Fortnox code already creates+maps the line,
-  but actuals only appear after a re-sync and there's a refresh gap; make it one smooth action. **[#17]**
-- [ ] **"Actuals booked through" → auto by default, hidden unless overriding** (concept is needed,
-  sidebar placement/prominence is wrong). **[#7]**
-- [ ] **Reconcile revenue-plan placement** — org-level "Revenue Plan" in Assumptions is redundant once
-  revenue is planned per line/project; decide its home (likely Planning) and relationship. **[#22]**
-- [ ] **"Your data" export → account settings, honest framing** — it's GDPR portability (JSON,
-  export-only, not backup/restore), not a user feature; move it and label it truthfully. **[#23]**
-- [ ] **Cash-flow legibility + live walkthrough with Felix** — method is already right (direct/13-week);
-  label it as short-term direct cash, consider a selectable horizon, keep the hard/estimated
-  separation. Felix needs to *understand* it to sell it. **[#16]**
+- [x] **Re-forecast → Planning + selectable source** *(done 2026-07-12)* — per-line row inside each
+  Planning block (Overview is monitoring-only now); source = recent actuals / monthly budget /
+  custom amount. Never automatic, always reversible. **[#3, #24]**
+- [x] **Import → auto-link + auto-reflect** *(done 2026-07-12)* — import/link a Fortnox code and a
+  sync runs automatically + reload, so the line arrives WITH its actuals; failed sync keeps its
+  error and skips the reload. **[#17]**
+- [x] **"Actuals booked through" demoted** *(done 2026-07-12)* — one-line read-out ("Actuals through
+  Jun 26 · change"); the select appears only while overriding, Auto collapses it back. **[#7]**
+- [x] **Revenue-plan placement reconciled** *(done 2026-07-12)* — org plan stays on Assumptions as
+  the fallback, but now states its relationship: an amber note appears when any line earns/bills,
+  saying the company total comes from the lines and the org plan is ignored. **[#22]**
+- [x] **"Your data" → honest GDPR framing** *(done 2026-07-12)* — renamed "Data portability (GDPR)",
+  copy says export-only/not-a-backup, points to Monthly's Excel export for real work; export table
+  list fixed (retired tables out, plan_versions/version_line_revenue/utilization_drivers/
+  signal_reviews in). Stays on Assumptions until a real account-settings page exists. **[#23]**
+- [~] **Cash-flow legibility** *(labels done 2026-07-12; walkthrough open)* — a `?` on Projected
+  Bank Balance names the method honestly (short-term DIRECT cash forecast, hard vs estimated
+  split, not an accounting statement). Still open: the live walkthrough with Felix + a selectable
+  horizon if his testing wants it. **[#16]**
 
-**Tier 5 — polish / chrome (the small, correct ones)**
-- [ ] Company selector truncates ("Meridian Manufac…") — width/tooltip **[#1]**
-- [ ] Language toggle shows the *target* language (confusing) → dropdown or "current + switch" **[#8]**
-- [ ] Kill the "Budget & Forecast" subtitle under the company name (adds nothing) **[#9, #27]**
-- [ ] Planning visual hierarchy — the line name ("Production") reads same-weight as its sub-sections
-  ("One-off costs"); make the line clearly the container + reduce density **[#10, #11]**
-- [ ] Variance note → small inline note/icon, not a full-width row; add save feedback **[#13]**
-- [ ] Fix the misleading fallback wording (projects *do* fall back; the copy implies otherwise) **[#19]**
-- [ ] CSV import → de-emphasize as a fallback; ship a downloadable Excel/CSV template + plain
-  instructions (SMEs live in Excel, "CSV" is jargon) **[#21]**
-- [ ] Revenue-plan grid → unambiguous 12-month layout (2×6 reads as "6 months") **[#22]**
-- [ ] **Kill "spread lumpy actuals"** — no competitor does it, low value, fights "actuals are as-is" **[#6]**
+**Tier 5 — polish / chrome (ALL done 2026-07-12)**
+- [x] Company selector tooltip for truncated names **[#1]**
+- [x] Language toggle → segmented EN | SV (active highlighted) **[#8]**
+- [x] Killed the "Budget & Forecast" subtitle **[#9, #27]**
+- [x] Planning hierarchy — line name is the container (larger + rule), sub-sections are quiet
+  uppercase labels **[#10, #11]**
+- [x] Variance note → quiet "+ Add note" link + "✓ Saved" feedback on blur **[#13]**
+- [x] Fallback wording fixed — ranges are the last resort for ANY unmatched booking, incl.
+  unmapped project/cost-centre tags **[#19]**
+- [x] Excel-first import: 3-step flow + downloadable template pre-filled with the org's lines
+  (sep=; + BOM) **[#21]**
+- [x] Plan grids → 3 columns so each row is a quarter (unambiguously 12 months) **[#22]**
+- [x] Killed "spread lumpy actuals" **[#6]**
 
 **Quick-wins note:** several Tier 5 items (company-selector, language toggle, subtitle, kill
 spread-lumpy) are near-zero cost and make Felix's own testing less annoying — fine to do a small batch
