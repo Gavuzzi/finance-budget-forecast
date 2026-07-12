@@ -498,6 +498,23 @@ Ordered by build sequence — each tier leans on the one above. `[B]` unless not
   (Phase 8b): Forecast/Budget/Scenario vocabulary + grouped switcher + Manage plans with unlock
   behind friction; merged one-table Costs section; note → closable ✎ icon; page-level help-mode
   toggle replacing scattered ? marks; "? How this works" killed.
+- [x] **Round-2 feedback batch (Felix 2026-07-12, 6 points → 3 commits 7abd777/6e87f1f/7583db7,
+  done 2026-07-13)** —
+  (1) Re-forecast rebuilt as a two-state row: silent within 3% of plan, one sentence + one action
+  on divergence, "re-forecast at X/mo · Undo" while overridden; source dropdown killed.
+  (4) Booked-through select collapses back to the read-out after every pick, manual picks tagged.
+  (2/6) "Build your company" wizard at org creation (revenue mode AND cost mode →
+  planning_config.headcount; simple-amounts orgs get no People tables / role engine); presets
+  collapsed from 4 industry stereotypes (3 were the same shape) to ONE sample per planning shape,
+  matched to the org's config.
+  (3/5) Budgets are fiscal-year plans: `plan_versions.budget_fy`, draft-from-current-plan →
+  lock-when-approved flow (Plans panel + Overview CTA + contextual sidebar lock), and a
+  FY-window engine (`FY_WINDOW_START`) so editing Budget 2027 shows Jan 27–Dec 27 everywhere;
+  drift measured over the budget's own year. Verified: 65 engine tests (8 new hand-derived
+  FY-window assertions), 49 e2e checks, EN+SV screenshots, drift check 160 cols.
+  NOT yet verified: the full create→edit→lock→drift cycle against the live DB with a real
+  signed-in session (demo mode blocks writes; the data layer reuses copyActiveVersion, which
+  Tier 0 verified live) — on Felix's next click-through.
 
 **Tier 3 — progressive disclosure (breadth without clutter)**
 - [x] **Contextual `?` pattern (SAC-style)** *(done 2026-07-12)* — shared `helpMark(key)` primitive
