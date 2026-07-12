@@ -21,9 +21,9 @@
 
       <div class="planning-actions">
         <button class="add-cc-btn" id="addCostCenter" type="button" data-i18n="add_reporting_line_btn">+ Add reporting line</button>
-        <label class="smooth-toggle" data-i18n-title="fully_loaded_hint" title="Allocate shared/corporate cost centres to the others, by headcount">
+        <label class="smooth-toggle" id="allocToggleWrap" hidden data-i18n-title="fully_loaded_hint" title="Spreads each overhead line across the other lines, weighted by headcount. Display only — nothing is written.">
           <input type="checkbox" id="allocToggle">
-          <span data-i18n="fully_loaded_toggle">Fully-loaded view</span>
+          <span data-i18n="fully_loaded_toggle">Show with overhead allocated</span>
         </label>
       </div>
 

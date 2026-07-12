@@ -300,6 +300,11 @@ function bridgeHtml(cc) {
 }
 
 function buildPlanningGrid() {
+  // The allocation view toggle only exists once at least one line is marked
+  // overhead — before that it's meaningless, so it stays hidden (#15: advanced
+  // features off the default surface).
+  const allocWrap = document.getElementById("allocToggleWrap");
+  if (allocWrap) allocWrap.hidden = !COST_CENTERS.some((c) => c.isShared);
   if (COST_CENTERS.length === 0) {
     document.getElementById("ccBlocks").innerHTML =
       `<p class="empty-hint">${t("no_reporting_lines_hint")}</p>`;

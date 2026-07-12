@@ -189,8 +189,6 @@ en: {
   // ---- monthly (monthly.html) ----
   monthly_h1: "Monthly",
   monthly_subtitle: "Month-by-month P&amp;L — actual + forecast",
-  smooth_toggle: "Spread lumpy actuals",
-  smooth_hint: "Period average, for trend reading — doesn't change totals",
   monthly_grid_h2: "Month by month",
   monthly_figures_hint: `Figures in <span id="unitLabel">mkr</span>. <span class="mt-legend-actual">Solid</span> = booked actuals, <span class="mt-legend-forecast">lighter</span> = forecast.`,
   export_excel_btn: "⬇ Export (Excel)",
@@ -201,7 +199,6 @@ en: {
   // ---- monthly.js ----
   col_fy_total_short: "FY Total", col_12mo_total: "12-mo Total",
   drill_override_title: "Using a re-forecast run-rate override, not the driver plan",
-  drill_smoothed_title: "Smoothed — the period average, not the raw booked figure. Click to see the real month.",
   drill_sub: "Booked actuals by account — straight from your ledger.",
   drill_empty: "No transactions behind this cell — run a sync to populate drill data.",
   drill_tx: (n) => `${n} tx`,
@@ -213,8 +210,8 @@ en: {
   planning_h1: "Planning",
   planning_subtitle: "The headcount and cost drivers behind each reporting line",
   add_reporting_line_btn: "+ Add reporting line",
-  fully_loaded_toggle: "Fully-loaded view",
-  fully_loaded_hint: "(allocate shared/corporate cost centres to the others, by headcount)",
+  fully_loaded_toggle: "Show with overhead allocated",
+  fully_loaded_hint: "Spreads each overhead line across the other lines, weighted by headcount. Display only — nothing is written.",
 
   // ---- planning.js ----
   fy_total_label: (v) => `FY2026 total: <strong>${v}</strong>`,
@@ -228,10 +225,10 @@ en: {
   remove_title: "Remove",
   reporting_line_name_label: "Reporting line name",
   annual_budget_label: "Annual budget (FY2026)",
-  shared_toggle_title: "Shared/corporate costs (rent for the whole building, group IT…) can be optionally allocated to the other reporting lines instead of sitting on their own line.",
-  shared_corporate_label: "Shared / corporate",
+  shared_toggle_title: "Overhead that belongs to the whole company (rent for the building, group IT…). Turn on \"Show with overhead allocated\" above to spread it across the other lines by headcount.",
+  shared_corporate_label: "Overhead (whole company)",
   delete_line_title: "Delete this reporting line",
-  shared_note: `Shared reporting line — with <strong>Fully-loaded view</strong> on, its total is allocated to the others below (by headcount) instead of shown here.`,
+  shared_note: `Overhead line — with <strong>Show with overhead allocated</strong> on, its total is spread across the other lines (by headcount) instead of shown here.`,
   col_role_line: "Role / line", col_count: "Count", col_cost_head: "Cost/head (mo)",
   col_active_from: "Active from", col_active_until: "Active until",
   add_line_btn: "+ Add line",
@@ -679,8 +676,6 @@ sv: {
   // ---- monthly (monthly.html) ----
   monthly_h1: "Månadsvis",
   monthly_subtitle: "Resultaträkning månad för månad — utfall + prognos",
-  smooth_toggle: "Jämna ut ojämnt utfall",
-  smooth_hint: "Periodgenomsnitt, för att läsa trend — ändrar inte totalsummor",
   monthly_grid_h2: "Månad för månad",
   monthly_figures_hint: `Belopp i <span id="unitLabel">mkr</span>. <span class="mt-legend-actual">Heldragna</span> = bokfört utfall, <span class="mt-legend-forecast">ljusare</span> = prognos.`,
   export_excel_btn: "⬇ Exportera (Excel)",
@@ -691,7 +686,6 @@ sv: {
   // ---- monthly.js ----
   col_fy_total_short: "FY Totalt", col_12mo_total: "12-mån totalt",
   drill_override_title: "Använder en ny-prognos körtakt-override, inte den drivarbaserade planen",
-  drill_smoothed_title: "Utjämnad — periodgenomsnittet, inte det råa bokförda talet. Klicka för att se den verkliga månaden.",
   drill_sub: "Bokfört utfall per konto — direkt från din bokföring.",
   drill_empty: "Inga transaktioner bakom denna cell — kör en synk för att fylla på detaljdata.",
   drill_tx: (n) => `${n} tr.`,
@@ -703,8 +697,8 @@ sv: {
   planning_h1: "Planering",
   planning_subtitle: "Bemanning och kostnadsdrivare bakom varje redovisningslinje",
   add_reporting_line_btn: "+ Lägg till redovisningslinje",
-  fully_loaded_toggle: "Fullt belastad vy",
-  fully_loaded_hint: "(fördela delade/gemensamma kostnadsställen på övriga, efter bemanning)",
+  fully_loaded_toggle: "Visa med overhead fördelad",
+  fully_loaded_hint: "Fördelar varje overheadlinje på övriga linjer, viktat efter bemanning. Endast visning — inget skrivs.",
 
   // ---- planning.js ----
   fy_total_label: (v) => `Helårstotal: <strong>${v}</strong>`,
@@ -718,10 +712,10 @@ sv: {
   remove_title: "Ta bort",
   reporting_line_name_label: "Redovisningslinjens namn",
   annual_budget_label: "Årsbudget (FY2026)",
-  shared_toggle_title: "Delade/gemensamma kostnader (hyra för hela byggnaden, gemensam IT…) kan valfritt fördelas på övriga redovisningslinjer istället för att ligga på sin egen rad.",
-  shared_corporate_label: "Delad / gemensam",
+  shared_toggle_title: "Overhead som tillhör hela företaget (hyra för byggnaden, gemensam IT…). Slå på \"Visa med overhead fördelad\" ovan för att fördela den på övriga linjer efter bemanning.",
+  shared_corporate_label: "Overhead (hela företaget)",
   delete_line_title: "Ta bort denna redovisningslinje",
-  shared_note: `Delad redovisningslinje — med <strong>Fullt belastad vy</strong> på fördelas dess totalsumma till övriga nedan (efter bemanning) istället för att visas här.`,
+  shared_note: `Overheadlinje — med <strong>Visa med overhead fördelad</strong> på fördelas dess totalsumma på övriga linjer (efter bemanning) istället för att visas här.`,
   col_role_line: "Roll / rad", col_count: "Antal", col_cost_head: "Kostnad/person (mån)",
   col_active_from: "Aktiv från", col_active_until: "Aktiv till",
   add_line_btn: "+ Lägg till rad",
