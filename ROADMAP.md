@@ -616,3 +616,41 @@ faster, and the verification loop catches mistakes. Split accordingly.
   to use — both of which are the dress rehearsal (Phase 7 step 5), and neither of which an agent can
   stand in for. Low residual risk (same render code screenshot-verified in `?preview`; same write
   functions verified by hand) but it's the last mile before a real client's data is on the line.
+
+### Phase 9 — "Walk-up-proud": the Brief, UX polish, and the dad pilot (approved 2026-07-13)
+
+**Context / strategy.** Product-advisor round (2026-07-13, full pitch in vault →
+`Product Vision v2`): the real competitor is Excel + the accountant's PDF, not Runway.
+Positioning: **the finance brain on top of Fortnox** — Sweden-native depth, decision-first,
+zero-maintenance. Market validated by research (vault → `Market Validation`): Fortnox ~612k
+customers; Oxceed (the incumbent layer-on-top) has 20k+ companies at ~700 kr/mo and a byrå plan
+(2 500 kr/mo · 30 clients) proving the accountant channel. Our lane vs Oxceed: driver-based
+forward planning, what-if, cash runway, narrative UX — not report count.
+**Target: the dad pilot** (his firm is NOT on Fortnox → SIE/CSV path is a first-class citizen).
+Sequence approved by Felix: 1 → 3 → 2 → 5 → 6, then reassess. No cold outreach; ladder is
+polish → dad pilot → case study → warm circle (dad's clients, colleague, byråer as partners).
+
+**Tier 1 — the experience spine**
+- [ ] **1. The Brief** — narrative hero on Overview: verdict headline + up to 5 plain-language
+  sentences with live numbers (cash runway, next tax due, top variances w/ inline review ritual,
+  forecast divergence, budget state), each linking to its evidence page. Happy state: "All quiet."
+  Absorbs the signals panel (one home per fact). Weekly email version is Tier 3.
+- [ ] **3. Visual polish pass to Stripe/Linear grade** — type scale, spacing rhythm, motion,
+  empty states, chart quality (dataviz pass), dark-mode audit, micro-interactions.
+- [ ] **2. Job-shaped navigation** — merge Overview+Monthly into one Results page (monthly grid =
+  the drill-down); dissolve Assumptions into Settings + Planning-adjacent panels. 6 nouns → 4 jobs.
+- [ ] **4. What-if ghosts v1** — delta chips (FY result, runway) previewing a driver edit before
+  it's saved; "keep as scenario / discard".
+
+**Tier 2 — the pilot enablers**
+- [ ] **5. SIE4 file import** (reuse the sync's SIE parsing) + polished CSV/Excel mapping UI —
+  the no-Fortnox on-ramp that also widens reach (Visma/BL/Hogia).
+- [ ] **6. Månadsrapport PDF** — Swedish board pack v1 with the ties-to-your-books footer.
+- [ ] **7. 13-week cash view** — weekly granularity, invoice-level, tax-date aware.
+- [ ] **8. Pilot kit** — one-page proposal + security summary (from SECURITY.md) for a skeptical
+  first pilot (dad): what data, where it lives, what he gets, exit/delete promise.
+
+**Tier 3 — after the pilot's first month**
+- [ ] Weekly Brief email (scheduled edge function) · ledger-seeded plan draft · demo storyline
+  polish · discovery-conversation script (5 questions for the analytics-consultant chat are in
+  the vault).

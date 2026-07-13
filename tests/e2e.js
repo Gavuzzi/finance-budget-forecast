@@ -31,6 +31,25 @@ function check(name, ok, detail = "") {
   await page.waitForSelector(".hero-verdict");
   check("overview: hero verdict renders", !!(await page.textContent(".hero-verdict")).trim());
 
+  // The Brief (Phase 9.1): the hero carries the week's sentences — cash, the
+  // next tax date, variances with the inline review ritual, divergence.
+  check("brief: renders 4–5 sentences", await page.locator(".brief-line").count() >= 4);
+  check("brief: cash line links to Cash Flow",
+    (await page.getAttribute('.brief-line .brief-act[href="cashflow.html"]', "href")) === "cashflow.html");
+  check("brief: names the next tax deadline", /Aug|aug/.test(await page.textContent(".brief-lines")));
+  check("brief: divergence line links to Planning",
+    await page.locator('.brief-act[href="planning.html"]').count() === 1);
+  await page.click(".brief-line .signal-review-btn");
+  await page.waitForSelector("#saveToast.show");
+  check("brief: mark-reviewed in demo → sign-in toast (ritual lives inline)", true);
+
+  // The lens only swaps the stats row — the Brief stays put
+  await page.click('.lens-btn[data-lens="rolling"]');
+  await page.waitForTimeout(150);
+  check("brief: survives the rolling lens",
+    await page.locator(".brief-line").count() >= 4 && await page.locator(".stat-card").count() === 3);
+  await page.click('.lens-btn[data-lens="fy"]');
+
   // Version switcher + lock affordance (Tier 0 spine), with the
   // Forecast/Budgets/Scenarios grouping (Phase 8b-B)
   check("overview: plan version switcher present", await page.locator("#versionSwitcher").count() === 1);

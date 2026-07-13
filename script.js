@@ -29,49 +29,176 @@ function lensMonthRange() {
   return months;
 }
 
-// Hero + compact stats (TEARDOWN C6): the hero answers the page's one
-// question — "are we on plan?" — as a verdict, not just a signed number.
-// The projected-FY-result line (revenue plan − cost) lives inside the hero
-// as a subline instead of being its own stacked panel.
-function renderStats() {
+// ---- The Brief (Phase 9.1) ---------------------------------------------------
+// The hero is a BRIEFING, not a dashboard: the verdict headline, then up to
+// five plain-language sentences with live numbers — cash, the next tax
+// deadline, the variances that need review (the ritual lives inline), any
+// actuals/plan divergence, the budget state — each linking to its evidence.
+// One home per fact: this absorbs the old "This month" signals panel.
+// Happy state: "All quiet." The Monday-email version is Tier 3.
+
+// Variance signals (≥3% of a line's annual target), biggest first. Only
+// meaningful when the window holds a closed month.
+function varianceSignals() {
+  if (CLOSE_MONTH < FY_WINDOW_START || CLOSE_MONTH > fyWindowEnd()) return [];
+  const out = [];
+  COST_CENTERS.forEach((cc) => {
+    const fy = fySummary(cc);
+    if (!fy.budget) return;
+    const pct = (fy.variance / fy.budget) * 100;
+    if (Math.abs(pct) < 3) return;
+    out.push({ id: cc.id, name: cc.name, note: cc.note, variance: fy.variance, pct, abs: Math.abs(fy.variance), over: fy.variance > 0 });
+  });
+  return out.sort((a, b) => b.abs - a.abs);
+}
+
+// The next Skatteverket payment (VAT / employer taxes) due within `days`.
+function nextTaxDue(days = 45) {
+  const today = new Date().toISOString().slice(0, 10);
+  const horizon = new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
+  let next = null;
+  for (const kind of ["vat", "payroll"]) {
+    for (const [fyMonth, balance] of TAX_LIABILITY[kind]) {
+      const owed = -balance;
+      if (owed <= 0) continue;
+      const due = taxDueDate(kind, fyMonth);
+      if (!due || due < today || due > horizon) continue;
+      if (!next || due < next.due) next = { kind, due, owed };
+    }
+  }
+  return next;
+}
+
+// The line whose booked run-rate diverges most from its driver plan (≥3%),
+// unless it's already been re-forecast (overrides exist) — same rules as the
+// Planning row, surfaced here because noticing is Overview's job.
+function topDivergence() {
+  if (CLOSE_MONTH < 1 || CLOSE_MONTH + 1 > TIMELINE_LENGTH) return null;
+  let top = null;
+  COST_CENTERS.forEach((cc) => {
+    if (cc.overrides && Object.keys(cc.overrides).length) return;
+    const recent = recentRunRate(cc);
+    const plan = forecastForMonth(cc, CLOSE_MONTH + 1);
+    if (recent == null || !plan) return;
+    const pct = ((recent - plan) / plan) * 100;
+    if (Math.abs(pct) < 3) return;
+    if (!top || Math.abs(pct) > Math.abs(top.pct)) top = { name: cc.name, pct };
+  });
+  return top;
+}
+
+function renderBrief() {
   const hero = document.getElementById("heroCard");
+  if (!hero) return;
+
+  const fy = companyFySummary();
+  const pct = fy.budget ? (fy.variance / fy.budget) * 100 : 0;
+  const cls = varianceClass(fy.variance, fy.budget);
+  const onPlan = Math.abs(pct) <= 1;
+  const verdict = onPlan ? t("verdict_on_plan")
+    : fy.variance > 0 ? t("verdict_over_budget") : t("verdict_under_budget");
+  // "On plan" is good news — green, not the amber the tiny raw variance
+  // would get from varianceClass (amber reads as a warning; TEARDOWN C4).
+  const verdictCls = onPlan ? "under" : cls;
+
+  const revenue = revenuePlanFyTotal();
+  let projHtml = "";
+  if (revenue) {
+    const result = revenue - fy.total;
+    const margin = Math.round((result / revenue) * 100);
+    const rcls = result >= 0 ? "under" : "over";
+    const hasPlan = Array.isArray(ASSUMPTIONS.revenuePlan) && ASSUMPTIONS.revenuePlan.some((v) => v > 0);
+    projHtml = `<p class="hero-sub"><strong>${t("forecast_pnl_title", fyName())}:</strong> ${t("forecast_pnl_body", `<strong class="${rcls}">${fmtMkrSigned(result)}</strong>`, fmtMkr(revenue), fmtMkr(fy.total), margin)}${hasPlan ? "" : ` · ${t("forecast_pnl_flat_note")}`}</p>`;
+  }
+
+  // The sentences, in fixed priority order, capped at five.
+  const lines = [];
+  const line = (sev, html, act = "") =>
+    lines.push(`<div class="brief-line"><span class="signal-dot ${sev}"></span><span class="brief-text">${html}</span>${act}</div>`);
+  const arrow = (href, label) => `<a class="brief-act" href="${href}">${label}</a>`;
+
+  if (CASH_POSITION) {
+    const proj = cashFlowProjection(6);
+    const bal = fmtMkr(CASH_POSITION.bankBalance);
+    if (proj && proj.runway != null) {
+      line(proj.runway <= 3 ? "over" : "warn", t("brief_cash_low", bal, proj.runway), arrow("cashflow.html", t("brief_see_cash")));
+    } else {
+      line("under", t("brief_cash_ok", bal), arrow("cashflow.html", t("brief_see_cash")));
+    }
+  }
+
+  const tax = nextTaxDue();
+  if (tax) {
+    // strip the locale's abbreviation dot ("aug.") — the sentence adds its own
+    const when = new Date(tax.due).toLocaleDateString(getLang() === "sv" ? "sv-SE" : "en-GB", { day: "numeric", month: "short" }).replace(/\.$/, "");
+    line("info", t("brief_tax_due", t(tax.kind === "vat" ? "brief_tax_vat" : "brief_tax_payroll"), fmtSek(tax.owed), when), arrow("cashflow.html", t("brief_see_cash")));
+  }
+
+  const isReviewed = (id) => SIGNAL_REVIEWS.has(id + ":" + CLOSE_MONTH);
+  varianceSignals().slice(0, 2).forEach((s) => {
+    const reviewed = isReviewed(s.id);
+    const text = `${t("signal_tracking", escapeHtml(s.name), fmtMkrSigned(s.variance), s.over ? t("signal_over") : t("signal_under"), `${s.pct > 0 ? "+" : ""}${s.pct.toFixed(1)}%`)}${s.note ? ` <span class="signal-note">— ${escapeHtml(s.note)}</span>` : ""}`;
+    lines.push(`<div class="brief-line ${reviewed ? "reviewed" : ""}">
+      <span class="signal-dot ${s.over ? "over" : "under"}"></span>
+      <span class="brief-text">${text}</span>
+      <button class="signal-review-btn" type="button" data-cc="${s.id}" data-mark="${!reviewed}">${reviewed ? t("signal_unmark") : t("signal_mark_reviewed")}</button>
+    </div>`);
+  });
+
+  const div = topDivergence();
+  if (div) {
+    line("warn", t("brief_diverge", escapeHtml(div.name), Math.abs(div.pct).toFixed(0), t(div.pct > 0 ? "rf_above" : "rf_below")), arrow("planning.html", t("brief_update_forecast")));
+  }
+
+  const budget = latestBudgetVersion();
+  const drift = budgetDrift();
+  if (!budget && draftBudgetVersions().length === 0) {
+    line("info", t("brief_no_budget", FY_START_YEAR + 1), arrow("assumptions.html", t("brief_open_plans")));
+  } else if (budget && drift != null && Math.abs(drift) >= (VERSION_SUMMARIES[budget.id] || {}).total * 0.01) {
+    line("warn", t("brief_drift", fmtMkrSigned(drift), escapeHtml(budget.name)), arrow("assumptions.html", t("brief_open_plans")));
+  }
+
+  const shown = lines.slice(0, 5);
+  if (shown.length === 0 && CLOSE_MONTH >= FY_WINDOW_START) {
+    shown.push(`<div class="brief-line"><span class="signal-dot under"></span><span class="brief-text">${t("brief_all_quiet")}</span></div>`);
+  }
+
+  hero.innerHTML = `
+    <div class="hero-main">
+      <div>
+        <span class="stat-label">${t("stat_variance_vs_budget")}</span>
+        <span class="hero-verdict ${verdictCls}">${verdict}</span>
+      </div>
+      <div class="hero-amount">
+        <span class="stat-value ${cls}">${fmtMkrSigned(fy.variance)}</span>
+        <span class="variance-pill ${cls}">${pct > 0 ? "+" : ""}${pct.toFixed(1)}%</span>
+      </div>
+    </div>
+    ${projHtml}
+    ${shown.length ? `<div class="brief-lines">${shown.join("")}</div>` : ""}`;
+}
+
+function initBrief() {
+  const hero = document.getElementById("heroCard");
+  if (!hero) return;
+  hero.addEventListener("click", async (e) => {
+    const btn = e.target.closest(".signal-review-btn");
+    if (!btn) return;
+    if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast(t("toast_signin_review")); return; }
+    const mark = btn.dataset.mark === "true";
+    const ok = mark ? await dbMarkReviewed(btn.dataset.cc, CLOSE_MONTH) : await dbUnmarkReviewed(btn.dataset.cc, CLOSE_MONTH);
+    if (ok) renderBrief();
+  });
+}
+
+// Compact stats under the Brief (TEARDOWN C6).
+function renderStats() {
   const statsRow = document.getElementById("statsRow");
 
   if (currentLens === "fy") {
     const fy = companyFySummary();
     let bookedActual = 0; // booked months INSIDE the active FY window (a next-year budget has none yet)
     for (let m = FY_WINDOW_START; m <= Math.min(CLOSE_MONTH, fyWindowEnd()); m++) bookedActual += companyMonthAmount(m);
-    const pct = fy.budget ? (fy.variance / fy.budget) * 100 : 0;
-    const cls = varianceClass(fy.variance, fy.budget);
-    const onPlan = Math.abs(pct) <= 1;
-    const verdict = onPlan ? t("verdict_on_plan")
-      : fy.variance > 0 ? t("verdict_over_budget") : t("verdict_under_budget");
-    // "On plan" is good news — green, not the amber the tiny raw variance
-    // would get from varianceClass (amber reads as a warning; TEARDOWN C4).
-    const verdictCls = onPlan ? "under" : cls;
-
-    const revenue = revenuePlanFyTotal();
-    let projHtml = "";
-    if (revenue) {
-      const result = revenue - fy.total;
-      const margin = Math.round((result / revenue) * 100);
-      const rcls = result >= 0 ? "under" : "over";
-      const hasPlan = Array.isArray(ASSUMPTIONS.revenuePlan) && ASSUMPTIONS.revenuePlan.some((v) => v > 0);
-      projHtml = `<p class="hero-sub"><strong>${t("forecast_pnl_title", fyName())}:</strong> ${t("forecast_pnl_body", `<strong class="${rcls}">${fmtMkrSigned(result)}</strong>`, fmtMkr(revenue), fmtMkr(fy.total), margin)}${hasPlan ? "" : ` · ${t("forecast_pnl_flat_note")}`}</p>`;
-    }
-
-    hero.innerHTML = `
-      <div class="hero-main">
-        <div>
-          <span class="stat-label">${t("stat_variance_vs_budget")}</span>
-          <span class="hero-verdict ${verdictCls}">${verdict}</span>
-        </div>
-        <div class="hero-amount">
-          <span class="stat-value ${cls}">${fmtMkrSigned(fy.variance)}</span>
-          <span class="variance-pill ${cls}">${pct > 0 ? "+" : ""}${pct.toFixed(1)}%</span>
-        </div>
-      </div>
-      ${projHtml}`;
 
     statsRow.innerHTML = `
       <div class="stat-card">
@@ -89,29 +216,21 @@ function renderStats() {
       </div>
     `;
   } else {
+    // Rolling lens: the Brief stays put (it's window-based, not lens-based);
+    // the R12 total leads the stats row instead of overwriting the hero.
     const { start, end } = rollingWindow();
     const rolling = companyRollingSummary();
     const monthsBeyondBudget = lensMonthRange().filter((m) => m < FY_WINDOW_START || m > fyWindowEnd()).length;
 
-    hero.innerHTML = `
-      <div class="hero-main">
-        <div>
-          <span class="stat-label">${t("stat_rolling_12")}</span>
-          <span class="hero-verdict">${fmtMkr(rolling.total)}</span>
-        </div>
-        <div class="hero-amount">
-          <span class="stat-sub">${monthLabel(start)} – ${monthLabel(end)}</span>
-        </div>
-      </div>`;
-
     statsRow.innerHTML = `
+      <div class="stat-card">
+        <span class="stat-label">${t("stat_rolling_12")}</span>
+        <span class="stat-value">${fmtMkr(rolling.total)}</span>
+        <span class="stat-sub">${monthLabel(start)} – ${monthLabel(end)}</span>
+      </div>
       <div class="stat-card">
         <span class="stat-label">${t("stat_avg_monthly")}</span>
         <span class="stat-value">${fmtMkr(rolling.total / 12)}</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-label">${t("stat_window")}</span>
-        <span class="stat-value small">${monthLabel(start)} – ${monthLabel(end)}</span>
       </div>
       <div class="stat-card">
         <span class="stat-label">${t("stat_months_without_budget")}</span>
@@ -493,7 +612,7 @@ function renderAll() {
   const sub = document.querySelector(".page-sub");
   if (sub) sub.textContent = t("overview_subtitle", fyName());
 
-  const sections = document.querySelectorAll(".lens-controls, .hero-card, .stats-row, .main-row, .table-panel, .this-month-panel, .collapse-panel");
+  const sections = document.querySelectorAll(".lens-controls, .hero-card, .stats-row, .main-row, .table-panel, .collapse-panel");
   let empty = document.getElementById("emptyState");
 
   if (COST_CENTERS.length === 0) {
@@ -511,19 +630,13 @@ function renderAll() {
 
   sections.forEach((el) => (el.style.display = ""));
   if (empty) empty.style.display = "none";
+  renderBrief();
   renderStats();
   renderTable();
   renderChart();
   renderRoleBreakdown();
   renderScenarios();
-  renderSignals();
   renderBudgetVersion();
-
-  // The "This month" wrapper now only holds the signals block; hide it when
-  // there's nothing to say (e.g. no closed month yet).
-  const wrap = document.getElementById("thisMonthPanel");
-  const sig = document.getElementById("signalsPanel");
-  if (wrap && sig) wrap.hidden = sig.hidden;
 }
 
 // A budget is a FISCAL-YEAR plan version (budget_fy): draft while you build
@@ -630,81 +743,9 @@ window.addEventListener("afterprint", () => {
   _printClosedDetails = [];
 });
 
-// Signals — proactively surface what's off, so the controller doesn't have to
-// hunt through tables (the pattern every winning FP&A tool shares).
-// Month-end review ritual: turns this panel into a checkable close checklist
-// instead of a wall of variance text. Reviewed state is per (reporting line,
-// CLOSE_MONTH) — purely a habit-tracking checkbox, never fed back into any
-// calculation. Two positive-reinforcement states (all reviewed / nothing to
-// flag) replace the old behavior of just hiding the panel when there's
-// nothing to complain about — the goal is a monthly habit, not a nag list.
-function renderSignals() {
-  const panel = document.getElementById("signalsPanel");
-  const list = document.getElementById("signalsList");
-  if (!panel || !list) return;
-
-  // "This month" is about booked reality — meaningless while editing a
-  // next-year budget whose window holds no booked months yet.
-  if (CLOSE_MONTH < FY_WINDOW_START || CLOSE_MONTH > fyWindowEnd()) {
-    panel.hidden = true;
-    return;
-  }
-
-  const monthLbl = monthLabel(CLOSE_MONTH);
-  const signals = [];
-  COST_CENTERS.forEach((cc) => {
-    const fy = fySummary(cc);
-    if (!fy.budget) return;
-    const pct = (fy.variance / fy.budget) * 100;
-    if (Math.abs(pct) < 3) return; // within tolerance — no noise
-    signals.push({
-      id: cc.id,
-      abs: Math.abs(fy.variance),
-      over: fy.variance > 0,
-      html: `${t("signal_tracking", escapeHtml(cc.name), fmtMkrSigned(fy.variance), fy.variance > 0 ? t("signal_over") : t("signal_under"), `${pct > 0 ? "+" : ""}${pct.toFixed(1)}%`)}${cc.note ? ` <span class="signal-note">— ${escapeHtml(cc.note)}</span>` : ""}`,
-    });
-  });
-
-  if (CLOSE_MONTH < 1) { panel.hidden = true; return; } // no closed month yet — nothing to review
-
-  if (signals.length === 0) {
-    list.innerHTML = `<div class="signal-empty">${t("signals_nothing_to_flag", monthLbl)}</div>`;
-    panel.hidden = false;
-    return;
-  }
-
-  signals.sort((a, b) => b.abs - a.abs);
-  const shown = signals.slice(0, 5);
-  const isReviewed = (s) => SIGNAL_REVIEWS.has(s.id + ":" + CLOSE_MONTH);
-  const allReviewed = shown.every(isReviewed);
-
-  list.innerHTML = shown.map((s) => {
-    const reviewed = isReviewed(s);
-    return `<div class="signal-row ${reviewed ? "reviewed" : ""}">
-      <span class="signal-dot ${s.over ? "over" : "under"}"></span>
-      <span class="signal-text">${s.html}</span>
-      <button class="signal-review-btn" type="button" data-cc="${s.id}" data-mark="${!reviewed}">${reviewed ? t("signal_unmark") : t("signal_mark_reviewed")}</button>
-    </div>`;
-  }).join("") + (allReviewed ? `<div class="signal-empty">${t("signals_all_reviewed", monthLbl)}</div>` : "");
-  panel.hidden = false;
-}
-
-function initSignals() {
-  const list = document.getElementById("signalsList");
-  if (!list) return;
-  list.addEventListener("click", async (e) => {
-    const btn = e.target.closest(".signal-review-btn");
-    if (!btn) return;
-    if (typeof DEMO_MODE !== "undefined" && DEMO_MODE) { showToast(t("toast_signin_review")); return; }
-    const ccId = btn.dataset.cc;
-    const mark = btn.dataset.mark === "true";
-    const ok = mark ? await dbMarkReviewed(ccId, CLOSE_MONTH) : await dbUnmarkReviewed(ccId, CLOSE_MONTH);
-    if (ok) renderSignals();
-  });
-}
-
-// (Re-forecast moved to Planning [#3] — it EDITS the plan, so it lives with
-// the other plan-editing tools; Overview stays a monitoring surface.)
+// (The "This month" signals panel was absorbed into the Brief [Phase 9.1] —
+// variance sentences + the mark-reviewed ritual live in the hero now, one
+// home per fact. Re-forecast lives on Planning — it EDITS the plan.)
 
 // The actuals P&L pulled from Fortnox (persisted from the last sync), shown on
 // the Overview so the headline view reflects the full picture, not just costs.
@@ -730,7 +771,7 @@ async function renderFortnoxPnl() {
 window.initPage = () => {
   initLensControls();
   initScenarios();
-  initSignals();
+  initBrief();
   initPrint();
   renderAll();
   renderFortnoxPnl();
