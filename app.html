@@ -51,6 +51,22 @@
         <div class="budget-table" id="budgetTable"></div>
       </section>
 
+      <!-- Month by month (absorbed from the old Monthly page, Phase 9.2):
+           the monthly grid IS the drill-down of the table above — one
+           "how are we doing" page, one lens toggle driving both. -->
+      <details class="panel collapse-panel" id="monthlyDetails">
+        <summary><h2><span data-i18n="monthly_grid_h2">Month by month</span> <span class="pnl-src" data-i18n="monthly_grid_sub">— every line, actual + forecast</span></h2></summary>
+        <div class="panel-head mt-panel-head">
+          <p class="panel-legend" data-i18n-html="monthly_figures_hint">Figures in <span id="unitLabel">mkr</span>. <span class="mt-legend-actual">Solid</span> = booked actuals, <span class="mt-legend-forecast">lighter</span> = forecast.</p>
+          <div class="panel-actions">
+            <button class="btn-secondary" id="exportBtn" type="button" data-i18n="export_excel_btn">⬇ Export (Excel)</button>
+          </div>
+        </div>
+        <div class="monthly-wrap">
+          <div id="monthlyGrid"></div>
+        </div>
+      </details>
+
       <!-- Demoted to collapsed sections (TEARDOWN C6): one click away, not shouting -->
       <details class="panel collapse-panel" id="fortnoxPnl" hidden>
         <summary><h2 data-i18n-html="fortnox_pnl_h2">Actuals P&amp;L <span class="pnl-src">— from Fortnox</span></h2></summary>
@@ -88,6 +104,7 @@
   <script src="sidebar.js"></script>
   <script src="fortnox.js"></script>
   <script src="script.js"></script>
+  <script src="monthly.js"></script>
   <script>requireAuthAndLoad(() => { renderSidebar(); window.initPage(); });</script>
 </body>
 </html>

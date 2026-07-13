@@ -50,6 +50,13 @@ function check(name, ok, detail = "") {
     await page.locator(".brief-line").count() >= 4 && await page.locator(".stat-card").count() === 3);
   await page.click('.lens-btn[data-lens="fy"]');
 
+  // Phase 9.2 merge: Monthly is a collapse-panel ON the Overview now
+  check("nav: Monthly absorbed — 5 nav items", await page.locator(".nav-item").count() === 5);
+  await page.evaluate(() => { document.getElementById("monthlyDetails").open = true; });
+  check("month-by-month grid renders on the Overview",
+    await page.locator("#monthlyGrid table tr").count() >= 4 &&
+    await page.locator("#exportBtn").count() === 1);
+
   // Version switcher + lock affordance (Tier 0 spine), with the
   // Forecast/Budgets/Scenarios grouping (Phase 8b-B)
   check("overview: plan version switcher present", await page.locator("#versionSwitcher").count() === 1);
@@ -164,10 +171,12 @@ function check(name, ok, detail = "") {
   await page.goto(url("planning.html", "&fy27"));
   await page.waitForSelector(".cc-block");
   check("fy27: Planning totals read FY2027", /FY2027/.test(await page.textContent(".cc-summary, .cc-block")));
-  await page.goto(url("monthly.html", "&fy27"));
-  await page.waitForSelector(".mt-table, table");
-  const monthlyHead = await page.textContent("table");
-  check("fy27: Monthly grid shows Jan 27–Dec 27", /Jan 27/.test(monthlyHead) && !/Jan 26/.test(monthlyHead));
+  // The month-by-month grid now lives ON the Overview (Phase 9.2 merge)
+  await page.goto(url("app.html", "&fy27"));
+  await page.waitForSelector("#monthlyDetails");
+  await page.evaluate(() => { document.getElementById("monthlyDetails").open = true; });
+  const monthlyHead = await page.textContent("#monthlyGrid table");
+  check("fy27: month-by-month grid shows Jan 27–Dec 27", /Jan 27/.test(monthlyHead) && !/Jan 26/.test(monthlyHead));
 
   // No budget yet (fresh real org): the panel offers to create next year's
   // (the panel lives in a collapsed <details>, so count — don't wait for visible)

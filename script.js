@@ -37,10 +37,15 @@ function chartBaseOptions(colors) {
   };
 }
 
-// Fixed palette for scenario lines (cycled if there are more scenarios than colors) —
-// deliberately distinct from THEME_COLORS.budget/actual/forecast so the "Current
-// plan" line (which reuses colors.actual) never collides with a scenario line.
-const SCENARIO_PALETTE = ["#d9a647", "#c86bd6", "#5aa8d9", "#e07a5f", "#8fbf5f"];
+// Fixed per-theme palettes for scenario lines (cycled if there are more
+// scenarios than colors) — validated per surface alongside the "Current plan"
+// green they overlay (six-checks ALL PASS in this adjacency order; scenario
+// dashes are the secondary encoding). The old single palette had a real CVD
+// defect: its blue↔purple pair was ΔE 3.1 under deuteranopia.
+const SCENARIO_PALETTES = {
+  light: ["#1d84a8", "#c08434", "#3d7fbf", "#c2588f", "#a355c0"],
+  dark: ["#1683ad", "#a8781f", "#4a7fc0", "#b3527f", "#9a4fb8"],
+};
 
 function companyMonthlyBudget(month) {
   if (month < FY_WINDOW_START || month > fyWindowEnd()) return null;
@@ -560,7 +565,7 @@ function renderScenarioChart() {
     ...withMonthly.map((s, i) => ({
       label: s.name,
       data: s.monthly,
-      borderColor: SCENARIO_PALETTE[i % SCENARIO_PALETTE.length],
+      borderColor: SCENARIO_PALETTES[getTheme()][i % SCENARIO_PALETTES[getTheme()].length],
       backgroundColor: "transparent",
       borderDash: [5, 3],
       borderWidth: 2,
@@ -658,6 +663,7 @@ function renderAll() {
   renderRoleBreakdown();
   renderScenarios();
   renderBudgetVersion();
+  renderMonthlyGrid(); // the month-by-month module (monthly.js) follows the same lens
 }
 
 // A budget is a FISCAL-YEAR plan version (budget_fy): draft while you build
@@ -793,6 +799,7 @@ window.initPage = () => {
   initLensControls();
   initScenarios();
   initBrief();
+  initMonthlyGrid();
   initPrint();
   renderAll();
   renderFortnoxPnl();

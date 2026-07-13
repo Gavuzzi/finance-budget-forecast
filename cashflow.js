@@ -182,7 +182,7 @@ function emptyCashflowHtml() {
     <div class="empty-state">
       <h2>${t("no_cash_data_h2")}</h2>
       <p>${t("no_cash_data_p")}</p>
-      <a class="empty-cta" href="monthly.html">${t("connect_sync_fortnox")}</a>
+      <a class="empty-cta" href="connect.html">${t("connect_sync_fortnox")}</a>
     </div>`;
 }
 

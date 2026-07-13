@@ -10,7 +10,7 @@ Live: https://gavuzzi.github.io/finance-budget-forecast/ · Supabase project ref
 - `i18n.js` — bilingual strings (English/Swedish); see "Localization" below. Loads right after `lib.js`, before `data.js`, on every page
 - `data.js` — in-memory model + calculation engine + ALL db reads/writes. UI-agnostic: never put rendering here
 - `sidebar.js` — shared nav, theme + language toggles, "actuals booked through" selector
-- `script.js` (Overview/app.html), `monthly.js`, `planning.js`, `assumptions.js`, `cashflow.js`, `connect.js` (Data page), `fortnox.js` — per-page rendering only. `fortnox.js` owns all actuals-loading (integration panel + `initImport`), rendered on `connect.html` (the "Data" nav page), NOT Monthly
+- `script.js` (Overview/app.html), `monthly.js` (month-by-month grid MODULE loaded by app.html after script.js — not a page since Phase 9.2), `planning.js`, `assumptions.js`, `cashflow.js`, `connect.js` (Data page), `fortnox.js` — per-page rendering only. `fortnox.js` owns all actuals-loading (integration panel + `initImport`), rendered on `connect.html` (the "Data" nav page), NOT Monthly
 - `connect.html` / `connect.js` — the "Data" page: Fortnox connect/sync/mapping + reconciled P&L + manual CSV import. Actuals-loading lives here, kept out of the reporting views
 - `schema.sql` / `integration-schema.sql` — idempotent DB source of truth (mirror every live DB change here). Note `reporting_lines.revenue_plan` — optional per-line revenue makes a line a profit centre (own P&L + margin); engine prefers per-line revenue over the org-level plan when any line earns
 - `supabase/functions/fortnox-sync/index.ts` — the sync Edge Function (self-contained, no imports beyond supabase-js)

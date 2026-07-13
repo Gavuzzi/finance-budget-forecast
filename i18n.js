@@ -50,7 +50,7 @@ function translateStaticHtml() {
 const STRINGS = {
 en: {
   // ---- sidebar / nav ----
-  nav_overview: "Overview", nav_monthly: "Monthly", nav_planning: "Planning",
+  nav_overview: "Overview", nav_planning: "Planning",
   nav_cashflow: "Cash Flow", nav_connect: "Data", nav_assumptions: "Assumptions",
   plan_version_label: "Plan",
   new_scenario_btn: "+ Scenario",
@@ -211,9 +211,8 @@ en: {
   toast_reverted: (name) => `Reverted ${name} to the driver-based plan.`,
   fortnox_pnl_note: (vouchers) => `Full-year actuals synced from Fortnox — ties out to your Resultatrapport.${vouchers ? ` Read from ${vouchers} vouchers.` : ""}`,
 
-  // ---- monthly (monthly.html) ----
-  monthly_h1: "Monthly",
-  monthly_subtitle: "Month-by-month P&amp;L — actual + forecast",
+  // ---- month-by-month grid (module on the Overview since Phase 9.2) ----
+  monthly_grid_sub: "— every line, actual + forecast",
   monthly_grid_h2: "Month by month",
   monthly_figures_hint: `Figures in <span id="unitLabel">mkr</span>. <span class="mt-legend-actual">Solid</span> = booked actuals, <span class="mt-legend-forecast">lighter</span> = forecast.`,
   export_excel_btn: "⬇ Export (Excel)",
@@ -595,7 +594,7 @@ en: {
   lp_footer: `A working demonstration project · built with Supabase + vanilla JS · <a href="https://github.com/Gavuzzi/finance-budget-forecast" target="_blank" rel="noopener">source on GitHub</a>`,
 },
 sv: {
-  nav_overview: "Översikt", nav_monthly: "Månadsvis", nav_planning: "Planering",
+  nav_overview: "Översikt", nav_planning: "Planering",
   nav_cashflow: "Kassaflöde", nav_connect: "Data", nav_assumptions: "Antaganden",
   plan_version_label: "Plan",
   new_scenario_btn: "+ Scenario",
@@ -754,9 +753,8 @@ sv: {
   toast_reverted: (name) => `Återställde ${name} till den drivarbaserade planen.`,
   fortnox_pnl_note: (vouchers) => `Helårsutfall synkat från Fortnox — stämmer av mot din resultatrapport.${vouchers ? ` Läst från ${vouchers} verifikat.` : ""}`,
 
-  // ---- monthly (monthly.html) ----
-  monthly_h1: "Månadsvis",
-  monthly_subtitle: "Resultaträkning månad för månad — utfall + prognos",
+  // ---- month-by-month grid (module on the Overview since Phase 9.2) ----
+  monthly_grid_sub: "— varje rad, utfall + prognos",
   monthly_grid_h2: "Månad för månad",
   monthly_figures_hint: `Belopp i <span id="unitLabel">mkr</span>. <span class="mt-legend-actual">Heldragna</span> = bokfört utfall, <span class="mt-legend-forecast">ljusare</span> = prognos.`,
   export_excel_btn: "⬇ Exportera (Excel)",

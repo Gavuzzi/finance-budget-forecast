@@ -9,7 +9,6 @@
 
 const NAV = [
   { id: "overview", href: "app.html" },
-  { id: "monthly", href: "monthly.html" },
   { id: "planning", href: "planning.html" },
   { id: "cashflow", href: "cashflow.html" },
   { id: "connect", href: "connect.html" },
@@ -18,7 +17,6 @@ const NAV = [
 
 function currentPageId() {
   const file = (location.pathname.split("/").pop() || "app.html").toLowerCase();
-  if (file.startsWith("monthly")) return "monthly";
   if (file.startsWith("planning")) return "planning";
   if (file.startsWith("cashflow")) return "cashflow";
   if (file.startsWith("connect")) return "connect";
@@ -50,11 +48,11 @@ function syncBadgeHtml() {
   if (!SYNC_STATUS || !SYNC_STATUS.last_synced_at) return "";
   const when = new Date(SYNC_STATUS.last_synced_at).toLocaleString("sv-SE");
   if (SYNC_STATUS.last_sync_error) {
-    return `<a class="sync-badge error" href="monthly.html" title="${escapeHtml(SYNC_STATUS.last_sync_error)}"><span class="sync-dot"></span>${t("sync_error")}</a>`;
+    return `<a class="sync-badge error" href="connect.html" title="${escapeHtml(SYNC_STATUS.last_sync_error)}"><span class="sync-dot"></span>${t("sync_error")}</a>`;
   }
   const ageH = (Date.now() - new Date(SYNC_STATUS.last_synced_at).getTime()) / 3600000;
   if (ageH >= 48) {
-    return `<a class="sync-badge stale" href="monthly.html" title="${when}"><span class="sync-dot"></span>${t("sync_stale", Math.floor(ageH / 24))}</a>`;
+    return `<a class="sync-badge stale" href="connect.html" title="${when}"><span class="sync-dot"></span>${t("sync_stale", Math.floor(ageH / 24))}</a>`;
   }
   const label = ageH < 1 ? t("sync_just_now") : ageH < 24 ? t("sync_hours_ago", Math.round(ageH)) : t("sync_yesterday");
   return `<span class="sync-badge fresh" title="${when}"><span class="sync-dot"></span>${t("sync_fresh", label)}</span>`;

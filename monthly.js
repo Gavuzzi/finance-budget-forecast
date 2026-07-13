@@ -1,6 +1,8 @@
-let currentLens = "fy"; // "fy" | "rolling"
-// (The "spread lumpy actuals" smoothing lens was removed — killed per feedback
-// #6: no competitor does it, low value, and it fought "actuals are as-is".)
+// monthly.js — the month-by-month grid, export and cell drill-down. Since
+// Phase 9.2 this is a MODULE of the Overview (app.html loads it after
+// script.js), not a page: script.js owns currentLens / lensMonthRange / the
+// lens buttons and calls renderMonthlyGrid() from renderAll(), so the one
+// lens toggle drives the chart, the stats and this grid together.
 
 // Compact cell value — just the number in the org's display unit (stated once in the hint).
 function fmtCell(n) {
@@ -8,17 +10,7 @@ function fmtCell(n) {
   return (n / u.div).toLocaleString("sv-SE", { minimumFractionDigits: u.dec, maximumFractionDigits: u.dec });
 }
 
-function lensMonths() {
-  if (currentLens === "rolling") {
-    const { start, end } = rollingWindow();
-    const a = [];
-    for (let m = start; m <= end; m++) a.push(m);
-    return a;
-  }
-  const a = [];
-  for (let m = FY_WINDOW_START; m <= fyWindowEnd(); m++) a.push(m);
-  return a;
-}
+const lensMonths = () => lensMonthRange(); // script.js owns the lens state
 
 function monthCell(value, isActual, isDivider, ccId, month, isOverridden) {
   // Actual cells are drillable ("what's in this number?"); forecast cells aren't.
@@ -32,21 +24,8 @@ function monthCell(value, isActual, isDivider, ccId, month, isOverridden) {
 }
 
 function renderMonthlyGrid() {
-  const sections = document.querySelectorAll(".lens-controls, .table-hint, .actuals-import, .panel");
-  let empty = document.getElementById("emptyState");
-  if (COST_CENTERS.length === 0) {
-    sections.forEach((el) => (el.style.display = "none"));
-    if (!empty) {
-      empty = document.createElement("div");
-      empty.id = "emptyState";
-      document.querySelector(".app-main").appendChild(empty);
-    }
-    empty.innerHTML = emptyOrgHtml();
-    empty.style.display = "";
-    return;
-  }
-  sections.forEach((el) => (el.style.display = ""));
-  if (empty) empty.style.display = "none";
+  const host = document.getElementById("monthlyGrid");
+  if (!host) return; // renderAll's empty-org state hides the whole section
 
   const unitEl = document.getElementById("unitLabel");
   if (unitEl) unitEl.textContent = DISPLAY_UNIT;
@@ -102,7 +81,7 @@ function renderMonthlyGrid() {
   }
   html += `</tr></tbody></table>`;
 
-  document.getElementById("monthlyGrid").innerHTML = html;
+  host.innerHTML = html;
 }
 
 // ---- Export (Excel) ---------------------------------------------------------
@@ -209,26 +188,21 @@ function initDrill() {
   });
 }
 
-function initMonthly() {
-  document.querySelectorAll(".lens-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      currentLens = btn.dataset.lens;
-      document.querySelectorAll(".lens-btn").forEach((b) => b.classList.toggle("active", b === btn));
-      renderMonthlyGrid();
-    });
-  });
-  document.getElementById("exportBtn").addEventListener("click", downloadExport);
+// Wire-up for the grid module — called from script.js's initPage (no lens
+// listeners here; script.js's lens handler re-renders everything).
+function initMonthlyGrid() {
+  const exportBtn = document.getElementById("exportBtn");
+  if (exportBtn) exportBtn.addEventListener("click", downloadExport);
   initDrill();
-  renderMonthlyGrid();
   // Dev hooks for headless verification.
-  if (location.hash === "#drilltest" && COST_CENTERS.length) showDrill(COST_CENTERS[0].id, 3);
+  if (location.hash === "#drilltest" && COST_CENTERS.length) {
+    const d = document.getElementById("monthlyDetails");
+    if (d) d.open = true;
+    showDrill(COST_CENTERS[0].id, 3);
+  }
   if (location.hash === "#csvtest") {
+    const d = document.getElementById("monthlyDetails");
+    if (d) d.open = true;
     document.getElementById("monthlyGrid").innerHTML = `<pre style="font-size:11px">${escapeHtml(buildExportCsv())}</pre>`;
   }
 }
-
-// Re-render when a month is closed from the sidebar.
-window.refreshAfterPeriodChange = renderMonthlyGrid;
-
-// Entry point — called by the auth bootstrap (lib.js) after login + data load.
-window.initPage = initMonthly;
