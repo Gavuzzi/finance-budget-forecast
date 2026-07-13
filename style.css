@@ -2147,3 +2147,50 @@ html[data-theme="light"] .panel {
 @media (max-width: 480px) {
   .stats-row, #cashStatsRow { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ============================================================
+   Polish pass (Phase 9.3) — type, motion, focus, scroll chrome.
+   Stripe/Linear-grade details: numbers align in columns, every
+   interactive element eases, keyboards get a visible ring, and
+   scrollbars stop looking like Windows 95.
+   ============================================================ */
+
+/* Numbers are data: tabular figures wherever digits stack into columns. */
+.num, .stat-value, .hero-amount, .variance-pill, .brief-text strong,
+.monthly-table td, .budget-row, .drill-row, .fn-recon-table td,
+.util-derived, .rate-cell, .cost-amount, .period-line strong {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Micro-motion: one shared easing for every interactive surface.
+   120ms — perceptible calm, never laggy. */
+button, select, a, input[type="text"], input[type="number"], input[type="email"],
+.nav-item, .preset-card, .planmode-opt, .stat-card, .lens-btn, .lang-opt {
+  transition: background-color 0.12s ease, border-color 0.12s ease,
+              color 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+
+/* Keyboard focus: a real ring, only for keyboard (focus-visible). */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Scroll chrome: thin, themed, quiet. */
+html { scrollbar-width: thin; scrollbar-color: var(--panel-border) transparent; }
+.monthly-wrap, .driver-table-wrap { scrollbar-width: thin; scrollbar-color: var(--panel-border) transparent; }
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-thumb { background: var(--panel-border); border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-dim); border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* A word verdict in a stat tile (e.g. "Cash-positive") reads at a calmer
+   size than a headline number. */
+.stat-card .stat-value.word { font-size: 1.35rem; line-height: 1.25; }
+
+/* Amount cells never wrap away from their vs-LY chips. */
+.fn-recon-table td.num { white-space: nowrap; }

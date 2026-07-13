@@ -12,8 +12,10 @@ const CASHFLOW_MONTHS_AHEAD = 6;
 
 // script.js (Overview) isn't loaded on this page, so this page keeps its own
 // copy rather than pulling in the whole Overview chart module for one const.
+// Kept in sync with script.js — series colors are palette-validated per
+// surface (dataviz six-checks); dark mode is its own selection.
 const THEME_COLORS = {
-  dark: { text: "#93a1b8", grid: "#28344a", budget: "#7aa3e0", actual: "#5cb88a", forecast: "#d9a647" },
+  dark: { text: "#93a1b8", grid: "#28344a", budget: "#5b8fd4", actual: "#3fa377", forecast: "#bd8623" },
   light: { text: "#647189", grid: "#dde4ee", budget: "#3461a8", actual: "#2f9e6a", forecast: "#b6841f" },
 };
 
@@ -60,7 +62,7 @@ function renderCashStats() {
     </div>
     <div class="stat-card highlight">
       <span class="stat-label" title="${t("runway_title")}">${t("runway_label")}</span>
-      <span class="stat-value ${runwayCls}">${runwayLabel}</span>
+      <span class="stat-value ${runwayCls}${runway == null ? " word" : ""}">${runwayLabel}</span>
       <span class="stat-sub ${runwayCls}">${runwaySub}</span>
     </div>
   `;
@@ -82,21 +84,36 @@ function renderCashChart() {
         label: t("chart_series_bank_balance"),
         data: balanceSeries,
         borderColor: colors.actual,
+        borderWidth: 2,
         backgroundColor: "transparent",
         tension: 0.25,
-        pointRadius: 3,
+        pointRadius: 2.5,
+        pointHoverRadius: 5,
+        pointBackgroundColor: colors.actual,
         fill: false,
       }],
     },
+    // Same dressing as the Overview charts: recessive horizontal-only grid,
+    // ≤6 ticks, fmtMkr tooltips, whole-month hover. Single series → no legend
+    // (the panel title names it).
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${fmtMkr(c.parsed.y)}` } },
+      },
       scales: {
-        x: { ticks: { color: colors.text }, grid: { color: colors.grid } },
+        x: {
+          ticks: { color: colors.text, maxRotation: 0, autoSkipPadding: 12 },
+          grid: { display: false },
+          border: { color: colors.grid },
+        },
         y: {
-          ticks: { color: colors.text, callback: (v) => fmtMkr(v) },
-          grid: { color: colors.grid },
+          ticks: { color: colors.text, callback: (v) => fmtMkr(v), maxTicksLimit: 6, padding: 6 },
+          grid: { color: colors.grid, drawTicks: false },
+          border: { display: false },
         },
       },
     },

@@ -2,10 +2,40 @@ let trendChart;
 let scenarioChart;
 let currentLens = "fy"; // "fy" | "rolling"
 
+// Series colors are palette-validated per surface (dataviz six-checks: CVD
+// separation, lightness band, chroma, contrast) — dark mode is its own
+// selection, not a pastel flip of light.
 const THEME_COLORS = {
-  dark: { text: "#93a1b8", grid: "#28344a", budget: "#7aa3e0", actual: "#5cb88a", forecast: "#d9a647" },
+  dark: { text: "#93a1b8", grid: "#28344a", budget: "#5b8fd4", actual: "#3fa377", forecast: "#bd8623" },
   light: { text: "#647189", grid: "#dde4ee", budget: "#3461a8", actual: "#2f9e6a", forecast: "#b6841f" },
 };
+
+// Shared Chart.js dressing: recessive grid (horizontal only, no chart-area
+// border), ≤6 y-ticks (kills duplicate labels from over-dense steps), fmtMkr
+// tooltips, index-mode hover so the whole month lights up as a crosshair.
+function chartBaseOptions(colors) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: "index", intersect: false },
+    plugins: {
+      legend: { labels: { color: colors.text, boxWidth: 16, boxHeight: 8 } },
+      tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${fmtMkr(c.parsed.y)}` } },
+    },
+    scales: {
+      x: {
+        ticks: { color: colors.text, maxRotation: 0, autoSkipPadding: 12 },
+        grid: { display: false },
+        border: { color: colors.grid },
+      },
+      y: {
+        ticks: { color: colors.text, callback: (v) => fmtMkr(v), maxTicksLimit: 6, padding: 6 },
+        grid: { color: colors.grid, drawTicks: false },
+        border: { display: false },
+      },
+    },
+  };
+}
 
 // Fixed palette for scenario lines (cycled if there are more scenarios than colors) —
 // deliberately distinct from THEME_COLORS.budget/actual/forecast so the "Current
@@ -338,27 +368,35 @@ function renderChart() {
       data: budgetSeries,
       borderColor: colors.budget,
       borderDash: [4, 4],
+      borderWidth: 2,
       backgroundColor: "transparent",
       tension: 0.2,
       pointRadius: 0,
+      pointHoverRadius: 5,
       spanGaps: false,
     },
     {
       label: t("chart_series_actual"),
       data: actualSeries,
       borderColor: colors.actual,
+      borderWidth: 2,
       backgroundColor: "transparent",
       tension: 0.25,
-      pointRadius: 3,
+      pointRadius: 2.5,
+      pointHoverRadius: 5,
+      pointBackgroundColor: colors.actual,
     },
     {
       label: t("chart_series_forecast"),
       data: forecastSeries,
       borderColor: colors.forecast,
       borderDash: [6, 3],
+      borderWidth: 2,
       backgroundColor: "transparent",
       tension: 0.25,
-      pointRadius: 3,
+      pointRadius: 2.5,
+      pointHoverRadius: 5,
+      pointBackgroundColor: colors.forecast,
     },
   ];
 
@@ -366,18 +404,7 @@ function renderChart() {
   trendChart = new Chart(ctx, {
     type: "line",
     data: { labels, datasets },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { labels: { color: colors.text } } },
-      scales: {
-        x: { ticks: { color: colors.text }, grid: { color: colors.grid } },
-        y: {
-          ticks: { color: colors.text, callback: (v) => fmtMkr(v) },
-          grid: { color: colors.grid },
-        },
-      },
-    },
+    options: chartBaseOptions(colors),
   });
 }
 
@@ -536,8 +563,10 @@ function renderScenarioChart() {
       borderColor: SCENARIO_PALETTE[i % SCENARIO_PALETTE.length],
       backgroundColor: "transparent",
       borderDash: [5, 3],
+      borderWidth: 2,
       tension: 0.2,
       pointRadius: 2,
+      pointHoverRadius: 5,
     })),
   ];
 
@@ -545,15 +574,7 @@ function renderScenarioChart() {
   scenarioChart = new Chart(document.getElementById("scenarioChart"), {
     type: "line",
     data: { labels, datasets },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { labels: { color: colors.text } } },
-      scales: {
-        x: { ticks: { color: colors.text }, grid: { color: colors.grid } },
-        y: { ticks: { color: colors.text, callback: (v) => fmtMkr(v) }, grid: { color: colors.grid } },
-      },
-    },
+    options: chartBaseOptions(colors),
   });
 }
 
