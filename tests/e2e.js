@@ -146,20 +146,30 @@ function check(name, ok, detail = "") {
   check("planning: allocation toggle hidden by default", await page.locator("#allocToggleWrap").isHidden());
 
   // Planning-mode gating (Phase 8b-A): an org-mode company sees ZERO
-  // revenue/capacity affordances on Planning — one revenue home.
+  // revenue/capacity affordances on the cost lines — and since 9.2b the org
+  // revenue plan + role engine live ON Planning (one page to plan).
   await page.goto(url("planning.html"));
   await page.waitForSelector(".cc-block");
   check("planning (org mode): no + Add revenue anywhere", await page.locator("[data-addrevenue]").count() === 0);
   check("planning (org mode): no billable-hours affordance", await page.locator("[data-addutil]").count() === 0);
-  await page.goto(url("assumptions.html", "&profit"));
+  check("planning (org mode): org revenue plan lives here now",
+    await page.locator("#revenueSlot .revenue-block").count() === 1);
+  check("planning: role/salary engine lives here now", await page.locator("#roleTableBody").count() === 1);
+  await page.goto(url("planning.html", "&profit"));
+  await page.waitForSelector(".cc-block");
+  check("planning (lines mode): no org revenue panel (one home)", await page.locator(".revenue-block").count() === 0);
+
+  // ---- Settings (the dissolved Assumptions page: config, plans, tax, team) ----
+  await page.goto(url("settings.html", "&profit"));
   await page.waitForSelector(".planmode-block");
-  check("assumptions (lines mode): no org revenue panel (one home)", await page.locator(".revenue-block").count() === 0);
-  check("assumptions: How-you-plan picker present (3 revenue + 2 people cards)",
+  check("settings: no revenue/roles here — config only", await page.locator(".revenue-block, #roleTableBody").count() === 0);
+  check("settings: How-you-plan picker present (3 revenue + 2 people cards)",
     await page.locator(".planmode-opt").count() === 5);
-  check("assumptions: Manage plans panel with unlock on the budget",
+  check("settings: Manage plans panel with unlock on the budget",
     await page.locator("[data-planunlock]").count() === 1);
-  check("assumptions: New-budget control with a fiscal-year choice",
+  check("settings: New-budget control with a fiscal-year choice",
     await page.locator("#newBudgetBtn").count() === 1 && await page.locator("#newBudgetFy option").count() === 2);
+  check("settings: tax block present", await page.locator('[data-taxfield="vatFrequency"]').count() === 1);
 
   // ---- FY-scoped budgets (&fy27: a draft Budget 2027 is the active version) ----
   await page.goto(url("app.html", "&fy27"));
@@ -170,7 +180,7 @@ function check(name, ok, detail = "") {
   check("fy27: switcher marks the draft", /draft|utkast/.test(await page.textContent("#versionSwitcher")));
   await page.goto(url("planning.html", "&fy27"));
   await page.waitForSelector(".cc-block");
-  check("fy27: Planning totals read FY2027", /FY2027/.test(await page.textContent(".cc-summary, .cc-block")));
+  check("fy27: Planning totals read FY2027", /FY2027/.test(await page.textContent("#ccBlocks")));
   // The month-by-month grid now lives ON the Overview (Phase 9.2 merge)
   await page.goto(url("app.html", "&fy27"));
   await page.waitForSelector("#monthlyDetails");
@@ -190,10 +200,10 @@ function check(name, ok, detail = "") {
   await page.waitForSelector(".cc-block");
   check("planning (simple costs): no People sections", await page.locator("[data-add]").count() === 0);
   check("planning (simple costs): costs tables still render", await page.locator(".costs-table").count() >= 2);
-  await page.goto(url("assumptions.html", "&simplecosts"));
+  check("planning (simple costs): role/salary engine hidden", await page.locator("#roleTableBody").count() === 0);
+  await page.goto(url("settings.html", "&simplecosts"));
   await page.waitForSelector(".planmode-block");
-  check("assumptions (simple costs): role/salary engine hidden", await page.locator("#roleTableBody").count() === 0);
-  check("assumptions: people-cost question with 2 cards", await page.locator(".planmode-people .planmode-opt").count() === 2);
+  check("settings: people-cost question with 2 cards", await page.locator(".planmode-people .planmode-opt").count() === 2);
 
   // ---- Org-creation wizard (build your company) ----------------------------------
   await page.goto(url("app.html"));

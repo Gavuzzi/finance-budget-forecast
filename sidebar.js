@@ -12,7 +12,7 @@ const NAV = [
   { id: "planning", href: "planning.html" },
   { id: "cashflow", href: "cashflow.html" },
   { id: "connect", href: "connect.html" },
-  { id: "assumptions", href: "assumptions.html" },
+  { id: "settings", href: "settings.html" },
 ];
 
 function currentPageId() {
@@ -20,7 +20,7 @@ function currentPageId() {
   if (file.startsWith("planning")) return "planning";
   if (file.startsWith("cashflow")) return "cashflow";
   if (file.startsWith("connect")) return "connect";
-  if (file.startsWith("assumptions")) return "assumptions";
+  if (file.startsWith("settings") || file.startsWith("assumptions")) return "settings";
   return "overview";
 }
 

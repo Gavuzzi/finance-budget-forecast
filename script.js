@@ -188,9 +188,9 @@ function renderBrief() {
   const budget = latestBudgetVersion();
   const drift = budgetDrift();
   if (!budget && draftBudgetVersions().length === 0) {
-    line("info", t("brief_no_budget", FY_START_YEAR + 1), arrow("assumptions.html", t("brief_open_plans")));
+    line("info", t("brief_no_budget", FY_START_YEAR + 1), arrow("settings.html", t("brief_open_plans")));
   } else if (budget && drift != null && Math.abs(drift) >= (VERSION_SUMMARIES[budget.id] || {}).total * 0.01) {
-    line("warn", t("brief_drift", fmtMkrSigned(drift), escapeHtml(budget.name)), arrow("assumptions.html", t("brief_open_plans")));
+    line("warn", t("brief_drift", fmtMkrSigned(drift), escapeHtml(budget.name)), arrow("settings.html", t("brief_open_plans")));
   }
 
   const shown = lines.slice(0, 5);

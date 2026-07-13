@@ -20,6 +20,11 @@
         <button class="help-toggle" type="button" data-i18n-title="help_toggle_title" title="Show explanations">?</button>
       </header>
 
+      <!-- Org-level revenue plan (org-mode companies only) — revenue is
+           planned WITH the rest of the plan since Phase 9.2b, not on a
+           separate Assumptions page. Rendered by assumptions.js. -->
+      <div id="revenueSlot"></div>
+
       <div class="planning-actions">
         <button class="add-cc-btn" id="addCostCenter" type="button" data-i18n="add_reporting_line_btn">+ Add reporting line</button>
         <label class="smooth-toggle" id="allocToggleWrap" hidden data-i18n-title="fully_loaded_hint" title="Spreads each overhead line across the other lines, weighted by headcount. Display only — nothing is written.">
@@ -29,6 +34,10 @@
       </div>
 
       <div id="ccBlocks"></div>
+
+      <!-- Salary assumptions + role catalog (headcount orgs) — the cost side
+           of the same plan. Rendered by assumptions.js. -->
+      <div id="rateEngine"></div>
     </main>
   </div>
 
@@ -38,6 +47,7 @@
   <script src="data.js"></script>
   <script src="sidebar.js"></script>
   <script src="planning.js"></script>
+  <script src="assumptions.js"></script>
   <script>requireAuthAndLoad(() => { renderSidebar(); window.initPage(); });</script>
 </body>
 </html>

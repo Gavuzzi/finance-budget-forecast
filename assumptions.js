@@ -1,7 +1,10 @@
-// assumptions.js — the rate engine: payroll assumptions + the role salary
-// catalog. Edits persist to Supabase (scoped to this org by RLS). Changing
-// anything here cascades into every reporting line's forecast on the other pages
-// (they recompute from this data on their next load).
+// assumptions.js — the rate engine + org configuration blocks. Since Phase
+// 9.2b this file serves TWO pages (job-shaped nav — "Assumptions" dissolved):
+//   · planning.html — the org revenue plan (#revenueSlot, org-mode only) and
+//     the salary/role engine (#rateEngine) live WITH the planning they drive
+//   · settings.html — tax, "How you plan", Plans & versions, team, export
+// buildRateEngine detects the page by which slots exist; the delegated
+// listeners attach to every host present, so absent blocks simply never fire.
 
 function roleBreakdown(role) {
   const afterEmployer = Math.round(role.baseSalary * (1 + ASSUMPTIONS.employerContributionPct / 100));
@@ -334,16 +337,25 @@ function renderPlansBlock() {
 }
 
 function buildRateEngine() {
-  // The revenue panel exists only for org-mode companies — lines-mode orgs
-  // plan revenue on Planning, so this page shows no second revenue home.
-  // Same one-home rule for the cost side: a no-headcount org gets no salary
-  // assumptions / role catalog (unless roles already exist — data always renders).
-  const showRoles = planHeadcount() || ROLE_CATALOG.length > 0;
-  document.getElementById("rateEngine").innerHTML =
-    (planRevenueOnLines() ? "" : renderRevenueBlock())
-    + (showRoles ? renderRateEngineBlock() : "")
-    + renderTaxBlock() + renderPlanningModeBlock() + renderPlansBlock() + renderTeamBlock() + renderDataBlock();
-  updateRateFormula();
+  const onPlanning = !!document.getElementById("ccBlocks");
+  const revenueSlot = document.getElementById("revenueSlot");
+  const rateEngine = document.getElementById("rateEngine");
+  if (!rateEngine) return;
+
+  if (onPlanning) {
+    // Planning: revenue above the cost lines (org-mode only — lines-mode orgs
+    // plan revenue per line; ONE revenue home), roles/salary engine below
+    // (hidden for simple-amounts orgs unless roles already exist — data
+    // always renders).
+    if (revenueSlot) revenueSlot.innerHTML = planRevenueOnLines() ? "" : renderRevenueBlock();
+    rateEngine.innerHTML = (planHeadcount() || ROLE_CATALOG.length > 0) ? renderRateEngineBlock() : "";
+    updateRateFormula();
+    return;
+  }
+
+  // Settings: the org's configuration corner.
+  rateEngine.innerHTML =
+    renderTaxBlock() + renderPlanningModeBlock() + renderPlansBlock() + renderTeamBlock() + renderDataBlock();
   renderTeamPanel();
 }
 
@@ -371,8 +383,15 @@ function refreshRoleRatesDisplay() {
 
 function initAssumptions() {
   buildRateEngine();
-  const rateEngine = document.getElementById("rateEngine");
+  // Attach the delegated handlers to every host this page has (#revenueSlot
+  // exists on Planning only); handlers for blocks that aren't rendered on
+  // this page simply never match anything.
+  [document.getElementById("revenueSlot"), document.getElementById("rateEngine")]
+    .filter(Boolean)
+    .forEach(attachRateEngineHandlers);
+}
 
+function attachRateEngineHandlers(rateEngine) {
   // Manage plans: create budget / rename / lock / unlock (with friction) / delete.
   rateEngine.addEventListener("click", async (e) => {
     const renameBtn = e.target.closest("[data-planrename]");
@@ -613,4 +632,11 @@ function initAssumptions() {
 }
 
 // Entry point — called by the auth bootstrap (lib.js) after login + data load.
-window.initPage = initAssumptions;
+// Page wiring: on Settings this module IS the page; on Planning it chains
+// after planning.js's own init (script order: planning.js, then this file).
+if (document.getElementById("ccBlocks")) {
+  const prevInit = window.initPage;
+  window.initPage = () => { if (typeof prevInit === "function") prevInit(); initAssumptions(); };
+} else {
+  window.initPage = initAssumptions;
+}

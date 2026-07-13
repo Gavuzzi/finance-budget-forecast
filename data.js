@@ -1656,7 +1656,7 @@ function emptyOrgHtml() {
           <li>${t("empty_org_step1")}</li>
           <li>${t("empty_org_step2")}</li>
         </ol>
-        <a class="empty-cta" href="assumptions.html">${t("empty_org_cta")}</a>
+        <a class="empty-cta" href="planning.html">${t("empty_org_cta")}</a>
       </div>
     </div>`;
 }

@@ -51,7 +51,7 @@ const STRINGS = {
 en: {
   // ---- sidebar / nav ----
   nav_overview: "Overview", nav_planning: "Planning",
-  nav_cashflow: "Cash Flow", nav_connect: "Data", nav_assumptions: "Assumptions",
+  nav_cashflow: "Cash Flow", nav_connect: "Data", nav_settings: "Settings",
   plan_version_label: "Plan",
   new_scenario_btn: "+ Scenario",
   new_scenario_title: "Branch a new scenario from this version",
@@ -183,7 +183,7 @@ en: {
   forecast_pnl_title: (fy) => `Projected ${fy} result`,
   forecast_pnl_body: (result, revenue, cost, margin) =>
     `${result} = ${revenue} planned revenue − ${cost} cost (booked + forecast) · ${margin}% margin`,
-  forecast_pnl_flat_note: `using a flat target ÷ 12 — set a monthly profile on <a href="assumptions.html">Assumptions</a>`,
+  forecast_pnl_flat_note: `using a flat target ÷ 12 — set a monthly profile on <a href="planning.html">Planning</a>`,
   lock_new_version: "Lock current as new version", lock_current_budget: "Lock current budget",
   budget_version_title: "Budget version",
   budget_version_clean: "✓ matches the live budget",
@@ -318,7 +318,7 @@ en: {
   monthly_projection_h2: "Monthly Projection",
   cashflow_table_caption: `<strong>Operating</strong> and <strong>Tax/VAT</strong> are estimates, kept separate from the hard invoice figures.`,
   cashflow_calc_summary: "How this is calculated",
-  cashflow_calc_detail: `Running balance = today's bank balance, walked forward by open invoices (hard Fortnox figures) plus two estimated columns: <strong>Operating</strong> — the same driver forecast behind Overview/Monthly (salaries, recurring costs, one-offs) netted against your monthly revenue plan (Assumptions → Revenue Plan; a flat target ÷ 12 when no plan is set); and <strong>Tax/VAT</strong> — projected from tracked account balances onto Skatteverket's standard deadlines (12th of the month, 17th in January/August, for turnover ≤40M SEK), appearing once the relevant month's actuals have synced. Adjust the account ranges or VAT frequency on <a href="assumptions.html">Assumptions</a> if it looks off for your chart of accounts. <strong>Runway</strong> is the same operating estimate walked forward until the balance would cross zero — planned revenue, not booked orders, so treat it as a rough signal, not a forecast to plan payroll against.`,
+  cashflow_calc_detail: `Running balance = today's bank balance, walked forward by open invoices (hard Fortnox figures) plus two estimated columns: <strong>Operating</strong> — the same driver forecast behind Overview/Monthly (salaries, recurring costs, one-offs) netted against your monthly revenue plan (the Revenue Plan on Planning; a flat target ÷ 12 when no plan is set); and <strong>Tax/VAT</strong> — projected from tracked account balances onto Skatteverket's standard deadlines (12th of the month, 17th in January/August, for turnover ≤40M SEK), appearing once the relevant month's actuals have synced. Adjust the account ranges or VAT frequency on <a href="settings.html">Settings</a> if it looks off for your chart of accounts. <strong>Runway</strong> is the same operating estimate walked forward until the balance would cross zero — planned revenue, not booked orders, so treat it as a rough signal, not a forecast to plan payroll against.`,
   open_invoices_h2: "Open Invoices",
   open_invoices_hint: "Unpaid customer (money coming in) and supplier (money going out) invoices from Fortnox, by due date.",
 
@@ -353,9 +353,9 @@ en: {
   no_cash_data_p: "Bank balance and open invoices come in automatically with your Fortnox sync.",
   connect_sync_fortnox: "Connect / sync Fortnox →",
 
-  // ---- assumptions (assumptions.html) ----
-  assumptions_h1: "Assumptions",
-  assumptions_subtitle: "The cost engine behind every forecast",
+  // ---- settings (settings.html; revenue+roles blocks render on planning.html) ----
+  settings_h1: "Settings",
+  settings_subtitle: "How this organization plans — plans & budgets, tax, team",
 
   // ---- assumptions.js ----
   no_roles_hint: `No roles yet — click "+ Add role" to create your first one.`,
@@ -518,9 +518,9 @@ en: {
   empty_org_option_fortnox: "Fastest — already on Fortnox?",
   empty_org_option_preset: "Or start from a working example shaped the way you plan",
   empty_org_option_manual: "Or build it by hand",
-  empty_org_step1: `Add your <strong>roles</strong> and their salaries on the <a href="assumptions.html">Assumptions</a> page.`,
+  empty_org_step1: `Add your <strong>roles</strong> and their salaries at the bottom of the <a href="planning.html">Planning</a> page.`,
   empty_org_step2: `Add <strong>reporting lines</strong> and their headcount on the <a href="planning.html">Planning</a> page.`,
-  empty_org_cta: "Start on Assumptions →",
+  empty_org_cta: "Start on Planning →",
   err_no_org_linked: "No organization is linked to your login.",
   new_role_label: "New role",
   new_reporting_line_name: "New reporting line",
@@ -595,7 +595,7 @@ en: {
 },
 sv: {
   nav_overview: "Översikt", nav_planning: "Planering",
-  nav_cashflow: "Kassaflöde", nav_connect: "Data", nav_assumptions: "Antaganden",
+  nav_cashflow: "Kassaflöde", nav_connect: "Data", nav_settings: "Inställningar",
   plan_version_label: "Plan",
   new_scenario_btn: "+ Scenario",
   new_scenario_title: "Förgrena ett nytt scenario från denna version",
@@ -725,7 +725,7 @@ sv: {
   forecast_pnl_title: (fy) => `Prognostiserat resultat ${fy}`,
   forecast_pnl_body: (result, revenue, cost, margin) =>
     `${result} = ${revenue} planerad intäkt − ${cost} kostnad (bokfört + prognos) · ${margin}% marginal`,
-  forecast_pnl_flat_note: `använder ett platt mål ÷ 12 — sätt en månadsprofil under <a href="assumptions.html">Antaganden</a>`,
+  forecast_pnl_flat_note: `använder ett platt mål ÷ 12 — sätt en månadsprofil under <a href="planning.html">Planering</a>`,
   lock_new_version: "Lås aktuell som ny version", lock_current_budget: "Lås aktuell budget",
   budget_version_title: "Budgetversion",
   budget_version_clean: "✓ matchar den aktuella budgeten",
@@ -860,7 +860,7 @@ sv: {
   monthly_projection_h2: "Månadsprognos",
   cashflow_table_caption: `<strong>Drift</strong> och <strong>Skatt/moms</strong> är uppskattningar, hållna separata från de hårda fakturasiffrorna.`,
   cashflow_calc_summary: "Så här beräknas det",
-  cashflow_calc_detail: `Löpande saldo = dagens banksaldo, framskrivet med öppna fakturor (hårda Fortnox-siffror) plus två uppskattade kolumner: <strong>Drift</strong> — samma drivarbaserade prognos som Översikt/Månadsvis (löner, återkommande kostnader, engångskostnader) nettad mot din månatliga intäktsplan (Antaganden → Intäktsplan; ett platt mål ÷ 12 när ingen plan är satt); och <strong>Skatt/moms</strong> — prognostiserat från spårade kontosaldon mot Skatteverkets standarddeadlines (12:e i månaden, 17:e i januari/augusti, för omsättning ≤40M SEK), som visas när relevant månads utfall har synkats. Justera kontointervallen eller momsfrekvensen under <a href="assumptions.html">Antaganden</a> om det ser fel ut för din kontoplan. <strong>Uthållighet</strong> är samma driftsuppskattning framskriven tills saldot skulle bli negativt — planerad intäkt, inte bokförda order, så behandla det som en grov signal, inte en prognos att planera löneutbetalningar mot.`,
+  cashflow_calc_detail: `Löpande saldo = dagens banksaldo, framskrivet med öppna fakturor (hårda Fortnox-siffror) plus två uppskattade kolumner: <strong>Drift</strong> — samma drivarbaserade prognos som Översikt/Månadsvis (löner, återkommande kostnader, engångskostnader) nettad mot din månatliga intäktsplan (Intäktsplanen på Planering; ett platt mål ÷ 12 när ingen plan är satt); och <strong>Skatt/moms</strong> — prognostiserat från spårade kontosaldon mot Skatteverkets standarddeadlines (12:e i månaden, 17:e i januari/augusti, för omsättning ≤40M SEK), som visas när relevant månads utfall har synkats. Justera kontointervallen eller momsfrekvensen under <a href="settings.html">Inställningar</a> om det ser fel ut för din kontoplan. <strong>Uthållighet</strong> är samma driftsuppskattning framskriven tills saldot skulle bli negativt — planerad intäkt, inte bokförda order, så behandla det som en grov signal, inte en prognos att planera löneutbetalningar mot.`,
   open_invoices_h2: "Öppna fakturor",
   open_invoices_hint: "Obetalda kund- (pengar in) och leverantörsfakturor (pengar ut) från Fortnox, efter förfallodatum.",
 
@@ -895,9 +895,9 @@ sv: {
   no_cash_data_p: "Banksaldo och öppna fakturor kommer in automatiskt med din Fortnox-synk.",
   connect_sync_fortnox: "Anslut / synka Fortnox →",
 
-  // ---- assumptions (assumptions.html) ----
-  assumptions_h1: "Antaganden",
-  assumptions_subtitle: "Kostnadsmotorn bakom varje prognos",
+  // ---- settings (settings.html; revenue+roles blocks render on planning.html) ----
+  settings_h1: "Inställningar",
+  settings_subtitle: "Hur denna organisation planerar — planer & budgetar, skatt, team",
 
   // ---- assumptions.js ----
   no_roles_hint: `Inga roller ännu — klicka på "+ Lägg till roll" för att skapa din första.`,
@@ -1060,9 +1060,9 @@ sv: {
   empty_org_option_fortnox: "Snabbast — redan på Fortnox?",
   empty_org_option_preset: "Eller börja med ett fungerande exempel format efter hur ni planerar",
   empty_org_option_manual: "Eller bygg det för hand",
-  empty_org_step1: `Lägg till dina <strong>roller</strong> och deras löner på <a href="assumptions.html">Antaganden</a>-sidan.`,
+  empty_org_step1: `Lägg till dina <strong>roller</strong> och deras löner längst ner på <a href="planning.html">Planerings</a>-sidan.`,
   empty_org_step2: `Lägg till <strong>redovisningslinjer</strong> och deras bemanning på <a href="planning.html">Planerings</a>-sidan.`,
-  empty_org_cta: "Börja med Antaganden →",
+  empty_org_cta: "Börja med Planering →",
   err_no_org_linked: "Ingen organisation är kopplad till ditt konto.",
   new_role_label: "Ny roll",
   new_reporting_line_name: "Ny redovisningslinje",
