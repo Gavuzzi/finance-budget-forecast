@@ -637,6 +637,13 @@ polish → dad pilot → case study → warm circle (dad's clients, colleague, b
   Absorbs the signals panel (one home per fact). Weekly email version is Tier 3.
 - [ ] **3. Visual polish pass to Stripe/Linear grade** — type scale, spacing rhythm, motion,
   empty states, chart quality (dataviz pass), dark-mode audit, micro-interactions.
+  *(9.3a shipped 2026-07-13, 61ee949: computationally validated chart palettes per surface —
+  dark series were outside the dark lightness band and got their own deepened trio; recessive
+  horizontal-only grids + ≤6 ticks on all 3 charts (duplicate tick labels fixed); tabular
+  numerals everywhere digits stack; 120ms shared easing + reduced-motion kill switch;
+  :focus-visible accent ring; thin themed scrollbars; cash 'word verdict' tile calmed.
+  Still open for 9.3b: spacing/type rhythm audit, empty states, SCENARIO_PALETTE validation,
+  broader dark-mode contrast sweep.)*
 - [ ] **2. Job-shaped navigation** — merge Overview+Monthly into one Results page (monthly grid =
   the drill-down); dissolve Assumptions into Settings + Planning-adjacent panels. 6 nouns → 4 jobs.
 - [ ] **4. What-if ghosts v1** — delta chips (FY result, runway) previewing a driver edit before
