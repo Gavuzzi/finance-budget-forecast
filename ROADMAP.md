@@ -646,6 +646,10 @@ polish → dad pilot → case study → warm circle (dad's clients, colleague, b
   broader dark-mode contrast sweep.)*
 - [ ] **2. Job-shaped navigation** — merge Overview+Monthly into one Results page (monthly grid =
   the drill-down); dissolve Assumptions into Settings + Planning-adjacent panels. 6 nouns → 4 jobs.
+  *(First half shipped 2026-07-13, 87d0acd: Monthly absorbed into Overview as the Reporting-Lines
+  drill-down panel — one lens drives chart+stats+grid; monthly.html deleted, nav 6→5; grid/export/
+  drill kept intact as a module. Scenario overlay palettes also validated per theme (old set had a
+  ΔE 3.1 deutan blue↔purple collision). Still open: the Assumptions dissolution half.)*
 - [ ] **4. What-if ghosts v1** — delta chips (FY result, runway) previewing a driver edit before
   it's saved; "keep as scenario / discard".
 
