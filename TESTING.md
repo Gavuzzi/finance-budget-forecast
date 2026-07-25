@@ -87,3 +87,22 @@ Everything below verified live against real Fortnox data:
 - [x] Fiscal-year anchoring — re-sync reproduced exact tie-out numbers.
 - [x] Reconciliation/tie-out — 146 462 448 / 98 918 624 / 47 543 824, to the krona, 54,966 vouchers in ~3s.
 - [x] Nightly auto-sync — cron path fired manually, synced all orgs autonomously, no error.
+
+## Before real customers sign up (found 2026-07-25, Phase 9.4)
+
+- [ ] **Configure custom SMTP in Supabase** — Auth → Settings → SMTP. Self-serve sign-up is
+  now live in the UI, but the project uses Supabase's built-in mail, which rate-limits to a
+  handful of messages per hour: during testing a genuine sign-up came back
+  `email rate limit exceeded` (HTTP 429). With more than one or two people signing up in the
+  same hour, confirmation mails will silently fail. Custom SMTP (Postmark/Resend/SES) also
+  keeps the mail from looking like it came from Supabase.
+- [ ] **Check the Site URL / redirect allowlist** — Auth → URL Configuration must list
+  `https://gavuzzi.github.io/finance-budget-forecast/` so the confirmation link (and the
+  password-reset link) return to the live app rather than localhost. Sign up with a real
+  address once and click the link end to end.
+- [ ] **Decide whether sign-up stays open.** It is enabled server-side (anyone with the
+  publishable key — which is in the client source by design — can create an account). RLS
+  means a stranger sees nothing: no org, no data, just the welcome/wizard. If you'd rather
+  keep it invite-only until you're ready, turn "Allow new users to sign up" off in Auth
+  settings; the login card's Create-account path then returns Supabase's own refusal, so
+  swap it for a "request access" note at the same time.
