@@ -90,14 +90,23 @@ Everything below verified live against real Fortnox data:
 
 ## Before real customers sign up (found 2026-07-25, Phase 9.4)
 
-- [ ] **Configure custom SMTP in Supabase — this is the launch blocker.** Auth → Settings →
-  SMTP. Self-serve sign-up is live in the UI, but the project still uses Supabase's built-in
-  mail, whose default limit is roughly **2 messages per hour for the whole project**. Measured
-  on 2026-07-25: the first confirmation mail sent fine (08:49 UTC), the next sign-up ~30 min
-  later was refused outright with `email rate limit exceeded` (HTTP 429) — so in practice the
-  second person to sign up in an hour gets nothing, silently. Custom SMTP (Postmark/Resend/SES)
-  lifts the cap, lets you raise the limit in Auth → Rate Limits, and stops the mail looking
-  like it came from Supabase. **Do this before showing anyone the sign-up page.**
+- [ ] **Point Supabase Auth at Resend — this is the launch blocker.** Note there are two
+  separate email paths and only one is done:
+  · the **monthly digest** calls the Resend API directly from `send-digest` (works,
+    `RESEND_API_KEY` already a Supabase secret);
+  · **auth email** — signup confirmation, password reset, team invites — still goes through
+    Supabase's own built-in mail, which Supabase does NOT route through Resend.
+  The built-in service allows roughly **2 messages per hour for the whole project**. Measured
+  2026-07-25: the first confirmation sent fine (08:49 UTC), the next signup ~30 min later was
+  refused with `email rate limit exceeded` (HTTP 429). The second person to sign up in an hour
+  gets nothing, silently. Fix: Supabase → Authentication → SMTP, paste Resend's SMTP
+  credentials, then raise the cap under Auth → Rate Limits.
+- [ ] **Verify a sending domain in Resend.** `send-digest` currently sends from
+  `onboarding@resend.dev` — Resend's shared test address, which only delivers to your own
+  account email. That's why the digest test showed "sent to 1" and looked healthy. No customer
+  can receive mail from either path until a domain you own is verified in Resend. Once it is,
+  change the `from:` line in `supabase/functions/send-digest/index.ts` to match and redeploy.
+  (A domain would also let the app live somewhere better than `gavuzzi.github.io`.)
 - [ ] **Check the Site URL / redirect allowlist** — Auth → URL Configuration must list
   `https://gavuzzi.github.io/finance-budget-forecast/` so the confirmation link (and the
   password-reset link) return to the live app rather than localhost. Sign up with a real
