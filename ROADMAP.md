@@ -653,6 +653,21 @@ polish → dad pilot → case study → warm circle (dad's clients, colleague, b
 - [ ] **4. What-if ghosts v1** — delta chips (FY result, runway) previewing a driver edit before
   it's saved; "keep as scenario / discard".
 
+- [x] **9.4 — the first-run path actually works** *(done 2026-07-25, c28ad1d — found by driving
+  the real flows against the live backend with a throwaway account, then deleting it)*: there was
+  **no way to create an account** (one user existed in the whole database) and a signed-in user
+  with no org hit a developer error telling them to "run the membership step in `schema.sql`",
+  with no nav and no escape — while the backend would happily have let them create an org.
+  Now: two-mode login (sign in / create account, 8-char guard, confirm-by-email copy), a
+  `NO_ORG`-tagged load path that renders a welcome and auto-opens the build-your-company wizard,
+  and a sample company that ties out — its budget, actuals and drivers all derive from one
+  run-rate, so a seeded workspace reads "On plan ✓ −0.2%" instead of the old "Over budget +8.2%"
+  plus a bogus "actuals run 80% above plan". Also: `close_month` defaults to 0 so a new org no
+  longer claims "Actuals through Jun 26"; level charts (spend, cash) start at zero so a flat
+  company looks flat; "Budget version" → "Budget". Verified live end-to-end; 65 engine + 67 e2e.
+  **Pre-launch blockers now in TESTING.md**: custom SMTP (built-in mail rate-limited a real
+  signup at 429), redirect allowlist, and the open-vs-invite-only signup decision.
+
 **Tier 2 — the pilot enablers**
 - [ ] **5. SIE4 file import** (reuse the sync's SIE parsing) + polished CSV/Excel mapping UI —
   the no-Fortnox on-ramp that also widens reach (Visma/BL/Hogia).
