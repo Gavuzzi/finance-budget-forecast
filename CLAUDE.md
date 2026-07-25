@@ -17,7 +17,7 @@ Live: https://gavuzzi.github.io/finance-budget-forecast/ · Supabase project ref
 - `sie.js` — SIE 4 reader (the Swedish bookkeeping interchange standard that every accounting program exports, so it reaches the whole market, not just Fortnox users). Pure and UI-free like `data.js`: bytes in, plain objects out. **Only `#TRANS` counts** — `#BTRANS`/`#RTRANS` are the audit trail of removed/added rows, and summing them overstated a real file's P&L by 3.9 MSEK. Decodes CP437 (`#FORMAT PC8`), not UTF-8. Real `.se`/`.sie` files are gitignored: they are live company books and this repo is public
 - `tests.html` — engine test suite (see Tools below); loads `lib.js`+`i18n.js`+`data.js` with a stubbed Supabase client
 - `index.html` — the marketing landing page. Separate from the app (no sidebar/data.js) but loads `i18n.js` for its own `lp_*` strings and a nav language toggle
-- `ROADMAP.md` — backlog + honest verification notes · `TESTING.md` — manual checks collected for Felix
+- `ROADMAP.md` — backlog + honest verification notes · `TESTING.md` — manual checks collected for Felix · `GO-LIVE.md` — the ordered path from "a customer said yes" to a real company on real books (long-lead items first: Fortnox production access, lawyer-reviewed DPA)
 - `TEARDOWN.md` — competitor UI convention sheet (C1–C12). Any UI/design change must cite a convention ID from it
 - `SECURITY.md` — client-facing security/data-protection posture doc, re-verify claims against the live system before reuse
 - `DPA-TEMPLATE.md` — DPA skeleton, explicitly NOT usable until a lawyer reviews it (see its own banner)
