@@ -669,8 +669,17 @@ polish → dad pilot → case study → warm circle (dad's clients, colleague, b
   signup at 429), redirect allowlist, and the open-vs-invite-only signup decision.
 
 **Tier 2 — the pilot enablers**
-- [ ] **5. SIE4 file import** (reuse the sync's SIE parsing) + polished CSV/Excel mapping UI —
-  the no-Fortnox on-ramp that also widens reach (Visma/BL/Hogia).
+- [x] **5. SIE4 file import** *(done 2026-07-25 — parser + UI)* — `sie.js` (pure reader) and
+  `sie-import.js` (Data-page flow: preview, tie-out badge, BAS-class grouping, target selector,
+  writes `monthly_actual` and moves booked-through to the ledger's last month). Built against a
+  real iOrdning export, which settled three things guesswork would have got wrong: only `#TRANS`
+  counts (`#BTRANS`/`#RTRANS` overstated that file by 3.9 MSEK), `#FORMAT PC8` means CP437 not
+  UTF-8, and small-SME books carry no cost-centre tags so BAS classes are the mapping key. Real
+  `.se` files are gitignored (public repo). 17 engine + 5 e2e checks.
+  **Still open:** per-cost-centre mapping when a file *does* carry object tags (bigger SMEs will);
+  importing a historical year as a baseline to build next year's plan from (currently such files
+  are read and explained but not importable); and `#UB`/`#IB` balance-sheet use (bank balance for
+  cash flow) — the parser already returns them, nothing consumes them yet.
 - [ ] **6. Månadsrapport PDF** — Swedish board pack v1 with the ties-to-your-books footer.
 - [ ] **7. 13-week cash view** — weekly granularity, invoice-level, tax-date aware.
 - [ ] **8. Pilot kit** — one-page proposal + security summary (from SECURITY.md) for a skeptical
