@@ -205,6 +205,30 @@ function check(name, ok, detail = "") {
   await page.waitForSelector(".planmode-block");
   check("settings: people-cost question with 2 cards", await page.locator(".planmode-people .planmode-opt").count() === 2);
 
+  // ---- Sign-up (Phase 9.4: self-serve account creation) --------------------------
+  // The login gate is only reachable without ?preview, so drive the real one.
+  const plain = `file:///${root.replace(/\\/g, "/")}/app.html`;
+  await page.goto(plain);
+  await page.evaluate(() => sessionStorage.clear()); // earlier checks left demo mode on
+  await page.reload();
+  await page.waitForSelector(".login-card");
+  await page.click(".login-signin summary");
+  check("login: defaults to sign-in", (await page.textContent("#loginSubmit")).includes("Sign in"));
+  check("login: offers account creation", await page.locator("#loginSwitchBtn").count() === 1);
+  await page.click("#loginSwitchBtn");
+  check("signup: form switches mode",
+    (await page.textContent("#loginSubmit")).includes("Create account") &&
+    (await page.textContent("#loginSummary")).includes("Create your workspace"));
+  check("signup: forgot-password hidden in signup mode", await page.locator("#forgotBtn").isHidden());
+  await page.fill("#loginEmail", "nobody@example.com");
+  await page.fill("#loginPassword", "short");
+  await page.click("#loginSubmit");
+  await page.waitForTimeout(300);
+  check("signup: rejects a weak password before hitting the network",
+    /8 characters/.test(await page.textContent("#loginError")));
+  await page.click("#loginSwitchBtn");
+  check("signup: switches back to sign-in", (await page.textContent("#loginSubmit")).includes("Sign in"));
+
   // ---- Org-creation wizard (build your company) ----------------------------------
   await page.goto(url("app.html"));
   await page.waitForSelector("#newOrgBtn");

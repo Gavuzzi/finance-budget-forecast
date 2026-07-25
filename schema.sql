@@ -17,7 +17,7 @@
 create table if not exists organizations (
   id                uuid primary key default gen_random_uuid(),
   name              text not null,
-  close_month       smallint not null default 6,   -- actuals booked through this absolute month (1..24 timeline)
+  close_month       smallint not null default 0,   -- actuals booked through this absolute month (0 = none yet; 1..24 timeline)
   currency          text not null default 'SEK',
   created_at        timestamptz not null default now()
 );
@@ -155,6 +155,10 @@ alter table reporting_lines add column if not exists note text;
 alter table organizations add column if not exists fy_start_month smallint not null default 1;  -- broken fiscal years (May–Apr etc.)
 alter table organizations add column if not exists fy_start_year  smallint not null default 2026;
 alter table organizations add column if not exists close_month_manual boolean not null default false; -- user override of "booked through"
+-- A brand-new org has booked nothing yet; the old default of 6 made an empty
+-- workspace claim "Actuals through Jun". (create table above only applies to
+-- fresh databases, so restate it for existing ones.)
+alter table organizations alter column close_month set default 0;
 alter table reporting_lines add column if not exists source text not null default 'manual';  -- fortnox|manual (fortnox-sourced lines refresh on sync)
 alter table reporting_lines add column if not exists state  text not null default 'linked';  -- planned|linked (plan-ahead lifecycle)
 alter table reporting_lines add column if not exists is_shared boolean not null default false; -- corporate/overhead reporting line — optionally allocated to the others, never on by default

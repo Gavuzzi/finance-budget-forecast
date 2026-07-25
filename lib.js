@@ -102,6 +102,11 @@ function showLoadError(message) {
 }
 
 function renderLogin(onSuccess) {
+  // One form, two modes. Signing up is a first-class path (Phase 9.4): a new
+  // customer creates an account here, confirms by email, and lands in the
+  // "build your company" wizard — no invite, no SQL, no support ticket.
+  let mode = "signin"; // "signin" | "signup"
+
   const overlay = document.createElement("div");
   overlay.className = "login-overlay";
   overlay.innerHTML = `
@@ -111,29 +116,77 @@ function renderLogin(onSuccess) {
       <button type="button" class="login-demo" id="demoBtn">${t("login_demo_btn")}</button>
       <p class="login-demo-sub">${t("login_demo_sub")}</p>
       <details class="login-signin">
-        <summary>${t("login_signin_summary")}</summary>
+        <summary id="loginSummary">${t("login_signin_summary")}</summary>
         <form id="loginForm">
           <label>${t("login_email")} <input type="email" id="loginEmail" required autocomplete="username"></label>
           <label>${t("login_password")} <input type="password" id="loginPassword" required autocomplete="current-password"></label>
-          <button type="submit">${t("login_submit")}</button>
+          <button type="submit" id="loginSubmit">${t("login_submit")}</button>
           <button type="button" class="login-forgot" id="forgotBtn">${t("login_forgot")}</button>
           <p class="login-error" id="loginError"></p>
+          <p class="login-switch">
+            <span id="loginSwitchText">${t("login_switch_to_signup_text")}</span>
+            <button type="button" id="loginSwitchBtn">${t("login_switch_to_signup_btn")}</button>
+          </p>
         </form>
       </details>
     </div>`;
   document.body.appendChild(overlay);
 
-  document.getElementById("demoBtn").addEventListener("click", () => {
+  const el = (id) => document.getElementById(id);
+
+  function applyMode() {
+    const signup = mode === "signup";
+    el("loginSummary").textContent = signup ? t("login_signup_summary") : t("login_signin_summary");
+    el("loginSubmit").textContent = signup ? t("login_signup_submit") : t("login_submit");
+    el("loginPassword").setAttribute("autocomplete", signup ? "new-password" : "current-password");
+    el("forgotBtn").hidden = signup;
+    el("loginSwitchText").textContent = signup ? t("login_switch_to_signin_text") : t("login_switch_to_signup_text");
+    el("loginSwitchBtn").textContent = signup ? t("login_switch_to_signin_btn") : t("login_switch_to_signup_btn");
+    const errEl = el("loginError");
+    errEl.textContent = "";
+    errEl.classList.remove("error");
+  }
+
+  el("loginSwitchBtn").addEventListener("click", () => {
+    mode = mode === "signup" ? "signin" : "signup";
+    applyMode();
+    el("loginEmail").focus();
+  });
+
+  el("demoBtn").addEventListener("click", () => {
     sessionStorage.setItem("demoMode", "1");
     location.reload();
   });
 
-  document.getElementById("loginForm").addEventListener("submit", async (e) => {
+  el("loginForm").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const email = document.getElementById("loginEmail").value.trim();
-    const password = document.getElementById("loginPassword").value;
-    const errEl = document.getElementById("loginError");
+    const email = el("loginEmail").value.trim();
+    const password = el("loginPassword").value;
+    const errEl = el("loginError");
     errEl.classList.remove("error");
+
+    if (mode === "signup") {
+      if (password.length < 8) {
+        errEl.textContent = t("login_password_too_short");
+        errEl.classList.add("error");
+        return;
+      }
+      errEl.textContent = t("login_creating");
+      // Confirmation mail returns the user to this same app URL.
+      const { data, error } = await sb.auth.signUp({
+        email, password,
+        options: { emailRedirectTo: location.origin + location.pathname },
+      });
+      if (error) {
+        errEl.textContent = error.message;
+        errEl.classList.add("error");
+        return;
+      }
+      if (data.session) { overlay.remove(); onSuccess(); return; } // confirmation disabled
+      errEl.textContent = t("login_check_email", email);           // confirmation required
+      return;
+    }
+
     errEl.textContent = t("login_signing_in");
     const { error } = await sb.auth.signInWithPassword({ email, password });
     if (error) {
@@ -167,6 +220,31 @@ function renderLogin(onSuccess) {
   });
 }
 
+// First screen of a brand-new account: no organization exists yet, so there is
+// nothing to load and nothing to show — just the one action that matters.
+// Opens the "build your company" wizard immediately (sidebar.js owns it, and
+// its create path reloads straight into the real app); the card behind it
+// keeps a way back in if they close the wizard, plus a way out.
+function renderNoOrgWelcome() {
+  document.body.innerHTML = `
+    <div class="login-overlay">
+      <div class="login-card">
+        <div class="login-brand"><span class="sb-name">FP&amp;A</span> <span class="login-fpa">Planning</span></div>
+        <h2 class="welcome-h2">${t("welcome_h2")}</h2>
+        <p class="login-demo-sub">${t("welcome_sub")}</p>
+        <button type="button" class="login-demo" id="welcomeStartBtn">${t("welcome_start_btn")}</button>
+        <button type="button" class="login-forgot" id="welcomeSignOut">${t("sign_out")}</button>
+      </div>
+    </div>`;
+  const open = () => (typeof openOrgWizard === "function" ? openOrgWizard() : null);
+  document.getElementById("welcomeStartBtn").addEventListener("click", open);
+  document.getElementById("welcomeSignOut").addEventListener("click", async () => {
+    await sb.auth.signOut();
+    location.reload();
+  });
+  open();
+}
+
 // Gate the page: require a session, load the tenant's data, then run the page's init.
 async function requireAuthAndLoad(initFn) {
   // Public demo: render the whole UI with sample data, no login, no live DB.
@@ -184,6 +262,10 @@ async function requireAuthAndLoad(initFn) {
       await loadData();
     } catch (e) {
       hideLoading();
+      // A signed-in account with no organization is a NEW USER, not a failure:
+      // send them to the wizard instead of a dead end. (It used to render a
+      // developer error telling a customer to run schema.sql.)
+      if (e.code === "NO_ORG") { renderNoOrgWelcome(); return; }
       showLoadError(e.message);
       return;
     }

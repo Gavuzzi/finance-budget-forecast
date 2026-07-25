@@ -111,6 +111,9 @@ function renderCashChart() {
           border: { color: colors.grid },
         },
         y: {
+          // Zero baseline: "how close is the bank balance to zero" IS the
+          // question this chart answers — auto-zoom hides exactly that.
+          beginAtZero: true,
           ticks: { color: colors.text, callback: (v) => fmtMkr(v), maxTicksLimit: 6, padding: 6 },
           grid: { color: colors.grid, drawTicks: false },
           border: { display: false },

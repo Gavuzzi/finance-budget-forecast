@@ -101,11 +101,18 @@ function getRole(roleId) {
   return ROLE_CATALOG.find((r) => r.id === roleId);
 }
 
+// Fully-loaded monthly cost for a base salary, under this org's assumptions.
+// Takes the salary rather than a role so it also works before roles exist in
+// memory (the preset seeder computes with it while inserting them).
+function loadedCostForSalary(baseSalary) {
+  const loaded = baseSalary * (1 + ASSUMPTIONS.employerContributionPct / 100) + ASSUMPTIONS.equipmentMonthly;
+  return Math.round(loaded * (1 + ASSUMPTIONS.otherOverheadPct / 100));
+}
+
 function monthlyCostForRole(roleId) {
   const role = getRole(roleId);
   if (!role) return 0;
-  const loaded = role.baseSalary * (1 + ASSUMPTIONS.employerContributionPct / 100) + ASSUMPTIONS.equipmentMonthly;
-  return Math.round(loaded * (1 + ASSUMPTIONS.otherOverheadPct / 100));
+  return loadedCostForSalary(role.baseSalary);
 }
 
 function isRoleInUse(roleId) {
@@ -784,7 +791,14 @@ async function loadData(orgId) {
   const orgsRes = await sb.from("organizations").select("*").order("name");
   if (orgsRes.error) throw new Error(orgsRes.error.message);
   USER_ORGS = orgsRes.data;
-  if (USER_ORGS.length === 0) throw new Error(t("err_no_org_linked"));
+  // A signed-in user with no organization isn't an error — it's a brand-new
+  // account. Tagged so the auth gate can show the "build your company"
+  // welcome instead of a failure screen (string compare would be fragile).
+  if (USER_ORGS.length === 0) {
+    const noOrg = new Error(t("err_no_org_linked"));
+    noOrg.code = "NO_ORG";
+    throw noOrg;
+  }
 
   // Pick the active org: explicit arg → saved choice → first available.
   const saved = orgId || localStorage.getItem(ORG_STORAGE_KEY);
@@ -1566,9 +1580,9 @@ const BUSINESS_PRESETS = {
     orgRevenue: 25000000, // one company-level target — the simplest mode
     roles: [["Manager", 55000], ["Specialist", 42000], ["Associate", 33000], ["Support", 30000]],
     costCenters: [
-      { name: "Production", budget: 12000000, other: 300000, hc: [["Manager", 1], ["Specialist", 4], ["Associate", 6]] },
-      { name: "Sales & Marketing", budget: 6000000, other: 150000, hc: [["Manager", 1], ["Associate", 4]] },
-      { name: "Administration", budget: 3000000, other: 120000, hc: [["Support", 2]] },
+      { name: "Production", other: 300000, hc: [["Manager", 1], ["Specialist", 4], ["Associate", 6]] },
+      { name: "Sales & Marketing", other: 150000, hc: [["Manager", 1], ["Associate", 4]] },
+      { name: "Administration", other: 120000, hc: [["Support", 2]] },
     ],
   },
   org_simple: {
@@ -1579,8 +1593,8 @@ const BUSINESS_PRESETS = {
     costCenters: [
       // No headcount modelling — each line is plain monthly amounts (salaries
       // included as a lump sum), the smallest-SME way of planning.
-      { name: "Operations", budget: 4400000, other: 365000, hc: [] },
-      { name: "Admin & premises", budget: 1100000, other: 90000, hc: [] },
+      { name: "Operations", other: 365000, hc: [] },
+      { name: "Admin & premises", other: 90000, hc: [] },
     ],
   },
   lines: {
@@ -1590,9 +1604,9 @@ const BUSINESS_PRESETS = {
     costCenters: [
       // Two business areas that each earn their own revenue (line P&L + margin),
       // plus a cost-only admin line — the profit-centre way of planning.
-      { name: "Product A", budget: 12000000, other: 300000, revenue: 18000000, hc: [["Manager", 1], ["Specialist", 4], ["Associate", 6]] },
-      { name: "Product B", budget: 6000000, other: 150000, revenue: 9500000, hc: [["Manager", 1], ["Associate", 4]] },
-      { name: "Administration", budget: 3000000, other: 120000, hc: [["Support", 2]] },
+      { name: "Product A", other: 300000, revenue: 18000000, hc: [["Manager", 1], ["Specialist", 4], ["Associate", 6]] },
+      { name: "Product B", other: 150000, revenue: 9500000, hc: [["Manager", 1], ["Associate", 4]] },
+      { name: "Administration", other: 120000, hc: [["Support", 2]] },
     ],
   },
   hours: {
@@ -1602,10 +1616,10 @@ const BUSINESS_PRESETS = {
       // Client Delivery is planned by the utilization driver (billable hours →
       // revenue, and → the delivery headcount needed), not manual headcount —
       // the services/consulting planning style. BD + Ops stay manual overhead.
-      { name: "Client Delivery", budget: 14000000, other: 100000, hc: [],
+      { name: "Client Delivery", other: 100000, hc: [],
         util: { billRate: 1250, utilizationPct: 72, hoursPerHead: 160, roleLabel: "Consultant", billableHours: 1350 } },
-      { name: "Business Development", budget: 2500000, other: 80000, hc: [["Partner", 1]] },
-      { name: "Operations", budget: 2000000, other: 90000, hc: [["Ops & Admin", 2]] },
+      { name: "Business Development", other: 80000, hc: [["Partner", 1]] },
+      { name: "Operations", other: 90000, hc: [["Ops & Admin", 2]] },
     ],
     roles: [["Partner", 75000], ["Senior Consultant", 55000], ["Consultant", 42000], ["Ops & Admin", 33000]],
   },
@@ -1678,8 +1692,30 @@ async function seedPreset(presetKey) {
   }
 
   for (const cc of preset.costCenters) {
+    // Everything about a sample line derives from ONE number: what its drivers
+    // actually cost per month. The annual target is that run-rate × 12 (rounded
+    // to a clean figure) and the booked months vary around it. Previously the
+    // target, the drivers and the actuals were three unrelated numbers, so a
+    // freshly seeded sample greeted new users with "Over budget +8%" and an
+    // "actuals run 80% above plan" warning — our fixture's fault, not theirs.
+    const peopleMonthly = cc.hc.reduce((sum, [label, count]) => {
+      const base = (preset.roles.find(([l]) => l === label) || [, 0])[1];
+      return sum + count * loadedCostForSalary(base);
+    }, 0);
+    let utilMonthly = 0;
+    if (cc.util) {
+      const capacityPerHead = (cc.util.utilizationPct / 100) * cc.util.hoursPerHead;
+      const hours = Array.isArray(cc.util.billableHours)
+        ? cc.util.billableHours.reduce((a, b) => a + b, 0) / cc.util.billableHours.length
+        : cc.util.billableHours;
+      const roleBase = (preset.roles.find(([l]) => l === cc.util.roleLabel) || [, 0])[1];
+      if (capacityPerHead > 0) utilMonthly = (hours / capacityPerHead) * loadedCostForSalary(roleBase);
+    }
+    const driverMonthly = peopleMonthly + utilMonthly + cc.other;
+    const annualBudget = Math.round((driverMonthly * 12) / 100000) * 100000; // clean, not computed-looking
+
     const { data: ccRow, error } = await sb.from("reporting_lines")
-      .insert({ org_id: CURRENT_ORG_ID, name: cc.name, annual_budget: cc.budget, other_monthly: 0 })
+      .insert({ org_id: CURRENT_ORG_ID, name: cc.name, annual_budget: annualBudget, other_monthly: 0 })
       .select().single();
     if (error) { flagWriteError(error); return false; }
     const ccId = ccRow.id;
@@ -1718,15 +1754,13 @@ async function seedPreset(presetKey) {
       if (vlrRes.error) { flagWriteError(vlrRes.error); return false; }
     }
 
-    // Believable 6 months of actuals derived from the monthly budget run-rate
-    // (small variation), so the example shows a real actual/forecast split.
-    // Cost-only lines (no headcount/util) run at their recurring amount — the
-    // headcount formula would double-count their budget.
-    const monthlyBudget = (cc.hc.length || cc.util) ? (cc.budget + cc.other * 12) / 12 : cc.other;
-    const factors = [0.93, 0.97, 1.02, 0.99, 1.01, 0.98];
+    // Six booked months around the SAME driver run-rate (factors average 1.00),
+    // so the sample lands on plan and its recent run-rate agrees with its own
+    // forecast — no invented variance, no false "re-forecast me" prompt.
+    const factors = [0.98, 1.01, 0.99, 1.02, 0.99, 1.01];
     const actRows = factors.map((f, i) => ({
       org_id: CURRENT_ORG_ID, reporting_line_id: ccId, month: i + 1,
-      amount: Math.round((monthlyBudget * f) / 1000) * 1000,
+      amount: Math.round((driverMonthly * f) / 1000) * 1000,
     }));
     const actRes = await sb.from("monthly_actual").insert(actRows);
     if (actRes.error) { flagWriteError(actRes.error); return false; }

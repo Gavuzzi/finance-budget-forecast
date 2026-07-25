@@ -2198,3 +2198,14 @@ html { scrollbar-width: thin; scrollbar-color: var(--panel-border) transparent; 
 /* Month-by-month module header inside its collapse panel (Phase 9.2 merge) */
 .mt-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
 .mt-panel-head .panel-legend { margin: 0; }
+
+/* Sign-up mode + the new-account welcome (Phase 9.4) */
+.login-switch {
+  margin: 12px 0 0; text-align: center; font-size: 0.85rem; color: var(--text-dim);
+}
+.login-switch button {
+  background: none; border: none; padding: 0 0 0 4px; cursor: pointer;
+  color: var(--accent); font: inherit; font-weight: 600; text-decoration: underline;
+}
+.login-switch button:hover { color: var(--accent-soft); }
+.welcome-h2 { font-size: 1.25rem; color: var(--text); margin: 4px 0 6px; text-align: center; }

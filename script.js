@@ -13,7 +13,13 @@ const THEME_COLORS = {
 // Shared Chart.js dressing: recessive grid (horizontal only, no chart-area
 // border), ≤6 y-ticks (kills duplicate labels from over-dense steps), fmtMkr
 // tooltips, index-mode hover so the whole month lights up as a crosshair.
-function chartBaseOptions(colors) {
+//
+// zeroBased: LEVEL charts (what we spend, what's in the bank) start at zero so
+// a company tracking flat LOOKS flat — auto-scaling turned a ±2% wobble into a
+// mountain range and quietly contradicted the "On plan" verdict beside it.
+// COMPARISON charts (scenario trajectories) keep auto-scale: their whole job is
+// showing where two plans diverge, which a zero baseline would flatten away.
+function chartBaseOptions(colors, { zeroBased = false } = {}) {
   return {
     responsive: true,
     maintainAspectRatio: false,
@@ -29,6 +35,7 @@ function chartBaseOptions(colors) {
         border: { color: colors.grid },
       },
       y: {
+        beginAtZero: zeroBased,
         ticks: { color: colors.text, callback: (v) => fmtMkr(v), maxTicksLimit: 6, padding: 6 },
         grid: { color: colors.grid, drawTicks: false },
         border: { display: false },
@@ -409,7 +416,7 @@ function renderChart() {
   trendChart = new Chart(ctx, {
     type: "line",
     data: { labels, datasets },
-    options: chartBaseOptions(colors),
+    options: chartBaseOptions(colors, { zeroBased: true }), // spend level
   });
 }
 
