@@ -680,7 +680,15 @@ polish → dad pilot → case study → warm circle (dad's clients, colleague, b
   importing a historical year as a baseline to build next year's plan from (currently such files
   are read and explained but not importable); and `#UB`/`#IB` balance-sheet use (bank balance for
   cash flow) — the parser already returns them, nothing consumes them yet.
-- [ ] **6. Månadsrapport PDF** — Swedish board pack v1 with the ties-to-your-books footer.
+- [x] **6. Månadsrapport PDF** *(done 2026-07-25 — `report.html` / `report.js`)* — verdict, key
+  figures, result per line with **booked-so-far as its own column**, the owner's own commentary,
+  cash + runway, headcount, and a provenance footer stating what is closed and what is forecast.
+  The Overview header now links here instead of printing the dashboard. Print-to-PDF only (no
+  library, app stays build-free). Caught while testing: the PDF depended on a `beforeprint`
+  handler to swap themes, so a dark-mode user could print grey-on-white — print colours are now
+  set in CSS alone. 8 e2e checks incl. a computed-colour assertion under print media.
+  **Still open:** a spend chart in the report (tables only for now); per-month columns rather
+  than FY totals; emailing/scheduling it (Tier 3's weekly Brief covers the cadence idea).
 - [ ] **7. 13-week cash view** — weekly granularity, invoice-level, tax-date aware.
 - [ ] **8. Pilot kit** — one-page proposal + security summary (from SECURITY.md) for a skeptical
   first pilot (dad): what data, where it lives, what he gets, exit/delete promise.
