@@ -96,7 +96,12 @@ callback both hard-depend on the app's URL.
 Then re-test **both** flows end to end: a signup confirmation link, and a Fortnox
 connect. Neither fails loudly if a URL is stale — they just don't come back.
 
-### 2e. Terms of service + privacy policy
+### 2e. Swap the contact links on the landing page
+`index.html` currently points "Contact" and "Book a walkthrough" at a personal
+gmail address (two `mailto:` links, plus the same address in `i18n.js` is not used —
+only the HTML). Change both to the new domain's address.
+
+### 2f. Terms of service + privacy policy
 Needed because sign-up is open to anyone. `SECURITY.md` already contains the factual
 content (what we store, where, who processes it); these pages are the customer-facing
 wrapper. Ask Claude to draft, then have the same lawyer glance at them while they have
