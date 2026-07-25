@@ -14,7 +14,8 @@ Live: https://gavuzzi.github.io/finance-budget-forecast/ · Supabase project ref
 - `connect.html` / `connect.js` — the "Data" page: Fortnox connect/sync/mapping + reconciled P&L + manual CSV import. Actuals-loading lives here, kept out of the reporting views
 - `schema.sql` / `integration-schema.sql` — idempotent DB source of truth (mirror every live DB change here). Note `reporting_lines.revenue_plan` — optional per-line revenue makes a line a profit centre (own P&L + margin); engine prefers per-line revenue over the org-level plan when any line earns
 - `supabase/functions/fortnox-sync/index.ts` — the sync Edge Function (self-contained, no imports beyond supabase-js)
-- `tests.html` — 44-assertion engine test suite (see Tools below); loads `lib.js`+`i18n.js`+`data.js` with a stubbed Supabase client
+- `sie.js` — SIE 4 reader (the Swedish bookkeeping interchange standard that every accounting program exports, so it reaches the whole market, not just Fortnox users). Pure and UI-free like `data.js`: bytes in, plain objects out. **Only `#TRANS` counts** — `#BTRANS`/`#RTRANS` are the audit trail of removed/added rows, and summing them overstated a real file's P&L by 3.9 MSEK. Decodes CP437 (`#FORMAT PC8`), not UTF-8. Real `.se`/`.sie` files are gitignored: they are live company books and this repo is public
+- `tests.html` — engine test suite (see Tools below); loads `lib.js`+`i18n.js`+`data.js` with a stubbed Supabase client
 - `index.html` — the marketing landing page. Separate from the app (no sidebar/data.js) but loads `i18n.js` for its own `lp_*` strings and a nav language toggle
 - `ROADMAP.md` — backlog + honest verification notes · `TESTING.md` — manual checks collected for Felix
 - `TEARDOWN.md` — competitor UI convention sheet (C1–C12). Any UI/design change must cite a convention ID from it

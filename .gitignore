@@ -1,3 +1,7 @@
 test-data/sandbox-scale.sie
 node_modules/
 package-lock.json
+
+# Real SIE exports are live company books — never commit them (public repo)
+*.se
+*.sie

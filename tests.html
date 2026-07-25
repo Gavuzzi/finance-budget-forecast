@@ -32,6 +32,7 @@ window.supabase = { createClient: () => ({ auth: { onAuthStateChange() {} } }) }
 <script src="lib.js"></script>
 <script src="i18n.js"></script>
 <script src="data.js"></script>
+<script src="sie.js"></script>
 <script>
 const results = [];
 function eq(name, actual, expected) {
@@ -195,6 +196,61 @@ eq("csv: matched by name onto the right line", parsed.rows[0].reporting_line_id,
 eq("escapeHtml neutralizes tags and quotes",
   escapeHtml(`<img src=x onerror="x('y')">&`),
   "&lt;img src=x onerror=&quot;x(&#39;y&#39;)&quot;&gt;&amp;");
+
+// ---- SIE 4 reader ----------------------------------------------------------------
+// Synthetic fixture mirroring a real iOrdning export's structure (the real file
+// is a live company's books and is deliberately never committed — public repo).
+// Two vouchers, plus a corrected one whose original rows appear as #BTRANS and
+// whose replacement rows appear as #RTRANS.
+const SIE_FIXTURE = [
+  '#FLAGGA 0', '#FORMAT PC8', '#SIETYP 4', '#PROGRAM "iOrdning" 6.0.65',
+  '#FNAMN "Testbolaget AB"', '#ORGNR 556000-0000',
+  '#RAR 0 20250101 20251231', '#RAR -1 20240101 20241231',
+  '#KONTO 3010 "Försäljning"', '#KONTO 5010 "Lokalhyra"', '#KONTO 7010 "Löner"',
+  '#RES 0 3010 -100000.00', '#RES 0 5010 12000.00', '#RES 0 7010 40000.00',
+  '#RES -1 3010 -80000.00',
+  '#UB 0 1920 58000.00',
+  '#VER A 1 20250315 "Faktura 1" 20250320',
+  '{', '#TRANS 3010 {} -60000.00', '#TRANS 1920 {} 60000.00', '}',
+  '#VER A 2 20250620 "Hyra + lön" 20250620',
+  '{', '#TRANS 5010 {} 12000.00', '#TRANS 7010 {} 40000.00', '#TRANS 1920 {} -52000.00', '}',
+  // Voucher 3 was corrected: the ORIGINAL rows are the #BTRANS pair, the
+  // replacement is the #TRANS pair. Summing all of them double-counts.
+  '#VER A 3 20251130 "Faktura 2 (rättad)" 20251201',
+  '{', '#BTRANS 3010 {} -999999.00', '#BTRANS 1920 {} 999999.00',
+  '#RTRANS 3010 {} -40000.00', '#RTRANS 1920 {} 40000.00',
+  '#TRANS 3010 {} -40000.00', '#TRANS 1920 {} 40000.00', '}',
+].join("\r\n");
+
+const sie = parseSie(SIE_FIXTURE);
+eq("sie: reads the company name", sie.company.name, "Testbolaget AB");
+eq("sie: reads both fiscal years", sie.fiscalYears.map((y) => y.from), ["2025-01-01", "2024-01-01"]);
+eq("sie: reads account names", sie.accounts["5010"], "Lokalhyra");
+eq("sie: counts vouchers", sie.vouchers, 3);
+eq("sie: no cost-centre tags in this file", sie.hasObjectTags, false);
+// THE critical rule, proven on the real export: #TRANS only. Including
+// #BTRANS/#RTRANS here would report revenue of 1 139 999 instead of 100 000.
+eq("sie: ignores #BTRANS/#RTRANS (audit trail, not reality)", sie.transSums["3010"], -100000);
+eq("sie: transactions tie out to the reported #RES", sie.tieOut.ok, true);
+eq("sie: tie-out covers every P&L account", sie.tieOut.accounts, 3);
+// P&L in the app's convention: revenue positive, costs positive.
+const sieP = siePnl(sie);
+eq("sie: P&L revenue flips credit-negative to positive", sieP.revenue, 100000);
+eq("sie: P&L splits opex vs personnel by BAS class", [sieP.opex, sieP.personnel], [12000, 40000]);
+eq("sie: P&L result = revenue − cost", sieP.result, 48000);
+eq("sie: prior year available for comparison", siePnl(sie, -1).revenue, 80000);
+// Monthly costs come from voucher dates; revenue months are excluded here.
+eq("sie: monthly costs bucketed by voucher date", sieMonthlyCosts(sie), { "2025-06": 52000 });
+const rhythm = sieBookingRhythm(sie);
+eq("sie: booking rhythm counts months with booked cost", rhythm.monthsWithData, 1);
+eq("sie: concentration flags a single-month year", rhythm.concentration, 1);
+// A UTF-8 file (BOM) must decode too, not just CP437.
+const utf8Bytes = new TextEncoder().encode("﻿" + '#FNAMN "Åkes Bygg AB"');
+eq("sie: honours a UTF-8 BOM", parseSie(utf8Bytes).company.name, "Åkes Bygg AB");
+// CP437 high bytes: å=0x86, ö=0x94 — reading these as UTF-8 mangles the name.
+const cp437 = new Uint8Array([...'#FNAMN "'].map((c) => c.charCodeAt(0))
+  .concat([0x86, 0x94], [...'ke AB"'].map((c) => c.charCodeAt(0))));
+eq("sie: decodes CP437 Swedish characters", parseSie(cp437).company.name, "åöke AB");
 
 // ---- Report ---------------------------------------------------------------------
 const failed = results.filter((r) => !r.ok);
