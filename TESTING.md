@@ -90,8 +90,16 @@ Everything below verified live against real Fortnox data:
 
 ## Before real customers sign up (found 2026-07-25, Phase 9.4)
 
-- [ ] **Point Supabase Auth at Resend — this is the launch blocker.** Note there are two
-  separate email paths and only one is done:
+> **Decision 2026-07-25: email is deferred to first-customer time.** Buy a domain, verify it in
+> Resend, point Supabase Auth at it — all together, when a paying customer is actually close.
+> Not before: it costs money, and nothing needs it yet. What still works in the meantime, so
+> nobody is surprised: **a single pilot user CAN sign up** (Supabase's built-in mail sends the
+> first message or two in an hour just fine), but **the monthly digest will NOT reach them** —
+> it sends from `onboarding@resend.dev`, which only delivers to Felix's own address. So a pilot
+> can use the app; they just won't get the digest email until the domain exists.
+
+- [ ] **Point Supabase Auth at Resend** *(deferred — do with the domain purchase above)*. Two
+  separate email paths, only one done:
   · the **monthly digest** calls the Resend API directly from `send-digest` (works,
     `RESEND_API_KEY` already a Supabase secret);
   · **auth email** — signup confirmation, password reset, team invites — still goes through
@@ -101,7 +109,9 @@ Everything below verified live against real Fortnox data:
   refused with `email rate limit exceeded` (HTTP 429). The second person to sign up in an hour
   gets nothing, silently. Fix: Supabase → Authentication → SMTP, paste Resend's SMTP
   credentials, then raise the cap under Auth → Rate Limits.
-- [ ] **Verify a sending domain in Resend.** `send-digest` currently sends from
+- [ ] **Buy + verify a sending domain** *(chosen route: own domain at first customer, not a
+  subdomain of someone else's — the app should live there too, `gavuzzi.github.io` is a weak
+  address for software that handles a company's books).* `send-digest` currently sends from
   `onboarding@resend.dev` — Resend's shared test address, which only delivers to your own
   account email. That's why the digest test showed "sent to 1" and looked healthy. No customer
   can receive mail from either path until a domain you own is verified in Resend. Once it is,
