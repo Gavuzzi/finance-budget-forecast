@@ -1264,9 +1264,12 @@ async function dbUpdateCostCenter(cc) {
   if (error) flagWriteError(error);
 }
 
-async function dbInsertCostCenter() {
+// name is optional: the Planning page creates blank lines for the user to
+// name, while the SIE import creates lines already named after the account
+// group they hold ("Personnel", "Other external costs", …).
+async function dbInsertCostCenter(name) {
   const { data, error } = await sb.from("reporting_lines")
-    .insert({ org_id: CURRENT_ORG_ID, name: t("new_reporting_line_name"), annual_budget: 0, other_monthly: 0 })
+    .insert({ org_id: CURRENT_ORG_ID, name: name || t("new_reporting_line_name"), annual_budget: 0, other_monthly: 0 })
     .select().single();
   if (error) { flagWriteError(error); return null; }
   return { id: data.id, name: data.name, annualBudget: Number(data.annual_budget), otherMonthly: Number(data.other_monthly), isShared: false, headcount: [], oneOffs: [], recurringCosts: [], overrides: {}, utilization: null, actualMonthly: [] };

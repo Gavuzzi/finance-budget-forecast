@@ -160,11 +160,15 @@ function parseSie(input) {
 
   // Tie-out: our summed transactions vs the file's own reported result. This is
   // the trust badge — if these disagree we say so instead of importing quietly.
+  // Tolerance is half a krona per account: exporters round to öre, so a few
+  // öre of drift is arithmetic noise, not a discrepancy. A genuine problem (a
+  // missed voucher, a misread tag) is orders of magnitude larger — flagging
+  // sub-krona differences only produced the absurd warning "largest gap 0 kr".
   const current = out.result[0] || {};
   let worstDiff = 0, mismatches = 0;
   for (const acct of Object.keys(current)) {
     const diff = Math.abs((out.transSums[acct] || 0) - current[acct]);
-    if (diff > 0.01) { mismatches++; worstDiff = Math.max(worstDiff, diff); }
+    if (diff > 0.5) { mismatches++; worstDiff = Math.max(worstDiff, diff); }
   }
   out.tieOut = { ok: mismatches === 0, mismatches, worstDiff, accounts: Object.keys(current).length };
   return out;

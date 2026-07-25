@@ -7,6 +7,7 @@
 function initConnect() {
   handleFortnoxRedirect();
   renderIntegrationPanel(document.getElementById("integrationPanel"));
+  initSieImport();
   initImport();
 
   // Dev hook (moved from Monthly): render the mapping editor with a mixed

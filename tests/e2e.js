@@ -248,6 +248,42 @@ function check(name, ok, detail = "") {
   await page.waitForSelector(".empty-state");
   check("empty org: exactly one matched sample card", await page.locator(".preset-card").count() === 1);
 
+  // ---- SIE import (Data page) ----------------------------------------------------
+  // A tiny in-window SIE 4 file, written on the fly — the real exports used in
+  // development are live company books and are never committed.
+  const sieFixture = [
+    "#FLAGGA 0", "#FORMAT PC8", "#SIETYP 4", '#FNAMN "E2E Testbolag AB"', "#ORGNR 556000-1111",
+    "#RAR 0 20260101 20261231", '#KONTO 5010 "Lokalhyra"', '#KONTO 7010 "Loner"',
+    "#RES 0 5010 120000.00", "#RES 0 7010 600000.00",
+    '#VER A 1 20260215 "Feb" 20260220', "{", "#TRANS 5010 {} 60000.00", "#TRANS 7010 {} 300000.00", "}",
+    '#VER A 2 20260315 "Mar" 20260320', "{", "#TRANS 5010 {} 60000.00", "#TRANS 7010 {} 300000.00", "}",
+  ].join("\r\n");
+  const siePath = path.join(require("os").tmpdir(), "e2e-fixture.se");
+  require("fs").writeFileSync(siePath, sieFixture, "latin1");
+
+  await page.goto(url("connect.html"));
+  await page.waitForSelector("#sieImportOpen");
+  await page.click("#sieImportOpen");
+  await page.setInputFiles("#sieFile", siePath);
+  await page.waitForSelector(".sie-card");
+  check("sie: reads the company and year out of the file",
+    /E2E Testbolag AB/.test(await page.textContent(".sie-card")));
+  check("sie: shows a tie-out badge that passes",
+    /Ties out/.test(await page.textContent(".sie-tie")));
+  check("sie: groups costs by BAS class with month counts",
+    await page.locator(".driver-table tbody tr").count() === 2);
+  // Nothing may be written until a target line is chosen…
+  await page.click("#sieImportBtn");
+  await page.waitForTimeout(300);
+  check("sie: refuses to import before a reporting line is picked",
+    /Choose a reporting line/.test(await page.textContent("#saveToast")));
+  // …and in demo mode the write itself is still blocked.
+  await page.selectOption('[data-siegroup="0"]', { index: 1 });
+  await page.click("#sieImportBtn");
+  await page.waitForSelector("#saveToast.show");
+  check("sie: demo mode blocks the write (sign-in toast)",
+    /[Ss]ign in/.test(await page.textContent("#saveToast")));
+
   // ---- Cash Flow -----------------------------------------------------------------
   await page.goto(url("cashflow.html"));
   await page.waitForSelector('[data-help="cashflow_method"]');

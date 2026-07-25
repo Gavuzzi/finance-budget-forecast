@@ -21,6 +21,20 @@
 
       <div id="integrationPanel"></div>
 
+      <!-- SIE import: the on-ramp for every Swedish accounting program, not
+           just Fortnox. Parsed in the browser; nothing is written until the
+           preview (tie-out + mapping) has been confirmed. -->
+      <section class="panel">
+        <h2 data-i18n="sie_h2">Import from your accounting system</h2>
+        <p class="panel-legend" data-i18n="sie_sub">Every Swedish bookkeeping program exports a SIE file (.se) — Visma, Björn Lundén, Hogia, iOrdning, Fortnox. Upload one and we read your booked figures straight from it.</p>
+        <button class="btn-secondary" id="sieImportOpen" type="button" data-i18n="sie_open_btn">Import a SIE file</button>
+        <div class="import-panel" id="siePanel" hidden>
+          <p class="import-help" data-i18n="sie_help">Export "SIE 4" (bokföringsår / transaktioner) from your program and choose the file here. It stays in your browser until you press Import.</p>
+          <input type="file" id="sieFile" accept=".se,.si,.sie">
+          <div id="sieResult"></div>
+        </div>
+      </section>
+
       <section class="panel">
         <h2 data-i18n="import_csv_h2">Manual import</h2>
         <p class="panel-legend" data-i18n="import_csv_sub">No Fortnox connection? Fill in a spreadsheet and upload it here.</p>
@@ -47,6 +61,8 @@
   <script src="data.js"></script>
   <script src="sidebar.js"></script>
   <script src="fortnox.js"></script>
+  <script src="sie.js"></script>
+  <script src="sie-import.js"></script>
   <script src="connect.js"></script>
   <script>requireAuthAndLoad(() => { renderSidebar(); window.initPage(); });</script>
 </body>

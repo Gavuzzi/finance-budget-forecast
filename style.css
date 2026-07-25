@@ -2209,3 +2209,19 @@ html { scrollbar-width: thin; scrollbar-color: var(--panel-border) transparent; 
 }
 .login-switch button:hover { color: var(--accent-soft); }
 .welcome-h2 { font-size: 1.25rem; color: var(--text); margin: 4px 0 6px; text-align: center; }
+
+/* SIE import (Data page) — preview before anything is written */
+.sie-card { margin-top: 14px; border: 1px solid var(--panel-border); border-radius: 12px; padding: 16px 18px; background: var(--bg); }
+.sie-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+.sie-head strong { font-size: 1.02rem; color: var(--text); }
+.sie-sub { color: var(--text-dim); font-size: 0.85rem; margin: 0 0 12px; }
+.sie-tie { font-size: 0.78rem; font-weight: 600; padding: 2px 9px; border-radius: 999px; margin-left: auto; }
+.sie-tie.ok { color: var(--green, #3fb27f); background: rgba(63,178,127,0.12); }
+.sie-tie.bad { color: var(--red); background: rgba(224,90,90,0.12); }
+.sie-pnl { max-width: 520px; margin-bottom: 12px; }
+.sie-note { font-size: 0.85rem; color: var(--text-dim); line-height: 1.55; margin: 10px 0; }
+.sie-note.sie-bad { color: var(--red); }
+.sie-acc { font-size: 0.75rem; color: var(--text-dim); }
+.sie-map { background: var(--bg); border: 1px solid var(--panel-border); color: var(--text); border-radius: 8px; padding: 5px 8px; font-size: 0.85rem; font-family: inherit; }
+.sie-map:focus { outline: none; border-color: var(--accent); }
+#sieFile { display: block; margin: 10px 0; font-size: 0.85rem; color: var(--text-dim); }
