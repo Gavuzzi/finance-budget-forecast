@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FP&A Planning — a driver-based financial planning app</title>
-<meta name="description" content="A working demonstration of a multi-tenant financial planning app: budget, forecast, and track spend built from drivers instead of spreadsheet cells.">
+<title>FP&A Planning — budget, forecast and cash for Swedish SMEs</title>
+<meta name="description" content="Driver-based budgeting, forecasting and cash planning for Swedish small and medium companies. Reads your booked figures straight from Fortnox or any SIE export, and produces a board-ready monthly report.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
@@ -114,7 +114,7 @@
       </div>
       <div class="lp-nav-links">
         <a href="app.html" data-i18n="lp_nav_signin">Sign in</a>
-        <a href="https://github.com/Gavuzzi/finance-budget-forecast" target="_blank" rel="noopener" data-i18n="lp_nav_source">Source</a>
+        <a href="mailto:felixroos@gmail.com?subject=FP%26A%20Planning" data-i18n="lp_nav_contact">Contact</a>
         <a class="primary" href="app.html?preview" data-i18n="lp_nav_demo">Live demo →</a>
         <button class="lang-toggle" id="langToggle" type="button" data-i18n="lang_toggle">🇸🇪 Svenska</button>
       </div>
@@ -127,7 +127,7 @@
       <p class="lead" data-i18n-html="lp_hero_lead">A multi-tenant financial planning app for growing companies. Every figure is built from <strong>drivers</strong> — your people and known costs — so changing one assumption flows through the whole plan instead of shattering a spreadsheet.</p>
       <div class="lp-cta">
         <a class="btn btn-primary" href="app.html?preview" data-i18n="lp_cta_demo">Explore the live demo →</a>
-        <a class="btn btn-ghost" href="https://github.com/Gavuzzi/finance-budget-forecast" target="_blank" rel="noopener" data-i18n="lp_cta_source">View the source</a>
+        <a class="btn btn-ghost" href="mailto:felixroos@gmail.com?subject=FP%26A%20Planning%20—%20walkthrough" data-i18n="lp_cta_talk">Book a walkthrough</a>
       </div>
       <p class="lp-cta-note" data-i18n="lp_cta_note">No sign-up — opens a full sample company you can click through.</p>
 
@@ -175,7 +175,7 @@
       </div>
       <div class="shot">
         <div class="shot-bar"><span></span><span></span><span></span></div>
-        <img src="assets/screen-loop.png" data-i18n-alt="lp_shot_loop_alt" alt="Signals flagging a variance and Re-forecast suggesting a one-click, reversible fix">
+        <img src="assets/screen-brief.png" data-i18n-alt="lp_shot_brief_alt" alt="The brief: cash, the next tax payment, and the lines drifting from budget — in sentences">
       </div>
     </section>
 
@@ -190,7 +190,22 @@
       </div>
       <div class="shot">
         <div class="shot-bar"><span></span><span></span><span></span></div>
-        <img src="assets/screen-assumptions.png" data-i18n-alt="lp_shot_assumptions_alt" alt="The rate engine: assumptions and derived loaded cost per role">
+        <img src="assets/screen-planning.png" data-i18n-alt="lp_shot_planning_alt" alt="Planning: revenue plan, then each reporting line built from roles, headcount and running costs">
+      </div>
+    </section>
+
+    <!-- The report: the artifact that leaves the building -->
+    <section class="split">
+      <div>
+        <div class="kicker" data-i18n="lp_report_kicker">The output</div>
+        <h2 data-i18n="lp_report_h2">A månadsrapport you can send as-is.</h2>
+        <p data-i18n-html="lp_report_p1">One click produces a clean monthly report: the verdict, the result per line with <strong>booked-so-far shown separately from forecast</strong>, your own commentary, cash and runway, and headcount.</p>
+        <p data-i18n-html="lp_report_p2">It ends by stating <strong>where every figure came from</strong> — what is closed, what is forecast from your drivers, and that nothing was typed over. That is the part a bank or a board actually needs.</p>
+        <p data-i18n="lp_report_p3">Swedish or English, straight to PDF.</p>
+      </div>
+      <div class="shot">
+        <div class="shot-bar"><span></span><span></span><span></span></div>
+        <img src="assets/screen-report.png" data-i18n-alt="lp_shot_report_alt" alt="The monthly report: verdict, result per reporting line, commentary, cash and headcount">
       </div>
     </section>
 
@@ -205,7 +220,7 @@
       </div>
       <div class="shot">
         <div class="shot-bar"><span></span><span></span><span></span></div>
-        <img src="assets/screen-fortnox.png" data-i18n-alt="lp_shot_fortnox_alt" alt="Connected to Fortnox — a full P&amp;L reconciled automatically from booked vouchers">
+        <img src="assets/screen-data.png" data-i18n-alt="lp_shot_data_alt" alt="The Data page: a connected Fortnox company reconciled automatically, plus SIE file import">
       </div>
     </section>
 
@@ -253,9 +268,10 @@
     <!-- Final CTA -->
     <section class="lp-final">
       <h2 class="lp-h2" data-i18n="lp_final_h2">See it for yourself.</h2>
+      <p class="lp-sub" data-i18n="lp_final_sub">The demo is the real app running on a sample company — click anything. When you want it pointed at your own books, get in touch and we'll set it up together.</p>
       <div class="lp-cta">
         <a class="btn btn-primary" href="app.html?preview" data-i18n="lp_final_cta_demo">Open the live demo →</a>
-        <a class="btn btn-ghost" href="https://github.com/Gavuzzi/finance-budget-forecast" target="_blank" rel="noopener" data-i18n="lp_final_cta_source">Read the code</a>
+        <a class="btn btn-ghost" href="mailto:felixroos@gmail.com?subject=FP%26A%20Planning%20—%20walkthrough" data-i18n="lp_cta_talk">Book a walkthrough</a>
       </div>
     </section>
   </div>
