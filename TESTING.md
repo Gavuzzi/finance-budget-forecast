@@ -90,19 +90,21 @@ Everything below verified live against real Fortnox data:
 
 ## Before real customers sign up (found 2026-07-25, Phase 9.4)
 
-- [ ] **Configure custom SMTP in Supabase** — Auth → Settings → SMTP. Self-serve sign-up is
-  now live in the UI, but the project uses Supabase's built-in mail, which rate-limits to a
-  handful of messages per hour: during testing a genuine sign-up came back
-  `email rate limit exceeded` (HTTP 429). With more than one or two people signing up in the
-  same hour, confirmation mails will silently fail. Custom SMTP (Postmark/Resend/SES) also
-  keeps the mail from looking like it came from Supabase.
+- [ ] **Configure custom SMTP in Supabase — this is the launch blocker.** Auth → Settings →
+  SMTP. Self-serve sign-up is live in the UI, but the project still uses Supabase's built-in
+  mail, whose default limit is roughly **2 messages per hour for the whole project**. Measured
+  on 2026-07-25: the first confirmation mail sent fine (08:49 UTC), the next sign-up ~30 min
+  later was refused outright with `email rate limit exceeded` (HTTP 429) — so in practice the
+  second person to sign up in an hour gets nothing, silently. Custom SMTP (Postmark/Resend/SES)
+  lifts the cap, lets you raise the limit in Auth → Rate Limits, and stops the mail looking
+  like it came from Supabase. **Do this before showing anyone the sign-up page.**
 - [ ] **Check the Site URL / redirect allowlist** — Auth → URL Configuration must list
   `https://gavuzzi.github.io/finance-budget-forecast/` so the confirmation link (and the
   password-reset link) return to the live app rather than localhost. Sign up with a real
   address once and click the link end to end.
-- [ ] **Decide whether sign-up stays open.** It is enabled server-side (anyone with the
-  publishable key — which is in the client source by design — can create an account). RLS
-  means a stranger sees nothing: no org, no data, just the welcome/wizard. If you'd rather
-  keep it invite-only until you're ready, turn "Allow new users to sign up" off in Auth
-  settings; the login card's Create-account path then returns Supabase's own refusal, so
-  swap it for a "request access" note at the same time.
+- [x] **Sign-up stays open** *(decided 2026-07-25)* — anyone can create an account; RLS means
+  a stranger sees nothing but the welcome/wizard until they build their own org. Consequences
+  to keep an eye on, none blocking: junk rows in `auth.users` (harmless, deletable), and the
+  email cap above applies to *everyone's* confirmations, so a burst of sign-ups starves the
+  real ones until custom SMTP is in place. Worth a quick look at Auth → Rate Limits and
+  Supabase's bot-protection (hCaptcha/Turnstile) toggle if the app is ever linked publicly.
