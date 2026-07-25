@@ -753,11 +753,13 @@ window.onThemeChanged = () => {
 window.refreshAfterPeriodChange = renderAll;
 
 // Entry point — called by the auth bootstrap (lib.js) after login + data load.
+// The Overview still prints sensibly (Ctrl-P), but the shareable artifact is
+// the månadsrapport (report.html) — a document rather than a screenshot of a
+// dashboard, so the header button links there instead of calling print().
 function initPrint() {
   const orgName = (USER_ORGS.find((o) => o.id === CURRENT_ORG_ID) || {}).name || "";
   const ph = document.getElementById("printHeader");
   if (ph) ph.textContent = t("print_header", orgName, new Date().toLocaleDateString("sv-SE"), fyName());
-  document.getElementById("printBtn").addEventListener("click", () => window.print());
 }
 
 // Force a clean light palette (and re-render the chart light) for printing,

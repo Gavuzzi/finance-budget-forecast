@@ -14,6 +14,7 @@ const path = require("path");
 
 const root = path.resolve(__dirname, "..");
 const url = (page, extra = "") => `file:///${root.replace(/\\/g, "/")}/${page}?preview${extra}`;
+const COST_CENTER_COUNT = 3; // the demo fixture's reporting lines (Production, R&D, IT)
 
 const results = [];
 function check(name, ok, detail = "") {
@@ -283,6 +284,37 @@ function check(name, ok, detail = "") {
   await page.waitForSelector("#saveToast.show");
   check("sie: demo mode blocks the write (sign-in toast)",
     /[Ss]ign in/.test(await page.textContent("#saveToast")));
+
+  // ---- Månadsrapport (report.html) -----------------------------------------------
+  await page.goto(url("app.html"));
+  await page.waitForSelector(".hero-verdict");
+  check("overview: links to the monthly report", await page.locator('a[href="report.html"]').count() === 1);
+
+  await page.goto(url("report.html"));
+  await page.waitForSelector(".rep-org");
+  check("report: leads with the company and a verdict",
+    !!(await page.textContent(".rep-org")).trim() && !!(await page.textContent(".rep-verdict")).trim());
+  check("report: result table carries every line plus a total",
+    await page.locator(".rep-table-result tbody tr").count() === COST_CENTER_COUNT &&
+    await page.locator(".rep-table-result tfoot tr").count() === 1);
+  check("report: separates booked actuals from the full-year figure",
+    (await page.textContent(".rep-table thead")).includes("Booked so far"));
+  check("report: states where the figures came from",
+    /forecast from your own drivers/.test(await page.textContent(".rep-provenance")));
+  check("report: carries the owner's commentary", await page.locator(".rep-notes dd").count() >= 1);
+
+  // The PDF must be readable from CSS alone — it used to rely on a beforeprint
+  // handler swapping the theme, so a dark-mode user could print grey on white.
+  await page.emulateMedia({ media: "print" });
+  await page.waitForTimeout(200);
+  check("report: app chrome is dropped when printing",
+    !(await page.locator(".sidebar").isVisible()) && !(await page.locator(".page-head").isVisible()));
+  const inkDark = await page.evaluate(() => {
+    const rgb = getComputedStyle(document.querySelector(".rep-org")).color.match(/\d+/g).map(Number);
+    return rgb[0] < 90 && rgb[1] < 90 && rgb[2] < 90; // near-black on paper
+  });
+  check("report: prints as ink on white regardless of theme", inkDark);
+  await page.emulateMedia({ media: "screen" });
 
   // ---- Cash Flow -----------------------------------------------------------------
   await page.goto(url("cashflow.html"));

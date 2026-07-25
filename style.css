@@ -2225,3 +2225,82 @@ html { scrollbar-width: thin; scrollbar-color: var(--panel-border) transparent; 
 .sie-map { background: var(--bg); border: 1px solid var(--panel-border); color: var(--text); border-radius: 8px; padding: 5px 8px; font-size: 0.85rem; font-family: inherit; }
 .sie-map:focus { outline: none; border-color: var(--accent); }
 #sieFile { display: block; margin: 10px 0; font-size: 0.85rem; color: var(--text-dim); }
+
+/* ============================================================
+   Månadsrapport (report.html) — a document, not a dashboard.
+   Screen shows it as a page-shaped sheet; print sheds all chrome.
+   ============================================================ */
+.report-doc {
+  background: var(--panel); border: 1px solid var(--panel-border); border-radius: 14px;
+  padding: 40px 44px; max-width: 900px; line-height: 1.6;
+}
+.rep-head { border-bottom: 2px solid var(--text); padding-bottom: 12px; margin-bottom: 20px; }
+.rep-org { font-family: 'Fraunces', Georgia, serif; font-size: 1.6rem; font-weight: 700; color: var(--text); margin: 0; }
+.rep-kicker { font-size: 0.85rem; color: var(--text-dim); margin: 4px 0 0; text-transform: uppercase; letter-spacing: 0.05em; }
+
+.rep-verdict-row { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 22px; }
+.rep-verdict { font-family: 'Fraunces', Georgia, serif; font-size: 1.7rem; font-weight: 700; }
+.rep-verdict.over { color: var(--red); } .rep-verdict.under { color: var(--green, #3fb27f); }
+.rep-verdict-num { font-size: 1rem; font-variant-numeric: tabular-nums; }
+
+.rep-figs { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; margin-bottom: 26px; }
+.rep-fig { display: flex; flex-direction: column; gap: 2px; }
+.rep-fig-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); }
+.rep-fig-value { font-size: 1.25rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.rep-fig-sub { font-size: 0.75rem; color: var(--text-dim); }
+
+.rep-section { margin-bottom: 26px; break-inside: avoid; }
+.rep-section h2 {
+  font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-dim);
+  border-bottom: 1px solid var(--panel-border); padding-bottom: 5px; margin: 0 0 12px;
+}
+.rep-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.rep-table-narrow { max-width: 420px; }
+.rep-table th {
+  text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--text-dim); font-weight: 600; padding: 0 8px 6px 0;
+}
+.rep-table th.num, .rep-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.rep-table td { padding: 7px 8px 7px 0; border-top: 1px solid var(--panel-border); color: var(--text); }
+.rep-table tfoot td { border-top: 2px solid var(--text); font-weight: 700; }
+.rep-table td.over { color: var(--red); } .rep-table td.under { color: var(--green, #3fb27f); }
+.rep-pct { font-size: 0.78rem; opacity: 0.75; }
+
+.rep-notes { margin: 0; }
+.rep-notes dt { font-weight: 600; color: var(--text); font-size: 0.9rem; margin-top: 8px; }
+.rep-notes dd { margin: 2px 0 0; color: var(--text-dim); font-size: 0.9rem; }
+.rep-fine { font-size: 0.78rem; color: var(--text-dim); margin: 8px 0 0; }
+.rep-provenance { border-top: 1px solid var(--panel-border); padding-top: 12px; font-size: 0.82rem; color: var(--text-dim); }
+.rep-provenance p { margin: 0 0 4px; }
+
+@media print {
+  @page { size: A4; margin: 16mm 14mm; }
+  .report-doc {
+    border: none; border-radius: 0; padding: 0; max-width: none;
+    background: #fff; color: #111; font-size: 10.5pt;
+  }
+  .rep-section { break-inside: avoid; }
+  .rep-table { break-inside: auto; }
+  .rep-table tr { break-inside: avoid; }
+  .rep-provenance { break-before: avoid; }
+  .demo-banner { display: none !important; }
+
+  /* Ink, not theme. The report used to inherit the app's theme variables and
+     rely on a beforeprint handler to swap them — so a dark-mode user whose
+     JS hadn't run got pale grey text on white paper. The PDF is the artifact
+     that leaves the building; it must be readable from CSS alone. */
+  .report-doc, .report-doc .rep-org, .report-doc .rep-fig-value,
+  .report-doc .rep-table td, .report-doc .rep-table tfoot td,
+  .report-doc .rep-notes dt { color: #111 !important; }
+  .report-doc .rep-kicker, .report-doc .rep-fig-label, .report-doc .rep-fig-sub,
+  .report-doc .rep-section h2, .report-doc .rep-fine, .report-doc .rep-provenance,
+  .report-doc .rep-notes dd, .report-doc .rep-table th,
+  .report-doc .rep-verdict-num, .report-doc .rep-pct { color: #555 !important; }
+  .report-doc .rep-verdict.under, .report-doc .rep-table td.under { color: #1a7f4b !important; }
+  .report-doc .rep-verdict.over, .report-doc .rep-table td.over { color: #b3261e !important; }
+  .report-doc .rep-head { border-bottom-color: #111 !important; }
+  .report-doc .rep-section h2, .report-doc .rep-table td,
+  .report-doc .rep-provenance { border-color: #ccc !important; }
+  .report-doc .rep-table tfoot td { border-top-color: #111 !important; }
+  .report-doc { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}

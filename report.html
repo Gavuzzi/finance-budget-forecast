@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monthly report — FP&A</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="app-main">
+      <header class="page-head print-hide">
+        <div class="page-head-text">
+          <h1 data-i18n="report_h1">Monthly report</h1>
+          <p class="page-sub" data-i18n="report_subtitle">The board pack — one page your bank, board or accountant can read without you in the room</p>
+        </div>
+        <button class="btn-secondary" id="reportPrintBtn" type="button" data-i18n="report_print_btn">⬇ Save as PDF</button>
+      </header>
+
+      <!-- The document itself. Everything inside prints; the app chrome doesn't. -->
+      <article class="report-doc" id="reportDoc"></article>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="lib.js"></script>
+  <script src="i18n.js"></script>
+  <script src="data.js"></script>
+  <script src="sidebar.js"></script>
+  <script src="report.js"></script>
+  <script>requireAuthAndLoad(() => { renderSidebar(); window.initPage(); });</script>
+</body>
+</html>

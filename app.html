@@ -18,7 +18,9 @@
           <h1 data-i18n="overview_h1">Overview</h1>
           <p class="page-sub" data-i18n="overview_subtitle">Are we on plan? Budget vs actual vs forecast — FY2026</p>
         </div>
-        <button class="print-btn print-hide" id="printBtn" type="button" data-i18n="print_btn">Print / Save as PDF</button>
+        <!-- The shareable artifact is a document, not a printed dashboard —
+             so this leads to the månadsrapport rather than window.print(). -->
+        <a class="print-btn print-hide" href="report.html" data-i18n="report_open_btn">Monthly report →</a>
       </header>
 
       <div class="print-only print-header" id="printHeader"></div>
