@@ -1112,9 +1112,13 @@ details.collapse-panel > *:last-child:not(summary) { margin-bottom: 20px; }
   border: 1px solid var(--panel-border);
   border-radius: 8px;
   overflow: hidden;
+  /* On the mobile top bar this sits in a wrapping flex row and used to be
+     squeezed until "EN | SV" read as "ENSV" — never shrink below legible. */
+  flex: 0 0 auto;
 }
 .lang-opt {
   flex: 1;
+  min-width: 38px;
   background: var(--bg);
   border: none;
   color: var(--text-dim);
