@@ -86,6 +86,11 @@ function parseSie(input) {
     result: {},                // { 0: { "3010": -1272825 }, -1: {…} } — #RES, the reported P&L
     ub: {}, ib: {},            // closing / opening balances by year index
     monthly: {},               // { "2025-03": { "3010": -362700 } } — from #TRANS, bucketed by voucher date
+    // Voucher-level detail per account per month. The analyst needs this to
+    // tell periodization from real change: one big voucher labelled
+    // "Prenumeration Di" is an annual subscription, twelve small ones are a
+    // running cost. Shape: { "6900": { "2025-07": { amount, count, texts } } }
+    detail: {},
     vouchers: 0,
     hasObjectTags: false,      // any transaction tagged with a cost centre / project?
     transSums: {},             // { "3010": -1272825 } — summed #TRANS, for the tie-out
@@ -93,6 +98,7 @@ function parseSie(input) {
   };
 
   let voucherMonth = null;
+  let voucherText = "";
   let sieType = null;
 
   for (const raw of text.split(/\r?\n/)) {
@@ -127,6 +133,7 @@ function parseSie(input) {
         // #VER <series> <number> <date> "<text>" <regdate>
         const d = sieDate(f[3]);
         voucherMonth = d ? d.slice(0, 7) : null;
+        voucherText = f[4] || "";
         out.vouchers++;
         break;
       }
@@ -145,6 +152,14 @@ function parseSie(input) {
         if (voucherMonth) {
           const m = (out.monthly[voucherMonth] = out.monthly[voucherMonth] || {});
           m[acct] = (m[acct] || 0) + amt;
+
+          const byAcct = (out.detail[acct] = out.detail[acct] || {});
+          const cell = (byAcct[voucherMonth] = byAcct[voucherMonth] || { amount: 0, count: 0, texts: [] });
+          cell.amount += amt;
+          cell.count++;
+          // Keep the voucher labels — the bookkeeper already wrote down what
+          // this was ("Prenumeration Di"), which beats anything we could infer.
+          if (voucherText && !cell.texts.includes(voucherText)) cell.texts.push(voucherText);
         }
         break;
       }

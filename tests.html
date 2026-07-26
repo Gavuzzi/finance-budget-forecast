@@ -33,6 +33,7 @@ window.supabase = { createClient: () => ({ auth: { onAuthStateChange() {} } }) }
 <script src="i18n.js"></script>
 <script src="data.js"></script>
 <script src="sie.js"></script>
+<script src="analyst.js"></script>
 <script>
 const results = [];
 function eq(name, actual, expected) {
@@ -251,6 +252,70 @@ eq("sie: honours a UTF-8 BOM", parseSie(utf8Bytes).company.name, "Åkes Bygg AB"
 const cp437 = new Uint8Array([...'#FNAMN "'].map((c) => c.charCodeAt(0))
   .concat([0x86, 0x94], [...'ke AB"'].map((c) => c.charCodeAt(0))));
 eq("sie: decodes CP437 Swedish characters", parseSie(cp437).company.name, "åöke AB");
+
+// ---- Ledger analyst ---------------------------------------------------------------
+// Both of the checks marked REGRESSION are bugs that survived reasoning and were
+// only caught by running the analyst against real books.
+const ANALYST_FIXTURE = (() => {
+  const L = [
+    '#FLAGGA 0', '#FORMAT PC8', '#SIETYP 4', '#FNAMN "Analys AB"',
+    '#RAR 0 20260101 20261231', '#RAR -1 20250101 20251231',
+    '#KONTO 5010 "Lokalhyra"', '#KONTO 6310 "Foretagsforsakringar"', '#KONTO 7010 "Loner"',
+    '#RES 0 5010 360000.00', '#RES 0 6310 48000.00', '#RES 0 7010 2400000.00',
+    '#RES -1 7010 1800000.00',
+  ];
+  // Rent flat all year; salaries step 150k → 250k at month 7; insurance once in March.
+  for (let m = 1; m <= 12; m++) {
+    const mm = String(m).padStart(2, "0");
+    L.push(`#VER A ${m} 2026${mm}25 "Manad ${mm}" 2026${mm}28`, "{",
+      "#TRANS 5010 {} 30000.00", `#TRANS 7010 {} ${m <= 6 ? 150000 : 250000}.00`, "}");
+  }
+  L.push('#VER B 1 20260315 "Arsforsakring" 20260320', "{", "#TRANS 6310 {} 48000.00", "}");
+  return L.join("\r\n");
+})();
+
+const anaP = parseSie(ANALYST_FIXTURE);
+eq("analyst: parser keeps voucher text", anaP.detail["6310"]["2026-03"].texts[0], "Arsforsakring");
+eq("analyst: parser counts vouchers per account-month", anaP.detail["5010"]["2026-01"].count, 1);
+
+const ana = analyseLedger(anaP);
+const byKind = (k) => ana.findings.filter((f) => f.kind === k);
+
+// REGRESSION: an account that fires once a year has a median equal to that one
+// month, so a median-of-active-months baseline made the most concentrated
+// pattern possible look perfectly flat. Baseline must be spread over the period.
+eq("analyst: single-month annual invoice IS detected", byKind("timing").length, 1);
+eq("analyst: …and is called timing, not overspend", byKind("timing")[0].account, "6310");
+eq("analyst: …with the bookkeeper's own label", byKind("timing")[0].texts[0], "Arsforsakring");
+
+// REGRESSION: a step change trips no spike threshold — no single month is
+// unusual — yet it's the most important thing in the ledger.
+eq("analyst: step change detected without any spike", byKind("step").length, 1);
+eq("analyst: step is on the salary account", byKind("step")[0].account, "7010");
+approx("analyst: step measures the new run-rate", byKind("step")[0].after, 250000, 1);
+approx("analyst: step reports the +67% shift", byKind("step")[0].pct, 66.67, 0.5);
+// A step already explains that account's year-over-year move; don't say it twice.
+eq("analyst: step suppresses the duplicate YoY on the same account",
+  ana.findings.filter((f) => f.kind === "yoy" && f.account === "7010").length, 0);
+// Flat rent must produce nothing at all — the false-positive guard.
+eq("analyst: a flat account produces no findings",
+  ana.findings.filter((f) => f.account === "5010").length, 0);
+// Real movement outranks timing artefacts, always.
+eq("analyst: real findings rank above timing", ana.findings[0].kind, "step");
+eq("analyst: summary separates action from noise",
+  [ana.summary.needsAttention, ana.summary.timingOnly], [1, 1]);
+
+// A bulk-booked ledger gets ONE honest sentence, not one finding per account.
+const BULK = [
+  '#FLAGGA 0', '#FORMAT PC8', '#SIETYP 4', '#FNAMN "Klump AB"', '#RAR 0 20260101 20261231',
+  '#KONTO 5010 "Lokalhyra"', '#KONTO 6900 "Ovrigt"',
+  '#RES 0 5010 120000.00', '#RES 0 6900 80000.00',
+  '#VER A 1 20261231 "Bokfor hela aret" 20261231', "{",
+  "#TRANS 5010 {} 120000.00", "#TRANS 6900 {} 80000.00", "}",
+].join("\r\n");
+const bulkReport = analystReport(parseSie(BULK));
+eq("analyst: bulk-booked ledger leads with the rhythm, not per-account noise",
+  /booked in bulk/.test(bulkReport) && !/Periodization, not a cost increase/.test(bulkReport), true);
 
 // ---- Report ---------------------------------------------------------------------
 const failed = results.filter((r) => !r.ok);
